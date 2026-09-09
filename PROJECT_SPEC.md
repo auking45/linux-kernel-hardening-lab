@@ -49,11 +49,11 @@
 - [x] **Task 1-3:** 초기 문서 골격(`docs/ko/index.md`, `docs/en/index.md`, 가이드 페이지) 구축 및 빌드 검증.
 
 ### [Phase 2] Kernel Build & Dual-Arch QEMU Runner Framework
-- [ ] **Task 2-1:** 커널 소스 자동 다운로드 및 캐싱 스크립트(`scripts/download_kernel.sh`).
-- [ ] **Task 2-2:** BusyBox 기반 초경량 initramfs 빌더(`scripts/build_rootfs.sh` - x86_64 & arm64).
-- [ ] **Task 2-3:** Kconfig fragment 병합 커널 빌더(`scripts/build_kernel.sh`).
-- [ ] **Task 2-4:** x86_64 / arm64 QEMU 자동 런처 스크립트(`scripts/run_qemu.sh`).
-- [ ] **Task 2-5:** 기본 최소 defconfig 템플릿(`configs/base/x86_64_defconfig`, `configs/base/arm64_defconfig`).
+- [x] **Task 2-1:** 커널 소스 자동 다운로드 및 캐싱 스크립트(`scripts/download_kernel.sh`).
+- [x] **Task 2-2:** BusyBox 기반 초경량 initramfs 빌더(`scripts/build_rootfs.sh` - x86_64 & arm64).
+- [x] **Task 2-3:** Kconfig fragment 병합 커널 빌더(`scripts/build_kernel.sh`).
+- [x] **Task 2-4:** x86_64 / arm64 QEMU 자동 런처 스크립트(`scripts/run_qemu.sh`).
+- [x] **Task 2-5:** 기본 최소 defconfig 템플릿(`configs/base/x86_64_defconfig`, `configs/base/arm64_defconfig`).
 
 ---
 
