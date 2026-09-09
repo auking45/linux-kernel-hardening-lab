@@ -19,88 +19,89 @@ usage() {
     exit 0
 }
 
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --arch)
-            TARGET_ARCH="$2"
-            shift 2
-            ;;
-        --force)
-            FORCE_REBUILD=1
-            shift
-            ;;
-        -h|--help)
-            usage
-            ;;
-        *)
-            echo "[-] Error: Unknown argument '$1'" >&2
-            usage
-            ;;
-    esac
-done
-
-setup_arch_env "${TARGET_ARCH}"
-
-ROOTFS_WORK_DIR="${ROOTFS_DIR}/rootfs_${TARGET_ARCH}"
-OUTPUT_INITRAMFS="${ROOTFS_DIR}/initramfs-${TARGET_ARCH}.cpio.gz"
-
-if [[ -f "${OUTPUT_INITRAMFS}" && "${FORCE_REBUILD}" -eq 0 ]]; then
-    echo "[+] Initramfs already exists: ${OUTPUT_INITRAMFS}"
-    echo "    (Use --force to rebuild)"
-    exit 0
-fi
-
-echo "[*] Generating rootfs for ${TARGET_ARCH}..."
-mkdir -p "${ROOTFS_DIR}" "${DOWNLOADS_DIR}"
-rm -rf "${ROOTFS_WORK_DIR}"
-mkdir -p "${ROOTFS_WORK_DIR}"/{bin,sbin,usr/bin,usr/sbin,proc,sys,dev,etc,tmp,root,sys/kernel/debug}
-
-# Download or acquire static BusyBox binary
-BUSYBOX_BIN="${DOWNLOADS_DIR}/busybox-${TARGET_ARCH}"
-if [[ ! -f "${BUSYBOX_BIN}" ]]; then
-    echo "[*] Downloading static BusyBox binary for ${TARGET_ARCH}..."
-    if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
-        BB_URL="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
-    else
-        BB_URL="https://busybox.net/downloads/binaries/1.35.0-aarch64-linux-musl/busybox"
-    fi
-
-    if command -v curl >/dev/null 2>&1; then
-        curl -L --progress-bar -o "${BUSYBOX_BIN}" "${BB_URL}"
-    else
-        wget --show-progress -O "${BUSYBOX_BIN}" "${BB_URL}"
-    fi
-    chmod +x "${BUSYBOX_BIN}"
-fi
-
-# Copy BusyBox and install symlinks
-cp "${BUSYBOX_BIN}" "${ROOTFS_WORK_DIR}/bin/busybox"
-chmod 755 "${ROOTFS_WORK_DIR}/bin/busybox"
-
-# Generate BusyBox core symlinks inside rootfs
-(
-    cd "${ROOTFS_WORK_DIR}/bin"
-    for tool in sh ash ls cp mv rm cat echo mkdir rmdir dmesg ps grep id whoami mount umount uname sync sleep poweroff reboot; do
-        ln -sf busybox "${tool}"
+parse_args() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --arch)
+                TARGET_ARCH="$2"
+                shift 2
+                ;;
+            --force)
+                FORCE_REBUILD=1
+                shift
+                ;;
+            -h|--help)
+                usage
+                ;;
+            *)
+                echo "[-] Error: Unknown argument '$1'" >&2
+                usage
+                ;;
+        esac
     done
-)
+}
 
-# Create /etc/passwd and /etc/group (root + unprivileged 'lab' user)
-cat << 'EOF' > "${ROOTFS_WORK_DIR}/etc/passwd"
+prepare_directories() {
+    local rootfs_work_dir="$1"
+    echo "[*] Generating rootfs directory skeleton at ${rootfs_work_dir}..."
+    mkdir -p "${ROOTFS_DIR}" "${DOWNLOADS_DIR}"
+    rm -rf "${rootfs_work_dir}"
+    mkdir -p "${rootfs_work_dir}"/{bin,sbin,usr/bin,usr/sbin,proc,sys,dev,etc,tmp,root,sys/kernel/debug,home/lab}
+}
+
+install_busybox() {
+    local rootfs_work_dir="$1"
+    local busybox_bin="${DOWNLOADS_DIR}/busybox-${TARGET_ARCH}"
+
+    if [[ ! -f "${busybox_bin}" ]]; then
+        echo "[*] Downloading static BusyBox binary for ${TARGET_ARCH}..."
+        local bb_url=""
+        if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
+            bb_url="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
+        else
+            bb_url="https://busybox.net/downloads/binaries/1.35.0-aarch64-linux-musl/busybox"
+        fi
+
+        if command -v curl >/dev/null 2>&1; then
+            curl -L --progress-bar -o "${busybox_bin}" "${bb_url}"
+        else
+            wget --show-progress -O "${busybox_bin}" "${bb_url}"
+        fi
+        chmod +x "${busybox_bin}"
+    fi
+
+    cp "${busybox_bin}" "${rootfs_work_dir}/bin/busybox"
+    chmod 755 "${rootfs_work_dir}/bin/busybox"
+
+    # Install core symlinks
+    (
+        cd "${rootfs_work_dir}/bin"
+        for tool in sh ash ls cp mv rm cat echo mkdir rmdir dmesg ps grep id whoami mount umount uname sync sleep poweroff reboot; do
+            ln -sf busybox "${tool}"
+        done
+    )
+}
+
+setup_users() {
+    local rootfs_work_dir="$1"
+
+    cat << 'EOF' > "${rootfs_work_dir}/etc/passwd"
 root:x:0:0:root:/root:/bin/sh
 lab:x:1000:1000:lab user:/home/lab:/bin/sh
 EOF
 
-cat << 'EOF' > "${ROOTFS_WORK_DIR}/etc/group"
+    cat << 'EOF' > "${rootfs_work_dir}/etc/group"
 root:x:0:
 lab:x:1000:
 EOF
 
-mkdir -p "${ROOTFS_WORK_DIR}/home/lab"
-chmod 755 "${ROOTFS_WORK_DIR}/home/lab"
+    chmod 755 "${rootfs_work_dir}/home/lab"
+}
 
-# Create /init script
-cat << 'EOF' > "${ROOTFS_WORK_DIR}/init"
+create_init_script() {
+    local rootfs_work_dir="$1"
+
+    cat << 'EOF' > "${rootfs_work_dir}/init"
 #!/bin/sh
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 
@@ -136,15 +137,41 @@ esac
 exec /bin/sh
 EOF
 
-chmod 755 "${ROOTFS_WORK_DIR}/init"
+    chmod 755 "${rootfs_work_dir}/init"
+}
 
-# Pack initramfs using cpio and gzip
-echo "[*] Packing initramfs cpio archive..."
-(
-    cd "${ROOTFS_WORK_DIR}"
-    find . -print0 | cpio --null -ov --format=newc 2>/dev/null | gzip -9 > "${OUTPUT_INITRAMFS}"
-)
+package_initramfs() {
+    local rootfs_work_dir="$1"
+    local output_archive="$2"
 
-echo "[+] Successfully created initramfs: ${OUTPUT_INITRAMFS}"
-ls -lh "${OUTPUT_INITRAMFS}"
+    echo "[*] Packing initramfs cpio archive..."
+    (
+        cd "${rootfs_work_dir}"
+        find . -print0 | cpio --null -ov --format=newc 2>/dev/null | gzip -9 > "${output_archive}"
+    )
 
+    echo "[+] Successfully created initramfs: ${output_archive}"
+    ls -lh "${output_archive}"
+}
+
+main() {
+    parse_args "$@"
+    setup_arch_env "${TARGET_ARCH}"
+
+    local rootfs_work_dir="${ROOTFS_DIR}/rootfs_${TARGET_ARCH}"
+    local output_initramfs="${ROOTFS_DIR}/initramfs-${TARGET_ARCH}.cpio.gz"
+
+    if [[ -f "${output_initramfs}" && "${FORCE_REBUILD}" -eq 0 ]]; then
+        echo "[+] Initramfs already exists: ${output_initramfs}"
+        echo "    (Use --force to rebuild)"
+        exit 0
+    fi
+
+    prepare_directories "${rootfs_work_dir}"
+    install_busybox "${rootfs_work_dir}"
+    setup_users "${rootfs_work_dir}"
+    create_init_script "${rootfs_work_dir}"
+    package_initramfs "${rootfs_work_dir}" "${output_initramfs}"
+}
+
+main "$@"

@@ -48,3 +48,24 @@ setup_arch_env() {
     esac
 }
 
+main() {
+    local target_arch="${1:-x86_64}"
+    setup_arch_env "${target_arch}"
+    echo "========================================================="
+    echo "  Linux Kernel Hardening Lab - Environment Summary"
+    echo "========================================================="
+    echo "  KERNEL_VERSION:   ${KERNEL_VERSION}"
+    echo "  LAB_ROOT_DIR:     ${LAB_ROOT_DIR}"
+    echo "  TARGET_ARCH:      ${TARGET_ARCH}"
+    echo "  KERNEL_ARCH:      ${KERNEL_ARCH}"
+    echo "  QEMU_BIN:         ${QEMU_BIN}"
+    echo "  CROSS_COMPILE:    ${CROSS_COMPILE:-<native>}"
+    echo "  KERNEL_IMAGE_REL: ${KERNEL_IMAGE_REL}"
+    echo "  CONSOLE_DEV:      ${CONSOLE_DEV}"
+    echo "========================================================="
+}
+
+# Execute main only if invoked directly (not sourced)
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
