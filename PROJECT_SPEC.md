@@ -58,7 +58,7 @@
 - [x] **Task 2-4:** x86_64 / arm64 QEMU 자동 런처 스크립트(`scripts/run_qemu.sh`).
 - [x] **Task 2-5:** 기본 최소 defconfig 템플릿(`configs/base/x86_64_defconfig`, `configs/base/arm64_defconfig`).
 - [x] **Task 2-6:** 원클릭 E2E 오케스트레이터 스크립트(`scripts/run_lab.sh`) 및 단축 실행 `Makefile` 작성.
-- [x] **Task 2-7:** 재현 가능한 Docker 컨테이너 환경(`docker/Dockerfile.lab`, `compose.yaml`) 및 GitHub Actions CI(`.github/workflows/test.yml`) 파이프라인 구축.
+- [x] **Task 2-7:** 재현 가능한 Docker 컨테이너 환경(`docker/Dockerfile.lab`, `compose.yaml`), GHCR 자동 배포(`.github/workflows/docker-publish.yml`) 및 GitHub Actions CI(`.github/workflows/test.yml`) 파이프라인 구축.
 
 ---
 

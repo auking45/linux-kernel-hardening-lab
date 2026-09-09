@@ -45,6 +45,9 @@ docs-build:
 	@.venv/bin/pip install -q -r requirements.txt
 	@.venv/bin/mkdocs build --strict
 
+docker-pull:
+	@docker compose pull lab
+
 docker-build:
 	@docker compose build lab
 

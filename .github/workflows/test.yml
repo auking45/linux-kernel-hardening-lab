@@ -22,9 +22,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker Lab Image
+      - name: Pull or Build Docker Lab Image
         run: |
-          docker compose build lab
+          docker compose pull lab 2>/dev/null || docker compose build lab
 
       - name: Verify Shell Script Syntax
         run: |
