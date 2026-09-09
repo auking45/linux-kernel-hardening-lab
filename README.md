@@ -47,19 +47,19 @@ mkdocs serve
 # http://127.0.0.1:8000 접속 (한/영 토글 가능)
 ```
 
-### 3.2 커널 빌드 및 QEMU 실행 환경 준비
+### 3.2 원클릭 커널 빌드 및 QEMU 가상머신 부팅
+
+소스 다운로드부터 rootfs 생성, 커널 빌드 및 QEMU 부팅까지 단 한 줄로 자동 실행 지원함:
 
 ```bash
-# 1. 커널 소스 자동 다운로드
-./scripts/download_kernel.sh
+# [방법 A] Makefile 활용 (권장)
+make run            # x86_64 베이스 커널 원클릭 빌드 & 부팅
+make run-arm64      # ARM64 베이스 커널 원클릭 빌드 & 부팅
 
-# 2. x86_64 및 arm64 초경량 BusyBox rootfs 빌드
-./scripts/build_rootfs.sh --arch x86_64
-./scripts/build_rootfs.sh --arch arm64
-
-# 3. 특정 피처 적용 커널 빌드 및 QEMU 실행
-./scripts/build_kernel.sh --arch x86_64 --feature stack-protector
-./scripts/run_qemu.sh --arch x86_64 --kernel build_dir/x86_64/arch/x86/boot/bzImage
+# [방법 B] run_lab.sh 오케스트레이터 직접 실행
+./scripts/run_lab.sh                                    # x86_64 베이스 커널 실행
+./scripts/run_lab.sh --arch arm64                       # ARM64 베이스 커널 실행
+./scripts/run_lab.sh --feature stack-protector          # 하드닝 피처 적용 빌드 & 실행
 ```
 
 ---

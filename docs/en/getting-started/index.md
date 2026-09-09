@@ -44,19 +44,17 @@ Navigate to `http://127.0.0.1:8000` to preview docs with dynamic language toggli
 
 ---
 
-## 3. Kernel Source & Rootfs Preparation
+## 3. One-Click Kernel Build & QEMU Boot
 
-1. **Download LTS Kernel**:
-   ```bash
-   ./scripts/download_kernel.sh
-   ```
-2. **Build Lightweight BusyBox Rootfs (x86_64 / arm64)**:
-   ```bash
-   ./scripts/build_rootfs.sh --arch x86_64
-   ./scripts/build_rootfs.sh --arch arm64
-   ```
-3. **Build Base Kernel & Boot in QEMU**:
-   ```bash
-   ./scripts/build_kernel.sh --arch x86_64 --feature base
-   ./scripts/run_qemu.sh --arch x86_64 --kernel build_dir/x86_64/arch/x86/boot/bzImage
-   ```
+Full automated pipeline from source download and rootfs generation to compilation and QEMU execution in a single command:
+
+```bash
+# [Option A] Via Makefile (Recommended)
+make run            # One-click x86_64 baseline build & boot
+make run-arm64      # One-click ARM64 baseline build & boot
+
+# [Option B] Direct run_lab.sh orchestrator
+./scripts/run_lab.sh                                    # x86_64 execution
+./scripts/run_lab.sh --arch arm64                       # ARM64 execution
+./scripts/run_lab.sh --feature stack-protector          # Hardened kernel build & run
+```

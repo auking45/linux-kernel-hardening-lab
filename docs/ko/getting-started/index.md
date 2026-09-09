@@ -44,19 +44,17 @@ mkdocs serve
 
 ---
 
-## 3. 커널 소스 및 루트 파일시스템 준비
+## 3. 원클릭 커널 빌드 및 QEMU 가상머신 부팅
 
-1. **LTS 커널 다운로드**:
-   ```bash
-   ./scripts/download_kernel.sh
-   ```
-2. **초경량 BusyBox Rootfs 생성 (x86_64 / arm64)**:
-   ```bash
-   ./scripts/build_rootfs.sh --arch x86_64
-   ./scripts/build_rootfs.sh --arch arm64
-   ```
-3. **베이스 커널 빌드 및 QEMU 부팅 테스트**:
-   ```bash
-   ./scripts/build_kernel.sh --arch x86_64 --feature base
-   ./scripts/run_qemu.sh --arch x86_64 --kernel build_dir/x86_64/arch/x86/boot/bzImage
-   ```
+소스 다운로드부터 rootfs 생성, 커널 빌드 및 QEMU 부팅까지 단 한 번의 명령으로 자동 수행 지원:
+
+```bash
+# [방법 A] Makefile 활용 (권장)
+make run            # x86_64 베이스 커널 원클릭 빌드 & 부팅
+make run-arm64      # ARM64 베이스 커널 원클릭 빌드 & 부팅
+
+# [방법 B] run_lab.sh 오케스트레이터 직접 실행
+./scripts/run_lab.sh                                    # x86_64 실행
+./scripts/run_lab.sh --arch arm64                       # ARM64 실행
+./scripts/run_lab.sh --feature stack-protector          # 하드닝 피처 적용 빌드 & 실행
+```

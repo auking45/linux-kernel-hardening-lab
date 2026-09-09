@@ -57,6 +57,7 @@
 - [x] **Task 2-3:** Kconfig fragment 병합 커널 빌더(`scripts/build_kernel.sh`).
 - [x] **Task 2-4:** x86_64 / arm64 QEMU 자동 런처 스크립트(`scripts/run_qemu.sh`).
 - [x] **Task 2-5:** 기본 최소 defconfig 템플릿(`configs/base/x86_64_defconfig`, `configs/base/arm64_defconfig`).
+- [x] **Task 2-6:** 원클릭 E2E 오케스트레이터 스크립트(`scripts/run_lab.sh`) 및 단축 실행 `Makefile` 작성.
 
 ---
 
