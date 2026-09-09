@@ -3,7 +3,8 @@
 # Provides dual-arch toolchains (x86_64 & arm64) and QEMU emulators.
 # =============================================================================
 
-FROM ubuntu:24.04
+ARG BASE_IMAGE=ubuntu:26.04
+FROM ${BASE_IMAGE}
 
 LABEL maintainer="auking45 <auking45@gmail.com>"
 LABEL description="Reproducible build & QEMU verification lab for Linux Kernel Hardening"
@@ -47,4 +48,3 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /workspace
 
 CMD ["/bin/bash"]
-

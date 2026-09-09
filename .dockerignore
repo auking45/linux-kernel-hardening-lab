@@ -1,0 +1,7 @@
+.git
+.venv
+build_dir
+downloads
+rootfs
+site
+.cache

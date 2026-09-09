@@ -7,6 +7,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.lab
+      args:
+        BASE_IMAGE: ubuntu:26.04
     image: ${KERNEL_LAB_IMAGE:-ghcr.io/auking45/linux-kernel-hardening-lab:latest}
     container_name: kernel-hardening-lab
     volumes:
@@ -15,4 +17,3 @@ services:
     stdin_open: true
     tty: true
     command: ["/bin/bash"]
-
