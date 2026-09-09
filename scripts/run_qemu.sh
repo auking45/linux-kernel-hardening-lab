@@ -174,3 +174,4 @@ if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
 else
     "${QEMU_CMD[@]}"
 fi
+

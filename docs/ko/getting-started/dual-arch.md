@@ -6,21 +6,22 @@ x86_64 및 arm64(aarch64) 아키텍처 간 커널 실행 환경 및 QEMU 에뮬�
 
 ## 1. 아키텍처별 가상머신 구동 모델 비교
 
-| 항목 | x86_64 | ARM64 (aarch64) |
-| :--- | :--- | :--- |
-| **QEMU 바이너리** | `qemu-system-x86_64` | `qemu-system-aarch64` |
-| **머신 타입** | `q35` 또는 `pc` | `virt` (Standard Virtual Machine) |
-| **CPU 모델** | `host` (KVM 가속 시) 또는 `max` | `host` (KVM 가속 시) 또는 `cortex-a72` / `max` |
-| **부팅 펌웨어** | Direct Kernel Boot 또는 SeaBIOS | Direct Kernel Boot (`-kernel`) |
-| **콘솔 인터페이스** | `ttyS0` (Serial 16550A) | `ttyAMA0` (PL011 UART) |
-| **커널 바이너리 타깃** | `arch/x86/boot/bzImage` | `arch/arm64/boot/Image` |
-| **주요 하드웨어 보안 기능** | Intel CET (IBT/SHSTK), SMEP, SMAP | ARMv8.3 PAC, ARMv8.5 BTI, PAN, PXN |
+| 항목                        | x86_64                            | ARM64 (aarch64)                                |
+| :-------------------------- | :-------------------------------- | :--------------------------------------------- |
+| **QEMU 바이너리**           | `qemu-system-x86_64`              | `qemu-system-aarch64`                          |
+| **머신 타입**               | `q35` 또는 `pc`                   | `virt` (Standard Virtual Machine)              |
+| **CPU 모델**                | `host` (KVM 가속 시) 또는 `max`   | `host` (KVM 가속 시) 또는 `cortex-a72` / `max` |
+| **부팅 펌웨어**             | Direct Kernel Boot 또는 SeaBIOS   | Direct Kernel Boot (`-kernel`)                 |
+| **콘솔 인터페이스**         | `ttyS0` (Serial 16550A)           | `ttyAMA0` (PL011 UART)                         |
+| **커널 바이너리 타깃**      | `arch/x86/boot/bzImage`           | `arch/arm64/boot/Image`                        |
+| **주요 하드웨어 보안 기능** | Intel CET (IBT/SHSTK), SMEP, SMAP | ARMv8.3 PAC, ARMv8.5 BTI, PAN, PXN             |
 
 ---
 
 ## 2. QEMU 실행 파라미터 구조
 
 ### 2.1 x86_64 에뮬레이션 명령 규격
+
 ```bash
 qemu-system-x86_64 \
     -m 1024M \
@@ -33,6 +34,7 @@ qemu-system-x86_64 \
 ```
 
 ### 2.2 ARM64 에뮬레이션 명령 규격
+
 ```bash
 qemu-system-aarch64 \
     -machine virt \
@@ -58,6 +60,7 @@ export CROSS_COMPILE=aarch64-linux-gnu-
 ```
 
 툴체인 정상 동작 확인:
+
 ```bash
 ${CROSS_COMPILE}gcc --version
 ```

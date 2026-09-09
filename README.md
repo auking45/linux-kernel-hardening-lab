@@ -38,6 +38,7 @@
 ## 3. 빠른 시작 (Quick Start)
 
 ### 3.1 문서 로컬 뷰어 실행
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -47,6 +48,7 @@ mkdocs serve
 ```
 
 ### 3.2 커널 빌드 및 QEMU 실행 환경 준비
+
 ```bash
 # 1. 커널 소스 자동 다운로드
 ./scripts/download_kernel.sh

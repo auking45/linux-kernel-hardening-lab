@@ -58,20 +58,20 @@ mindmap
 
 ## 2. 세부 피처별 실습 상태
 
-| 번호 | 피처 명칭 | Kconfig 심볼 | 지원 아키텍처 | 실습 상태 |
-| :--- | :--- | :--- | :--- | :--- |
-| **01** | [Stack Protector (Canary)](01-stack-protector.md) | `CONFIG_STACKPROTECTOR_STRONG` | x86_64, arm64 | 실습 준비 완료 |
-| **02** | Fortify Source | `CONFIG_FORTIFY_SOURCE` | x86_64, arm64 | 예정 |
-| **03** | Shadow Call Stack | `CONFIG_SHADOW_CALL_STACK` | arm64 | 예정 |
-| **04** | Stackleak Plugin | `CONFIG_GCC_PLUGIN_STACKLEAK` | x86_64, arm64 | 예정 |
-| **05** | KASLR | `CONFIG_RANDOMIZE_BASE` | x86_64, arm64 | 예정 |
-| **06** | Strict Kernel RWX | `CONFIG_STRICT_KERNEL_RWX` | x86_64, arm64 | 예정 |
-| **07** | SMEP & SMAP / PAN & PXN | CPU Feature | x86_64, arm64 | 예정 |
-| **08** | Kernel CFI | `CONFIG_CFI_CLANG` | x86_64, arm64 | 예정 |
-| **09** | SLAB Freelist Hardening | `CONFIG_SLAB_FREELIST_HARDENED` | x86_64, arm64 | 예정 |
-| **10** | KFENCE | `CONFIG_KFENCE` | x86_64, arm64 | 예정 |
-| **11** | AppArmor LSM | `CONFIG_SECURITY_APPARMOR` | x86_64, arm64 | 예정 |
-| **12** | IMA / EVM | `CONFIG_IMA`, `CONFIG_EVM` | x86_64, arm64 | 예정 |
-| **13** | IPE LSM | `CONFIG_SECURITY_IPE` | x86_64, arm64 | 예정 |
-| **14** | Kernel Lockdown | `CONFIG_SECURITY_LOCKDOWN_LSM` | x86_64, arm64 | 예정 |
-| **15** | Seccomp-BPF | `CONFIG_SECCOMP_FILTER` | x86_64, arm64 | 예정 |
+| 번호   | 피처 명칭                                         | Kconfig 심볼                    | 지원 아키텍처 | 실습 상태      |
+| :----- | :------------------------------------------------ | :------------------------------ | :------------ | :------------- |
+| **01** | [Stack Protector (Canary)](01-stack-protector.md) | `CONFIG_STACKPROTECTOR_STRONG`  | x86_64, arm64 | 실습 준비 완료 |
+| **02** | Fortify Source                                    | `CONFIG_FORTIFY_SOURCE`         | x86_64, arm64 | 예정           |
+| **03** | Shadow Call Stack                                 | `CONFIG_SHADOW_CALL_STACK`      | arm64         | 예정           |
+| **04** | Stackleak Plugin                                  | `CONFIG_GCC_PLUGIN_STACKLEAK`   | x86_64, arm64 | 예정           |
+| **05** | KASLR                                             | `CONFIG_RANDOMIZE_BASE`         | x86_64, arm64 | 예정           |
+| **06** | Strict Kernel RWX                                 | `CONFIG_STRICT_KERNEL_RWX`      | x86_64, arm64 | 예정           |
+| **07** | SMEP & SMAP / PAN & PXN                           | CPU Feature                     | x86_64, arm64 | 예정           |
+| **08** | Kernel CFI                                        | `CONFIG_CFI_CLANG`              | x86_64, arm64 | 예정           |
+| **09** | SLAB Freelist Hardening                           | `CONFIG_SLAB_FREELIST_HARDENED` | x86_64, arm64 | 예정           |
+| **10** | KFENCE                                            | `CONFIG_KFENCE`                 | x86_64, arm64 | 예정           |
+| **11** | AppArmor LSM                                      | `CONFIG_SECURITY_APPARMOR`      | x86_64, arm64 | 예정           |
+| **12** | IMA / EVM                                         | `CONFIG_IMA`, `CONFIG_EVM`      | x86_64, arm64 | 예정           |
+| **13** | IPE LSM                                           | `CONFIG_SECURITY_IPE`           | x86_64, arm64 | 예정           |
+| **14** | Kernel Lockdown                                   | `CONFIG_SECURITY_LOCKDOWN_LSM`  | x86_64, arm64 | 예정           |
+| **15** | Seccomp-BPF                                       | `CONFIG_SECCOMP_FILTER`         | x86_64, arm64 | 예정           |

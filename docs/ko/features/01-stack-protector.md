@@ -37,6 +37,7 @@ sequenceDiagram
 ```
 
 ### 동작 원리 상세 분석
+
 1. **함수 프롤로그(Prologue)**:
    - x86_64: `%gs:40` (세그먼트 레지스터 기반 Per-CPU 스택 카나리 값)에서 난수를 읽어 스택 프레임의 리턴 주소 바로 직전에 저장함.
    - ARM64: `__stack_chk_guard` 전역 또는 Per-CPU 변수로부터 카나리 값을 로드하여 `[sp, offset]`에 저장함.
@@ -50,11 +51,11 @@ sequenceDiagram
 
 ## 3. Kconfig 설정 및 제어 옵션 (Configuration)
 
-| Kconfig 심볼 | 권장 설정 | 설명 |
-| :--- | :--- | :--- |
-| `CONFIG_STACKPROTECTOR` | `y` | 기본 스택 카나리 인프라 활성화 |
-| `CONFIG_STACKPROTECTOR_STRONG` | `y` (권장) | GCC/Clang의 `-fstack-protector-strong` 옵션 적용 |
-| `CONFIG_STACKPROTECTOR_ALL` | `n` (성능 고려) | 모든 함수에 카나리 삽입 (약 5~10% 오버헤드 발생) |
+| Kconfig 심볼                   | 권장 설정       | 설명                                             |
+| :----------------------------- | :-------------- | :----------------------------------------------- |
+| `CONFIG_STACKPROTECTOR`        | `y`             | 기본 스택 카나리 인프라 활성화                   |
+| `CONFIG_STACKPROTECTOR_STRONG` | `y` (권장)      | GCC/Clang의 `-fstack-protector-strong` 옵션 적용 |
+| `CONFIG_STACKPROTECTOR_ALL`    | `n` (성능 고려) | 모든 함수에 카나리 삽입 (약 5~10% 오버헤드 발생) |
 
 ---
 

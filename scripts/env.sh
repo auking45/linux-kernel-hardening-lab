@@ -47,3 +47,4 @@ setup_arch_env() {
             ;;
     esac
 }
+

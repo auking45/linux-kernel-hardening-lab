@@ -30,18 +30,18 @@ graph TD
 
 ## 2. 10대 핵심 하드닝 카테고리 로드맵
 
-| 카테고리 | 핵심 메커니즘 | 주요 Kconfig 및 기술 |
-| :--- | :--- | :--- |
-| **1. Stack & Buffer** | 함수 스택 프레임 무결성 검증 및 버퍼 경계 검사 | `CONFIG_STACKPROTECTOR_STRONG`, `CONFIG_FORTIFY_SOURCE` |
-| **2. Memory Layout** | 커널 텍스트, 모듈, 물리 메모리 배치 난수화 | `CONFIG_RANDOMIZE_BASE` (KASLR), FG-KASLR |
-| **3. Memory Permissions** | W^X 메모리 보호, 유저/커널 영역 간 불법 실행·접근 차단 | `CONFIG_STRICT_KERNEL_RWX`, SMEP/SMAP, KPTI |
-| **4. Control Flow Integrity** | 컴파일 타임 및 하드웨어 지원 간접 분기 추적 | Clang kCFI, Intel CET (IBT/SHSTK), ARM PAC/BTI |
-| **5. Heap & SLAB Hardening** | 힙 메타데이터 난독화, UAF 방지 자동 영(0) 초기화 | `CONFIG_SLAB_FREELIST_HARDENED`, `CONFIG_INIT_ON_ALLOC_DEFAULT_ON`, KFENCE |
-| **6. Compiler Plugins** | 구조체 레이아웃 난수화, 스택 잔여 데이터 자동 소거 | `CONFIG_GCC_PLUGIN_RANDSTRUCT`, `CONFIG_GCC_PLUGIN_STACKLEAK` |
-| **7. Speculative Mitigations** | CPU 투기적 실행 결함(Spectre, Meltdown) 소프트웨어 완화 | Retpoline, IBPB, STIBP, SSBD |
-| **8. Access Control (LSM)** | 프로세스 단위 강제적 접근 통제 및 샌드박싱 | AppArmor, SELinux, Landlock |
-| **9. Integrity Verification** | 파일 실행 무결성 해시 측정, xattr 서명, 정책 집행 | IMA, EVM, IPE, Kernel Lockdown |
-| **10. Attack Surface Reduction** | 시스템 콜 필터링, 임의 메모리 접근 및 정보 누출 차단 | Seccomp-BPF, `CONFIG_STRICT_DEVMEM`, Yama ptrace |
+| 카테고리                         | 핵심 메커니즘                                           | 주요 Kconfig 및 기술                                                       |
+| :------------------------------- | :------------------------------------------------------ | :------------------------------------------------------------------------- |
+| **1. Stack & Buffer**            | 함수 스택 프레임 무결성 검증 및 버퍼 경계 검사          | `CONFIG_STACKPROTECTOR_STRONG`, `CONFIG_FORTIFY_SOURCE`                    |
+| **2. Memory Layout**             | 커널 텍스트, 모듈, 물리 메모리 배치 난수화              | `CONFIG_RANDOMIZE_BASE` (KASLR), FG-KASLR                                  |
+| **3. Memory Permissions**        | W^X 메모리 보호, 유저/커널 영역 간 불법 실행·접근 차단  | `CONFIG_STRICT_KERNEL_RWX`, SMEP/SMAP, KPTI                                |
+| **4. Control Flow Integrity**    | 컴파일 타임 및 하드웨어 지원 간접 분기 추적             | Clang kCFI, Intel CET (IBT/SHSTK), ARM PAC/BTI                             |
+| **5. Heap & SLAB Hardening**     | 힙 메타데이터 난독화, UAF 방지 자동 영(0) 초기화        | `CONFIG_SLAB_FREELIST_HARDENED`, `CONFIG_INIT_ON_ALLOC_DEFAULT_ON`, KFENCE |
+| **6. Compiler Plugins**          | 구조체 레이아웃 난수화, 스택 잔여 데이터 자동 소거      | `CONFIG_GCC_PLUGIN_RANDSTRUCT`, `CONFIG_GCC_PLUGIN_STACKLEAK`              |
+| **7. Speculative Mitigations**   | CPU 투기적 실행 결함(Spectre, Meltdown) 소프트웨어 완화 | Retpoline, IBPB, STIBP, SSBD                                               |
+| **8. Access Control (LSM)**      | 프로세스 단위 강제적 접근 통제 및 샌드박싱              | AppArmor, SELinux, Landlock                                                |
+| **9. Integrity Verification**    | 파일 실행 무결성 해시 측정, xattr 서명, 정책 집행       | IMA, EVM, IPE, Kernel Lockdown                                             |
+| **10. Attack Surface Reduction** | 시스템 콜 필터링, 임의 메모리 접근 및 정보 누출 차단    | Seccomp-BPF, `CONFIG_STRICT_DEVMEM`, Yama ptrace                           |
 
 ---
 

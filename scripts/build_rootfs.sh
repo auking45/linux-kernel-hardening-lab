@@ -147,3 +147,4 @@ echo "[*] Packing initramfs cpio archive..."
 
 echo "[+] Successfully created initramfs: ${OUTPUT_INITRAMFS}"
 ls -lh "${OUTPUT_INITRAMFS}"
+

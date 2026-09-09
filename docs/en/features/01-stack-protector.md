@@ -37,6 +37,7 @@ sequenceDiagram
 ```
 
 ### Mechanism Breakdown
+
 1. **Function Prologue**:
    - x86_64: Reads random value from `%gs:40` (Per-CPU stack canary) and places it immediately before the return address.
    - ARM64: Loads canary from `__stack_chk_guard` and places it at `[sp, offset]`.
@@ -50,11 +51,11 @@ sequenceDiagram
 
 ## 3. Configuration & Options
 
-| Kconfig Symbol | Recommended | Description |
-| :--- | :--- | :--- |
-| `CONFIG_STACKPROTECTOR` | `y` | Base stack canary infrastructure |
-| `CONFIG_STACKPROTECTOR_STRONG` | `y` (Recommended) | Compiler flag `-fstack-protector-strong` |
-| `CONFIG_STACKPROTECTOR_ALL` | `n` (Performance impact) | Canary inserted into all functions |
+| Kconfig Symbol                 | Recommended              | Description                              |
+| :----------------------------- | :----------------------- | :--------------------------------------- |
+| `CONFIG_STACKPROTECTOR`        | `y`                      | Base stack canary infrastructure         |
+| `CONFIG_STACKPROTECTOR_STRONG` | `y` (Recommended)        | Compiler flag `-fstack-protector-strong` |
+| `CONFIG_STACKPROTECTOR_ALL`    | `n` (Performance impact) | Canary inserted into all functions       |
 
 ---
 

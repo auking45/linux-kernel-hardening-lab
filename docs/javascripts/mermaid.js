@@ -136,3 +136,4 @@ if (typeof document$ !== "undefined") {
 } else {
   document.addEventListener("DOMContentLoaded", renderMermaidDiagrams);
 }
+

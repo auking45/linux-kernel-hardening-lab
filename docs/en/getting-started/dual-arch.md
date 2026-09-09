@@ -6,21 +6,22 @@ Comparison of kernel execution environments and QEMU emulation parameters betwee
 
 ## 1. Virtual Machine Emulation Model Comparison
 
-| Parameter | x86_64 | ARM64 (aarch64) |
-| :--- | :--- | :--- |
-| **QEMU Binary** | `qemu-system-x86_64` | `qemu-system-aarch64` |
-| **Machine Type** | `q35` or `pc` | `virt` (Standard Virtual Machine) |
-| **CPU Model** | `host` (with KVM) or `max` | `host` (with KVM) or `cortex-a72` / `max` |
-| **Boot Firmware** | Direct Kernel Boot or SeaBIOS | Direct Kernel Boot (`-kernel`) |
-| **Console Interface** | `ttyS0` (Serial 16550A) | `ttyAMA0` (PL011 UART) |
-| **Kernel Target** | `arch/x86/boot/bzImage` | `arch/arm64/boot/Image` |
-| **Key Hardware Security** | Intel CET (IBT/SHSTK), SMEP, SMAP | ARMv8.3 PAC, ARMv8.5 BTI, PAN, PXN |
+| Parameter                 | x86_64                            | ARM64 (aarch64)                           |
+| :------------------------ | :-------------------------------- | :---------------------------------------- |
+| **QEMU Binary**           | `qemu-system-x86_64`              | `qemu-system-aarch64`                     |
+| **Machine Type**          | `q35` or `pc`                     | `virt` (Standard Virtual Machine)         |
+| **CPU Model**             | `host` (with KVM) or `max`        | `host` (with KVM) or `cortex-a72` / `max` |
+| **Boot Firmware**         | Direct Kernel Boot or SeaBIOS     | Direct Kernel Boot (`-kernel`)            |
+| **Console Interface**     | `ttyS0` (Serial 16550A)           | `ttyAMA0` (PL011 UART)                    |
+| **Kernel Target**         | `arch/x86/boot/bzImage`           | `arch/arm64/boot/Image`                   |
+| **Key Hardware Security** | Intel CET (IBT/SHSTK), SMEP, SMAP | ARMv8.3 PAC, ARMv8.5 BTI, PAN, PXN        |
 
 ---
 
 ## 2. QEMU Command Line Structures
 
 ### 2.1 x86_64 Emulation
+
 ```bash
 qemu-system-x86_64 \
     -m 1024M \
@@ -33,6 +34,7 @@ qemu-system-x86_64 \
 ```
 
 ### 2.2 ARM64 Emulation
+
 ```bash
 qemu-system-aarch64 \
     -machine virt \
@@ -58,6 +60,7 @@ export CROSS_COMPILE=aarch64-linux-gnu-
 ```
 
 Verification command:
+
 ```bash
 ${CROSS_COMPILE}gcc --version
 ```
