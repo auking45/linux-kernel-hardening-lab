@@ -77,7 +77,7 @@ Verification via LKDTM `CORRUPT_STACK` test trigger.
     [    2.104231] lkdtm: Performing direct entry CORRUPT_STACK
     [    2.105420] lkdtm: attempting bad stack write ...
     [    2.106102] Kernel panic - not syncing: stack-protector: Kernel stack is corrupted in: lkdtm_CORRUPT_STACK+0x4a/0x60
-    [    2.107519] CPU: 0 PID: 68 Comm: sh Not tainted 6.6.0-hardened #1
+    [    2.107519] CPU: 0 PID: 68 Comm: sh Not tainted 6.12.0-hardened #1
     [    2.108421] Call Trace:
     [    2.108812]  <TASK>
     [    2.109152]  panic+0x140/0x310
@@ -111,7 +111,7 @@ Verification via LKDTM `CORRUPT_STACK` test trigger.
     **Verification Log (ARM64 Kernel Panic)**:
     ```text
     [    2.302194] Kernel panic - not syncing: stack-protector: Kernel stack is corrupted in: lkdtm_CORRUPT_STACK+0x3c/0x50
-    [    2.303102] CPU: 0 PID: 65 Comm: sh Not tainted 6.6.0-arm64-hardened #1
+    [    2.303102] CPU: 0 PID: 65 Comm: sh Not tainted 6.12.0-arm64-hardened #1
     [    2.304011] Call trace:
     [    2.304410]  panic+0x144/0x320
     [    2.304912]  __stack_chk_fail+0x18/0x24

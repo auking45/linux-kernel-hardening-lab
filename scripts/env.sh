@@ -3,8 +3,8 @@
 
 set -euo pipefail
 
-# Kernel version (LTS recommended)
-export KERNEL_VERSION="${KERNEL_VERSION:-6.6.79}"
+# Kernel version (Latest LTS with IPE & modern security features)
+export KERNEL_VERSION="${KERNEL_VERSION:-6.12.109}"
 export KERNEL_MAJOR="v6.x"
 export KERNEL_TARBALL="linux-${KERNEL_VERSION}.tar.xz"
 export KERNEL_URL="https://cdn.kernel.org/pub/linux/kernel/${KERNEL_MAJOR}/${KERNEL_TARBALL}"

@@ -16,6 +16,7 @@ site/
 # Kernel & Build Artifacts
 downloads/
 build_dir/
+rootfs/
 kernel_source/
 linux-*/
 *.tar.xz
