@@ -14,6 +14,11 @@ help:
 	@echo "  make docs-build      - Build strict static documentation site"
 	@echo "  make clean           - Clean build artifacts (keeps downloads/)"
 	@echo ""
+	@echo "Docker Isolated Targets:"
+	@echo "  make docker-build    - Build isolated Docker container image"
+	@echo "  make docker-run      - Run one-click kernel build & QEMU inside Docker"
+	@echo "  make docker-shell    - Enter interactive Docker shell"
+	@echo ""
 	@echo "Advanced Feature Runs (via scripts/run_lab.sh):"
 	@echo "  ./scripts/run_lab.sh --feature stack-protector"
 	@echo "  ./scripts/run_lab.sh --arch arm64 --feature stack-protector"
@@ -39,6 +44,15 @@ docs-build:
 	@python3 -m venv .venv 2>/dev/null || true
 	@.venv/bin/pip install -q -r requirements.txt
 	@.venv/bin/mkdocs build --strict
+
+docker-build:
+	@docker compose build lab
+
+docker-run:
+	@docker compose run --rm lab ./scripts/run_lab.sh --arch x86_64
+
+docker-shell:
+	@docker compose run --rm -it lab /bin/bash
 
 clean:
 	@echo "Cleaning build outputs and rootfs..."

@@ -1,0 +1,17 @@
+# =============================================================================
+# Linux Kernel Hardening Lab - Docker Compose Configuration
+# =============================================================================
+
+services:
+  lab:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.lab
+    image: ${KERNEL_LAB_IMAGE:-ghcr.io/auking45/linux-kernel-hardening-lab:latest}
+    container_name: kernel-hardening-lab
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+    stdin_open: true
+    tty: true
+    command: ["/bin/bash"]

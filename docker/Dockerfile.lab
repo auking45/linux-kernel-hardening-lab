@@ -1,0 +1,49 @@
+# =============================================================================
+# Linux Kernel Hardening Engineering Lab - Docker Environment
+# Provides dual-arch toolchains (x86_64 & arm64) and QEMU emulators.
+# =============================================================================
+
+FROM ubuntu:24.04
+
+LABEL maintainer="auking45 <auking45@gmail.com>"
+LABEL description="Reproducible build & QEMU verification lab for Linux Kernel Hardening"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+
+# Install build essentials, cross-compilers, QEMU emulators, and documentation tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    flex \
+    bison \
+    libncurses-dev \
+    libssl-dev \
+    libelf-dev \
+    bc \
+    cpio \
+    tar \
+    gzip \
+    xz-utils \
+    wget \
+    curl \
+    git \
+    rsync \
+    kmod \
+    python3 \
+    python3-pip \
+    python3-venv \
+    clang \
+    lld \
+    llvm \
+    gcc-x86-64-linux-gnu \
+    gcc-aarch64-linux-gnu \
+    qemu-system-x86 \
+    qemu-system-arm \
+    ca-certificates \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /workspace
+
+CMD ["/bin/bash"]

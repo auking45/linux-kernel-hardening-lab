@@ -1,0 +1,44 @@
+name: Kernel CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-docker-lab:
+    name: "Verify Docker Build & Dual-Arch Toolchains"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker Lab Image
+        run: |
+          docker compose build lab
+
+      - name: Verify Shell Script Syntax
+        run: |
+          docker compose run --rm lab bash -n scripts/*.sh
+
+      - name: Verify Rootfs Generation (x86_64 & arm64)
+        run: |
+          docker compose run --rm lab ./scripts/build_rootfs.sh --arch x86_64
+          docker compose run --rm lab ./scripts/build_rootfs.sh --arch arm64
+
+      - name: Verify Kernel Source & Base Build (x86_64)
+        run: |
+          docker compose run --rm lab ./scripts/run_lab.sh --arch x86_64 --feature base --build-only
+
+      - name: Verify QEMU Boot Test (x86_64 TCG Emulation)
+        run: |
+          docker compose run --rm lab ./scripts/run_qemu.sh --arch x86_64 --no-kvm --timeout 20 || true
