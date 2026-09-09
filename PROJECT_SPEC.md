@@ -44,9 +44,9 @@
 - [x] **Task 0-1:** 프로젝트 마스터 스펙(`PROJECT_SPEC.md`), 작성 표준(`SKILL.md`), `.gitignore`, 초기 `README.md` 작성.
 
 ### [Phase 1] MkDocs Multilingual Infrastructure & GitHub Pages CI/CD
-- [ ] **Task 1-1:** MkDocs 다국어 설정(`mkdocs.yml`, `requirements.txt`, `mkdocs-static-i18n`, Mermaid/MathJax 테마).
-- [ ] **Task 1-2:** GitHub Actions Pages 자동 배포 워크플로우(`.github/workflows/docs.yml`) 작성.
-- [ ] **Task 1-3:** 초기 문서 골격(`docs/ko/index.md`, `docs/en/index.md`, 가이드 페이지) 구축 및 빌드 검증.
+- [x] **Task 1-1:** MkDocs 다국어 설정(`mkdocs.yml`, `requirements.txt`, `mkdocs-static-i18n`, Mermaid/MathJax 테마).
+- [x] **Task 1-2:** GitHub Actions Pages 자동 배포 워크플로우(`.github/workflows/docs.yml`) 작성.
+- [x] **Task 1-3:** 초기 문서 골격(`docs/ko/index.md`, `docs/en/index.md`, 가이드 페이지) 구축 및 빌드 검증.
 
 ### [Phase 2] Kernel Build & Dual-Arch QEMU Runner Framework
 - [ ] **Task 2-1:** 커널 소스 자동 다운로드 및 캐싱 스크립트(`scripts/download_kernel.sh`).

@@ -1,0 +1,81 @@
+/* Custom styles for Linux Kernel Hardening Lab */
+
+:root {
+  --md-primary-fg-color: #37474f;
+  --md-primary-fg-color--light: #455a64;
+  --md-primary-fg-color--dark: #263238;
+  --md-accent-fg-color: #3f51b5;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #263238;
+  --md-accent-fg-color: #5c6bc0;
+}
+
+/* Adjust tabbed content header styling */
+.tabbed-set {
+  border-radius: 4px;
+}
+
+/* Archify Interactive Diagram Container */
+.archify-container {
+  width: 100%;
+  margin: 1.5rem 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: var(--md-default-bg-color);
+}
+
+.archify-container iframe {
+  width: 100%;
+  min-height: 480px;
+  border: none;
+  display: block;
+}
+
+/* Mermaid Diagram Styling for High Contrast in Dark & Light Modes */
+.mermaid-container {
+  padding: 1.25rem 0;
+  border-radius: 6px;
+  background-color: transparent;
+}
+
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Dark mode text & contrast visibility enhancements */
+[data-md-color-scheme="slate"] .mermaid-container svg text {
+  fill: #f8fafc !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid-container svg .titleText,
+[data-md-color-scheme="slate"] .mermaid-container svg .sectionTitle,
+[data-md-color-scheme="slate"] .mermaid-container svg .timeline-title,
+[data-md-color-scheme="slate"] .mermaid-container svg .period,
+[data-md-color-scheme="slate"] .mermaid-container svg .event-desc,
+[data-md-color-scheme="slate"] .mermaid-container svg .task-text,
+[data-md-color-scheme="slate"] .mermaid-container svg .labelText,
+[data-md-color-scheme="slate"] .mermaid-container svg .nodeLabel,
+[data-md-color-scheme="slate"] .mermaid-container svg .node text,
+[data-md-color-scheme="slate"] .mermaid-container svg .label text,
+[data-md-color-scheme="slate"] .mermaid-container svg .noteText,
+[data-md-color-scheme="slate"] .mermaid-container svg .actor-man,
+[data-md-color-scheme="slate"] .mermaid-container svg text.actor,
+[data-md-color-scheme="slate"] .mermaid-container svg .messageText {
+  fill: #f8fafc !important;
+  color: #f8fafc !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid-container .edgeLabel {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+}
+
+[data-md-color-scheme="slate"] .mermaid-container .edgeLabel p,
+[data-md-color-scheme="slate"] .mermaid-container .edgeLabel span {
+  color: #f8fafc !important;
+}
