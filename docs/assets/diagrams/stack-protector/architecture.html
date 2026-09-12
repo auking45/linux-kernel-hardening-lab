@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stack Protector Architecture & Threat Model Map</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background-color: rgba(56, 189, 248, 0.2);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .controls {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      background-color: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      border-color: var(--accent-blue);
+    }
+
+    button.active {
+      background-color: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .diagram-board {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Stack Memory Layout Visualizer */
+    .stack-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stack-header {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 4px;
+    }
+
+    .stack-block {
+      border: 2px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .block-ret {
+      background-color: rgba(168, 85, 247, 0.15);
+      border-color: var(--accent-purple);
+      color: var(--accent-purple);
+    }
+
+    .block-sfp {
+      background-color: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .block-canary {
+      background-color: rgba(34, 197, 94, 0.15);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      box-shadow: 0 0 10px rgba(34, 197, 94, 0.2);
+    }
+
+    .block-buffer {
+      background-color: rgba(234, 179, 8, 0.15);
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+      height: 70px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* Attack State */
+    .attack-mode .block-canary {
+      background-color: rgba(239, 68, 68, 0.25);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      animation: pulse 1s infinite alternate;
+    }
+
+    .attack-mode .block-ret {
+      opacity: 0.4;
+    }
+
+    @keyframes pulse {
+      from { box-shadow: 0 0 4px var(--accent-red); }
+      to { box-shadow: 0 0 16px var(--accent-red); }
+    }
+
+    /* Explanation Panel */
+    .detail-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .status-card {
+      background-color: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .status-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-desc {
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .code-box {
+      background-color: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      margin-top: 8px;
+    }
+
+    .arch-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .arch-card {
+      background-color: rgba(15, 23, 42, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      font-size: 0.8rem;
+    }
+
+    .arch-card h4 {
+      color: var(--accent-blue);
+      margin-bottom: 4px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>
+      <span>Stack Protector (Canary) System Map</span>
+      <span class="badge">CONFIG_STACKPROTECTOR_STRONG</span>
+    </h1>
+    <div class="controls">
+      <button id="btnNormal" class="active" onclick="setView('normal')">정상 실행 (Normal)</button>
+      <button id="btnAttack" onclick="setView('attack')">오버플로우 방어 (Overflow Blocked)</button>
+      <button id="btnArch" onclick="setView('arch')">x86_64 vs ARM64</button>
+      <button onclick="toggleTheme()">테마 전환</button>
+    </div>
+  </header>
+
+  <div class="diagram-board" id="diagramBoard">
+    <!-- Stack Memory Visualization -->
+    <div class="stack-layout">
+      <div class="stack-header">▲ 높은 주소 (High Memory)</div>
+      
+      <div class="stack-block block-ret">
+        <div>Return Address (RIP / LR)</div>
+        <small style="font-size: 0.7rem; font-weight: normal;">호출자 복귀 주소</small>
+      </div>
+
+      <div class="stack-block block-sfp">
+        <div>Saved Frame Pointer (RBP / x29)</div>
+        <small style="font-size: 0.7rem; font-weight: normal;">이전 스택 프레임 베이스</small>
+      </div>
+
+      <div class="stack-block block-canary" id="canaryBlock">
+        <div id="canaryLabel">🛡️ Stack Canary (난수)</div>
+        <small id="canarySub" style="font-size: 0.7rem; font-weight: normal;">무결성 감시 가드 값</small>
+      </div>
+
+      <div class="stack-block block-buffer" id="bufferBlock">
+        <div>Local Buffers & Variables</div>
+        <small style="font-size: 0.7rem; font-weight: normal;">지역 배열 (char buf[64])</small>
+      </div>
+
+      <div class="stack-header">▼ 낮은 주소 (Low Memory / SP)</div>
+    </div>
+
+    <!-- Explanatory Details -->
+    <div class="detail-panel">
+      <div class="status-card" id="statusCard">
+        <div class="status-title" id="statusTitle" style="color: var(--accent-green);">
+          ● 정상 프롤로그 & 에필로그 검증 메커니즘
+        </div>
+        <div class="status-desc" id="statusDesc">
+          함수 진입 시(Prologue) CPU 전용 레지스터에서 난수 카나리 값을 읽어 리턴 주소 직전에 배치함. 함수 종료 시(Epilogue) 저장된 값과 원본 레지스터 값을 비교하여 변조가 없으면 정상 반환함.
+        </div>
+        <div class="code-box" id="codeBox">
+; x86_64 Function Epilogue Check
+movq -0x8(%rbp), %rax
+xorq %gs:0x28, %rax        ; 카나리 일치 검증
+je   .L_return             ; 일치 시 정상 반환
+call __stack_chk_fail      ; 불일치 시 패닉 호출
+        </div>
+      </div>
+
+      <div class="arch-grid" id="archGrid">
+        <div class="arch-card">
+          <h4>x86_64 아키텍처</h4>
+          <div>• 카나리 출처: <code>%gs:40</code> (Per-CPU)</div>
+          <div>• 프레임 포인터: <code>%rbp</code></div>
+          <div>• 리턴 주소: 스택에 직접 저장</div>
+        </div>
+        <div class="arch-card">
+          <h4>ARM64 (aarch64)</h4>
+          <div>• 카나리 출처: <code>__stack_chk_guard</code></div>
+          <div>• 프레임 포인터: <code>x29 (FP)</code></div>
+          <div>• 리턴 주소: <code>x30 (LR)</code> 레지스터/스택</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function setView(mode) {
+    document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+    const board = document.getElementById('diagramBoard');
+    const title = document.getElementById('statusTitle');
+    const desc = document.getElementById('statusDesc');
+    const code = document.getElementById('codeBox');
+    const canary = document.getElementById('canaryBlock');
+    const canaryLabel = document.getElementById('canaryLabel');
+    const canarySub = document.getElementById('canarySub');
+
+    board.classList.remove('attack-mode');
+
+    if (mode === 'normal') {
+      document.getElementById('btnNormal').classList.add('active');
+      title.style.color = 'var(--accent-green)';
+      title.innerHTML = '● 정상 프롤로그 & 에필로그 검증 메커니즘';
+      desc.innerText = '함수 진입 시 난수 카나리를 주입하고, 에필로그에서 xor 연산으로 변조 여부를 검증함. 변조가 없으면 원래 호출자로 안전 복귀함.';
+      code.innerHTML = `; x86_64 Function Epilogue Check\nmovq -0x8(%rbp), %rax\nxorq %gs:0x28, %rax        ; 카나리 일치 검증\nje   .L_return             ; 정상 복귀\ncall __stack_chk_fail`;
+      canaryLabel.innerHTML = '🛡️ Stack Canary (0x9a8f4c...)';
+      canarySub.innerHTML = '무결성 유지 상태';
+    } else if (mode === 'attack') {
+      document.getElementById('btnAttack').classList.add('active');
+      board.classList.add('attack-mode');
+      title.style.color = 'var(--accent-red)';
+      title.innerHTML = '🚨 버퍼 오버플로우 침해 탐지 및 커널 패닉';
+      desc.innerText = '버퍼 경계를 초과한 악성 데이터가 스택 카나리 값을 오염시킴. 에필로그의 xor 검증에서 불일치가 즉시 적발되어 __stack_chk_fail()을 호출하고 커널 패닉으로 시스템을 보호함.';
+      code.innerHTML = `; Corrupted Canary Detected!\n[    2.106102] Kernel panic - not syncing:\nstack-protector: Kernel stack is corrupted in:\nlkdtm_CORRUPT_STACK+0x4a/0x60\nCPU: 0 PID: 68 Comm: sh\nCall Trace:\n panic+0x140/0x310\n __stack_chk_fail+0x15/0x20`;
+      canaryLabel.innerHTML = '💥 CORRUPTED CANARY (0x41414141)';
+      canarySub.innerHTML = '변조 감지! __stack_chk_fail() 트리거';
+    } else if (mode === 'arch') {
+      document.getElementById('btnArch').classList.add('active');
+      title.style.color = 'var(--accent-blue)';
+      title.innerHTML = '⚖️ x86_64 vs ARM64 하드웨어/ABI 차이';
+      desc.innerText = 'x86_64는 세그먼트 레지스터(%gs) 기반 Per-CPU 스토리지에서 카나리를 고속 로드함. ARM64는 전역 __stack_chk_guard 가드 변수를 로드하며, 리턴 주소를 x30(Link Register)에 보관하다가 필요 시 스택에 저장함.';
+      code.innerHTML = `// ARM64 Function Prologue\nadrp x8, __stack_chk_guard\nldr  x8, [x8, :lo12:__stack_chk_guard]\nstr  x8, [sp, 24]          ; 스택에 카나리 저장\n\n// ARM64 Function Epilogue\nldr  x9, [sp, 24]\nsubs x8, x8, x9            ; 값 일치 비교\nb.ne __stack_chk_fail`;
+      canaryLabel.innerHTML = '🛡️ Stack Canary Guard';
+      canarySub.innerHTML = 'x86_64 (%gs:40) / ARM64 (__stack_chk_guard)';
+    }
+  }
+
+  function toggleTheme() {
+    const current = document.body.getAttribute('data-theme');
+    if (current === 'light') {
+      document.body.removeAttribute('data-theme');
+    } else {
+      document.body.setAttribute('data-theme', 'light');
+    }
+  }
+</script>
+
+</body>
+</html>

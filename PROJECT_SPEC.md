@@ -64,7 +64,7 @@
 
 ### [Phase 3] Category 1: Stack & Buffer Overflow Protection
 
-- [ ] **Task 3-1:** `CONFIG_STACKPROTECTOR_STRONG` (Stack Canary 메커니즘 및 스택 변조 탐지 실습).
+- [x] **Task 3-1:** `CONFIG_STACKPROTECTOR_STRONG` (Stack Canary 메커니즘 및 스택 변조 탐지 실습).
 - [ ] **Task 3-2:** `CONFIG_FORTIFY_SOURCE` (컴파일/런타임 버퍼 경계 검사 메커니즘).
 - [ ] **Task 3-3:** `CONFIG_SHADOW_CALL_STACK` (ARM64 리턴 주소 보호용 그림자 호출 스택).
 - [ ] **Task 3-4:** `CONFIG_GCC_PLUGIN_STACKLEAK` (커널 스택 데이터 소거 및 스택 고갈 공격 방어).

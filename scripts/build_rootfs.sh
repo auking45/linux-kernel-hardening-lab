@@ -98,6 +98,29 @@ EOF
     chmod 755 "${rootfs_work_dir}/home/lab"
 }
 
+install_lab_tests() {
+    local rootfs_work_dir="$1"
+    local labs_dir="${LAB_ROOT_DIR}/labs"
+
+    if [[ -d "${labs_dir}" ]]; then
+        echo "[*] Installing in-guest lab test scripts..."
+        for test_file in "${labs_dir}"/*/test.sh; do
+            if [[ -f "${test_file}" ]]; then
+                local feature_dir
+                feature_dir="$(basename "$(dirname "${test_file}")")"
+                # Strip leading numeric prefix, e.g. 01-stack-protector -> stack-protector -> test_stack_protector
+                local clean_name
+                clean_name="$(echo "${feature_dir}" | sed -E 's/^[0-9]+-//' | tr '-' '_')"
+                local target_bin="${rootfs_work_dir}/bin/test_${clean_name}"
+
+                cp "${test_file}" "${target_bin}"
+                chmod 755 "${target_bin}"
+                echo "    Installed: /bin/test_${clean_name}"
+            fi
+        done
+    fi
+}
+
 create_init_script() {
     local rootfs_work_dir="$1"
 
@@ -170,6 +193,7 @@ main() {
     prepare_directories "${rootfs_work_dir}"
     install_busybox "${rootfs_work_dir}"
     setup_users "${rootfs_work_dir}"
+    install_lab_tests "${rootfs_work_dir}"
     create_init_script "${rootfs_work_dir}"
     package_initramfs "${rootfs_work_dir}" "${output_initramfs}"
 }
