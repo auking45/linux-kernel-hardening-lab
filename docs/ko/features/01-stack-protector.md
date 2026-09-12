@@ -58,6 +58,7 @@ sequenceDiagram
 ### 2.3 아키텍처별 어셈블리 구현 상세 비교
 
 #### (1) x86_64 어셈블리 메커니즘
+
 컴파일러는 함수 프롤로그에서 세그먼트 레지스터 `%gs` 기반 Per-CPU 스토리지 오프셋(`0x28` 또는 `0x40`)에서 난수를 읽어 스택에 배치함:
 
 ```nasm
@@ -83,6 +84,7 @@ call    __stack_chk_fail      ; 커널 패닉 유발
 ```
 
 #### (2) ARM64 (aarch64) 어셈블리 메커니즘
+
 ARM64에서는 전역 심볼 `__stack_chk_guard`로부터 가드 값을 읽어 스택 포인터 기준 상대 오프셋에 저장함:
 
 ```nasm
@@ -112,12 +114,12 @@ bl      __stack_chk_fail      ; 패닉 핸들러 호출
 
 ### 3.1 GCC / Clang 스택 보호 플래그 레벨 비교
 
-| 컴파일러 플래그 | 보호 대상 함수 조건 | 보안 수준 | 성능 오버헤드 |
-| :--- | :--- | :--- | :--- |
-| `-fno-stack-protector` | 보호 미적용 | 없음 | 0% (베이스라인) |
-| `-fstack-protector` | 8바이트 이상의 `char` 배열이 선언된 함수만 적용 | 낮음 | 약 0.1% 미만 |
-| **`-fstack-protector-strong`** | **임의 크기의 배열, 로컬 변수 주소 참조(`&val`)가 존재하는 모든 함수** | **높음 (권장)** | **약 0.5% 미만** |
-| `-fstack-protector-all` | 로컬 변수가 없는 함수를 제외한 커널 내 모든 함수에 무차별 삽입 | 극대 | 약 5~10% (비효율) |
+| 컴파일러 플래그                | 보호 대상 함수 조건                                                    | 보안 수준       | 성능 오버헤드     |
+| :----------------------------- | :--------------------------------------------------------------------- | :-------------- | :---------------- |
+| `-fno-stack-protector`         | 보호 미적용                                                            | 없음            | 0% (베이스라인)   |
+| `-fstack-protector`            | 8바이트 이상의 `char` 배열이 선언된 함수만 적용                        | 낮음            | 약 0.1% 미만      |
+| **`-fstack-protector-strong`** | **임의 크기의 배열, 로컬 변수 주소 참조(`&val`)가 존재하는 모든 함수** | **높음 (권장)** | **약 0.5% 미만**  |
+| `-fstack-protector-all`        | 로컬 변수가 없는 함수를 제외한 커널 내 모든 함수에 무차별 삽입         | 극대            | 약 5~10% (비효율) |
 
 ### 3.2 리눅스 커널 Kconfig 설정값
 
@@ -227,3 +229,47 @@ LKDTM(Linux Kernel Dump Test Module)의 `CORRUPT_STACK` 트리거를 이용해 �
   - 커널 텍스트(`.text`) 세그먼트 크기가 약 **1.2% ~ 1.5% 증가**함.
 - **실무 적용 가이드**:
   - 오버헤드가 극히 미미하며 메모리 오염 공격의 가장 기초적인 진입을 원천 봉쇄하므로, 클라우드 서버, 모바일(Android), 임베디드 리눅스를 막론하고 **필수 활성화(Must-have)** 권장함.
+
+---
+
+## 6. 강의 및 발표 스크립트 (Lecture & Presentation Script - English Practice)
+
+세미나, 사내 기술 발표 또는 해외 엔지니어링 인터뷰에서 본 피처를 직접 설명할 때 활용할 수 있는 실전 1인칭 영어 스피킹 대본 및 주요 표현 정리.
+
+### 6.1 영문 강의 대본 (Full Speaking Script)
+
+#### Part 1: Opening Hook & Problem Statement
+> "Hello everyone. Today, let's take a deep dive into one of the most fundamental yet critical defenses in the Linux kernel: **Stack Protector Strong**, or `CONFIG_STACKPROTECTOR_STRONG`."
+>
+> "Think about what happens when a kernel driver performs an unbounded memory copy on the stack. Without any protection, an attacker can simply overflow a local buffer, smash through the saved frame pointer, and overwrite the function's return address. When that function returns, the CPU doesn't go back to the caller—it jumps straight into the attacker's ROP gadgets in Ring 0. That is an instant privilege escalation. So, how does the kernel prevent this?"
+
+#### Part 2: Diagram & Architecture Walkthrough
+> "If you look at our interactive system map above, notice where the **Stack Canary** sits. It is positioned right between the local buffers and the saved frame pointer."
+>
+> "Here is how it works under the hood: during the function prologue, the compiler inserts assembly instructions that fetch a random 64-bit secret from a protected CPU register—specifically `%gs:40` on x86_64, or `__stack_chk_guard` on ARM64—and places it right onto the stack."
+>
+> "Now, look at the epilogue. Right before the function returns, the CPU loads the canary from the stack and XORs it against the original register value. If an overflow occurred, that canary value is already corrupted. The XOR result is non-zero, the equality check fails, and instead of returning to a hijacked address, the kernel immediately jumps to `__stack_chk_fail()`, triggering a panic and halting execution on the spot."
+
+#### Part 3: Live Demo Commentary
+> "Let's see this in action in our QEMU environment. First, we run a kernel with stack protection disabled and trigger the LKDTM `CORRUPT_STACK` test."
+>
+> "Notice the output: the kernel doesn't catch the corruption. Instead, it crashes with a raw general protection fault because RIP was overwritten with our dummy attacker value, `0x4141414141414141`. If this were a real exploit, the attacker would have control."
+>
+> "Now, let's switch to our hardened kernel with `CONFIG_STACKPROTECTOR_STRONG=y`. When we run the exact same test, watch the console: `Kernel panic - not syncing: stack-protector: Kernel stack is corrupted`. The canary intercepted the buffer overflow before the CPU could execute a single hijacked instruction."
+
+#### Part 4: Key Takeaways & Trade-offs
+> "To wrap up: why do we specifically use `-fstack-protector-strong` instead of `-all`? Because `-strong` intelligently targets only the functions that actually have arrays or take address references of local variables. This gives us nearly the exact same security coverage as `-all`, but keeps the CPU overhead under 0.5%."
+>
+> "In modern production systems—whether it's cloud hypervisors or Android devices—this is an absolute, non-negotiable baseline defense. Thank you."
+
+---
+
+### 6.2 핵심 프레젠테이션 영어 표현 (Key Presentation Phrases)
+
+| 한국어 표현 | 권장 영어 스피킹 표현 | 용례 및 발화 팁 |
+| :--- | :--- | :--- |
+| **"내부 동작 원리를 살펴보면"** | *"Under the hood, ..."* / *"If we look under the hood..."* | 아키텍처나 어셈블리 설명으로 넘어갈 때 자연스러운 전환구 |
+| **"~를 덮어쓰다/변조하다"** | *"smash through ~"* / *"overwrite the return address"* | 버퍼 오버플로우로 메모리가 파괴되는 동작 묘사 |
+| **"즉시/현장에서 차단하다"** | *"halt execution on the spot"* / *"intercept the attack"* | 보안 통제 동작의 신속성 강조 |
+| **"절충/트레이드오프를 고려할 때"** | *"When considering the trade-offs..."* | 성능 vs 보안 수준을 비교 설명할 때 유용 |
+| **"타협할 수 없는 기본 방어선"** | *"an absolute, non-negotiable baseline defense"* | 결론 요약 시 강력한 권고 표현 |

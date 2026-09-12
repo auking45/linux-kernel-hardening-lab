@@ -102,6 +102,14 @@
 ## 5. 성능 및 호환성 분석 (Performance & Compatibility)
 - CPU 연산 오버헤드, 바이너리 크기 증가율, 런타임 메모리 사용량 비교.
 - 운영 환경(서버, 임베디드, 안드로이드 등)별 권장 적용 가이드.
+
+## 6. 강의 및 발표 스크립트 (Lecture & Presentation Script - English Practice)
+- 동료 엔지니어, 기술 세미나 청중, 인터뷰어를 대상으로 직접 1인칭 발표를 수행하는 **실전 영문 강의 대본(Spoken Technical English)** 제공.
+- **표준 4단계 대본 구성**:
+  1. **Opening Hook & Problem Statement**: 해당 하드닝 기능이 해결하는 핵심 보안 위협 제시.
+  2. **Diagram & Architecture Walkthrough**: 다이어그램을 짚어가며 내부 메커니즘 설명.
+  3. **Live Demo Commentary**: QEMU 실행 및 익스플로잇/LKDTM 차단 로그 현장 중계.
+  4. **Key Takeaways & Production Advice**: 실무 적용 권고 및 요약.
 ```
 
 ---
