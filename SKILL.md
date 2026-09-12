@@ -7,6 +7,7 @@
 ## 1. Tone & Style Guidelines (문체 및 어조 표준)
 
 ### 🇰🇷 한국어 기술 문서 규격 (명사 종결형 필수 준수)
+
 1. **명사 종결형 원칙**:
    - 존댓말("~합니다 / ~했습니다 / ~됩니다") 사용을 **절대 금지함**.
    - 구어체 서술형 평서체("~다 / ~한다 / ~이다") 또한 지양함.
@@ -24,6 +25,7 @@
    - Kconfig 심볼은 백틱과 함께 대문자로 표기함 (예: `CONFIG_STACKPROTECTOR_STRONG`).
 
 ### 🇺🇸 영어 기술 문서 규격
+
 1. **Concise & Active Engineering Voice**:
    - Write in direct, technical, active voice. Avoid filler phrases and conversational transitions.
 2. **Standard Linux Kernel Nomenclature**:
@@ -36,18 +38,25 @@
 모든 아티클은 텍스트 중심 서술 이전에 직관적인 시각 자료를 필수로 배치함.
 
 ### 1. Archify 인터랙티브 다이어그램 규격 (`tt-a1i/archify`)
+
 - **용도:** 시스템 전반의 아키텍처 맵, 커널 메모리 레이아웃 구조, 하위 보안 서브시스템 간의 연결 관계 시각화.
 - **배치 방식:**
   - Archify를 통해 생성된 인터랙티브 HTML 파일은 `docs/assets/diagrams/<feature>/` 디렉터리에 저장함.
   - 마크다운 본문에서는 iframe 태그를 사용하여 반응형으로 임베드함:
     ```html
     <div class="archify-container">
-      <iframe src="../../assets/diagrams/stack-protector/architecture.html" width="100%" height="450px" frameborder="0"></iframe>
+      <iframe
+        src="../../assets/diagrams/stack-protector/architecture.html"
+        width="100%"
+        height="450px"
+        frameborder="0"
+      ></iframe>
     </div>
     ```
   - 오프라인 또는 이미지 뷰어를 위해 동일한 구조의 SVG/PNG 스냅샷을 함께 보관함.
 
 ### 2. Mermaid 다이어그램 규격
+
 - **용도:** 프로세스 흐름도, 시퀀스 다이어그램, 공격 시나리오(Exploit) vs 방어 메커니즘 비교.
 - **테마 호환성:**
   - 다크 모드와 라이트 모드 모두에서 명확히 식별 가능하도록 하드코딩된 색상 인라인 스타일을 배제함.
@@ -59,22 +68,26 @@
 
 각 하드닝 피처 문서는 다음 6단계 구조를 엄격히 준수하여 일관된 학습 경험을 제공함:
 
-```markdown
+````markdown
 # [피처 이름] ([Kconfig 심볼 / 메커니즘 명칭])
 
 ## 1. 개요 및 위협 모델 (Overview & Threat Model)
+
 - 방어 대상 취약점 유형 (예: Stack-based Buffer Overflow, Return-Oriented Programming, Meltdown).
 - 공격 벡터 및 위험도 분석.
 
 ## 2. 방어 아키텍처 및 메커니즘 (Architecture & Mechanism)
+
 - Archify 아키텍처 맵 또는 Mermaid 시퀀스 다이어그램 배치.
 - 컴파일러 및 하드웨어 CPU 수준에서의 동작 원리 분석.
 
 ## 3. Kconfig 설정 및 부팅 파라미터 (Configuration)
+
 - 관련 커널 설정 옵션 (`CONFIG_*`) 및 디펜던시 명시.
 - 런타임 부팅 파라미터 및 sysctl 제어 항목 표 정리.
 
 ## 4. 실습 및 검증 (Hands-on Verification)
+
 - 듀얼 아키텍처(x86_64 / arm64) 및 Base vs Hardened 탭 제공:
 
 === "x86_64: Base Kernel (미적용)"
@@ -100,17 +113,19 @@
     ```
 
 ## 5. 성능 및 호환성 분석 (Performance & Compatibility)
+
 - CPU 연산 오버헤드, 바이너리 크기 증가율, 런타임 메모리 사용량 비교.
 - 운영 환경(서버, 임베디드, 안드로이드 등)별 권장 적용 가이드.
 
 ## 6. 강의 및 발표 스크립트 (Lecture & Presentation Script - English Practice)
+
 - 동료 엔지니어, 기술 세미나 청중, 인터뷰어를 대상으로 직접 1인칭 발표를 수행하는 **실전 영문 강의 대본(Spoken Technical English)** 제공.
 - **표준 4단계 대본 구성**:
   1. **Opening Hook & Problem Statement**: 해당 하드닝 기능이 해결하는 핵심 보안 위협 제시.
   2. **Diagram & Architecture Walkthrough**: 다이어그램을 짚어가며 내부 메커니즘 설명.
   3. **Live Demo Commentary**: QEMU 실행 및 익스플로잇/LKDTM 차단 로그 현장 중계.
   4. **Key Takeaways & Production Advice**: 실무 적용 권고 및 요약.
-```
+````
 
 ---
 
@@ -134,4 +149,3 @@
 3. **`main "$@"` 진입점 구조 의무화**:
    - 모든 셸 스크립트는 상단에 설정 및 모듈화된 서브루틴 함수들을 정의하고, 스크립트의 실행 흐름을 한눈에 파악할 수 있도록 `main "$@"` 구조로 작성함.
    - 절차적 단계(인자 파싱 -> 환경 검증 -> 빌드/생성 -> 산출물 검증)가 `main` 함수 내에 명확히 드러나도록 구현함.
-

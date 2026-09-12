@@ -239,11 +239,13 @@ LKDTM(Linux Kernel Dump Test Module)의 `CORRUPT_STACK` 트리거를 이용해 �
 ### 6.1 영문 강의 대본 (Full Speaking Script)
 
 #### Part 1: Opening Hook & Problem Statement
+
 > "Hello everyone. Today, let's take a deep dive into one of the most fundamental yet critical defenses in the Linux kernel: **Stack Protector Strong**, or `CONFIG_STACKPROTECTOR_STRONG`."
 >
 > "Think about what happens when a kernel driver performs an unbounded memory copy on the stack. Without any protection, an attacker can simply overflow a local buffer, smash through the saved frame pointer, and overwrite the function's return address. When that function returns, the CPU doesn't go back to the caller—it jumps straight into the attacker's ROP gadgets in Ring 0. That is an instant privilege escalation. So, how does the kernel prevent this?"
 
 #### Part 2: Diagram & Architecture Walkthrough
+
 > "If you look at our interactive system map above, notice where the **Stack Canary** sits. It is positioned right between the local buffers and the saved frame pointer."
 >
 > "Here is how it works under the hood: during the function prologue, the compiler inserts assembly instructions that fetch a random 64-bit secret from a protected CPU register—specifically `%gs:40` on x86_64, or `__stack_chk_guard` on ARM64—and places it right onto the stack."
@@ -251,6 +253,7 @@ LKDTM(Linux Kernel Dump Test Module)의 `CORRUPT_STACK` 트리거를 이용해 �
 > "Now, look at the epilogue. Right before the function returns, the CPU loads the canary from the stack and XORs it against the original register value. If an overflow occurred, that canary value is already corrupted. The XOR result is non-zero, the equality check fails, and instead of returning to a hijacked address, the kernel immediately jumps to `__stack_chk_fail()`, triggering a panic and halting execution on the spot."
 
 #### Part 3: Live Demo Commentary
+
 > "Let's see this in action in our QEMU environment. First, we run a kernel with stack protection disabled and trigger the LKDTM `CORRUPT_STACK` test."
 >
 > "Notice the output: the kernel doesn't catch the corruption. Instead, it crashes with a raw general protection fault because RIP was overwritten with our dummy attacker value, `0x4141414141414141`. If this were a real exploit, the attacker would have control."
@@ -258,6 +261,7 @@ LKDTM(Linux Kernel Dump Test Module)의 `CORRUPT_STACK` 트리거를 이용해 �
 > "Now, let's switch to our hardened kernel with `CONFIG_STACKPROTECTOR_STRONG=y`. When we run the exact same test, watch the console: `Kernel panic - not syncing: stack-protector: Kernel stack is corrupted`. The canary intercepted the buffer overflow before the CPU could execute a single hijacked instruction."
 
 #### Part 4: Key Takeaways & Trade-offs
+
 > "To wrap up: why do we specifically use `-fstack-protector-strong` instead of `-all`? Because `-strong` intelligently targets only the functions that actually have arrays or take address references of local variables. This gives us nearly the exact same security coverage as `-all`, but keeps the CPU overhead under 0.5%."
 >
 > "In modern production systems—whether it's cloud hypervisors or Android devices—this is an absolute, non-negotiable baseline defense. Thank you."
@@ -266,10 +270,10 @@ LKDTM(Linux Kernel Dump Test Module)의 `CORRUPT_STACK` 트리거를 이용해 �
 
 ### 6.2 핵심 프레젠테이션 영어 표현 (Key Presentation Phrases)
 
-| 한국어 표현 | 권장 영어 스피킹 표현 | 용례 및 발화 팁 |
-| :--- | :--- | :--- |
-| **"내부 동작 원리를 살펴보면"** | *"Under the hood, ..."* / *"If we look under the hood..."* | 아키텍처나 어셈블리 설명으로 넘어갈 때 자연스러운 전환구 |
-| **"~를 덮어쓰다/변조하다"** | *"smash through ~"* / *"overwrite the return address"* | 버퍼 오버플로우로 메모리가 파괴되는 동작 묘사 |
-| **"즉시/현장에서 차단하다"** | *"halt execution on the spot"* / *"intercept the attack"* | 보안 통제 동작의 신속성 강조 |
-| **"절충/트레이드오프를 고려할 때"** | *"When considering the trade-offs..."* | 성능 vs 보안 수준을 비교 설명할 때 유용 |
-| **"타협할 수 없는 기본 방어선"** | *"an absolute, non-negotiable baseline defense"* | 결론 요약 시 강력한 권고 표현 |
+| 한국어 표현                         | 권장 영어 스피킹 표현                                      | 용례 및 발화 팁                                          |
+| :---------------------------------- | :--------------------------------------------------------- | :------------------------------------------------------- |
+| **"내부 동작 원리를 살펴보면"**     | _"Under the hood, ..."_ / _"If we look under the hood..."_ | 아키텍처나 어셈블리 설명으로 넘어갈 때 자연스러운 전환구 |
+| **"~를 덮어쓰다/변조하다"**         | _"smash through ~"_ / _"overwrite the return address"_     | 버퍼 오버플로우로 메모리가 파괴되는 동작 묘사            |
+| **"즉시/현장에서 차단하다"**        | _"halt execution on the spot"_ / _"intercept the attack"_  | 보안 통제 동작의 신속성 강조                             |
+| **"절충/트레이드오프를 고려할 때"** | _"When considering the trade-offs..."_                     | 성능 vs 보안 수준을 비교 설명할 때 유용                  |
+| **"타협할 수 없는 기본 방어선"**    | _"an absolute, non-negotiable baseline defense"_           | 결론 요약 시 강력한 권고 표현                            |

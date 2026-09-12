@@ -3,9 +3,21 @@ name: Kernel CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".github/workflows/docs.yml"
   pull_request:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**.md"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -22,9 +34,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Pull or Build Docker Lab Image
         run: |
-          docker compose pull lab 2>/dev/null || docker compose build lab
+          echo "Attempting to pull lab image from GHCR..."
+          if ! docker compose pull lab; then
+            echo "Pull failed or image not found, falling back to local build..."
+            docker compose build lab
+          fi
 
       - name: Verify Shell Script Syntax
         run: |
