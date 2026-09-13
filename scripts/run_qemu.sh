@@ -138,7 +138,11 @@ build_kvm_flags() {
         echo "[*] TCG software emulation mode enabled (KVM unavailable or disabled)."
     fi
 
-    KVM_FLAGS=("-cpu" "${QEMU_CPU}")
+    local tcg_cpu="${QEMU_CPU}"
+    if [[ "${tcg_cpu}" == host* ]]; then
+        tcg_cpu="max"
+    fi
+    KVM_FLAGS=("-cpu" "${tcg_cpu}")
 }
 
 assemble_cmdline() {

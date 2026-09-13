@@ -29,7 +29,7 @@ setup_arch_env() {
             export KERNEL_IMAGE_REL="arch/x86/boot/bzImage"
             export CONSOLE_DEV="ttyS0"
             export QEMU_MACHINE="q35"
-            export QEMU_CPU="host,migratable=no"
+            export QEMU_CPU="max"
             ;;
         arm64|aarch64)
             export TARGET_ARCH="arm64"

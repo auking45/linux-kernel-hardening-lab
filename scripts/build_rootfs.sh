@@ -73,11 +73,11 @@ install_busybox() {
     cp "${busybox_bin}" "${rootfs_work_dir}/bin/busybox"
     chmod 755 "${rootfs_work_dir}/bin/busybox"
 
-    # Install core symlinks
+    # Install all applet symlinks
     (
         cd "${rootfs_work_dir}/bin"
-        for tool in sh ash ls cp mv rm cat echo mkdir rmdir dmesg ps grep id whoami mount umount uname sync sleep poweroff reboot; do
-            ln -sf busybox "${tool}"
+        for applet in $(./busybox --list); do
+            ln -sf busybox "${applet}"
         done
     )
 }
@@ -144,17 +144,25 @@ echo ""
 
 # Check for automated test script passed via kernel commandline
 CMDLINE=$(cat /proc/cmdline)
-case "$CMDLINE" in
-    *lab_test=*)
-        TEST_NAME=$(echo "$CMDLINE" | sed -n 's/.*lab_test=\([^ ]*\).*/\1/p')
-        echo "[*] Automated test requested: $TEST_NAME"
-        if [ -x "/bin/$TEST_NAME" ]; then
-            /bin/"$TEST_NAME"
-        fi
-        echo "[*] Automated test finished. Powering off..."
-        poweroff -f
-        ;;
-esac
+TEST_NAME=""
+for arg in $CMDLINE; do
+    case "$arg" in
+        lab_test=*)
+            TEST_NAME="${arg#lab_test=}"
+            ;;
+    esac
+done
+
+if [ -n "$TEST_NAME" ]; then
+    echo "[*] Automated test requested: $TEST_NAME"
+    if [ -x "/bin/$TEST_NAME" ]; then
+        /bin/"$TEST_NAME"
+    else
+        echo "[-] Error: /bin/$TEST_NAME not found or not executable"
+    fi
+    echo "[*] Automated test finished. Powering off..."
+    poweroff -f
+fi
 
 # Interactive shell
 exec /bin/sh
