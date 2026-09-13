@@ -106,3 +106,4 @@ nav:
       - 01. Stack & Buffer Protection:
           - Stack Canary: features/01-stack-protector.md
           - Fortify Source: features/02-fortify-source.md
+          - Shadow Call Stack: features/03-shadow-call-stack.md

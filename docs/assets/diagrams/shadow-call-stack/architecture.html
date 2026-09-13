@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARM64 Shadow Call Stack (SCS) Dual-Stack Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      background-color: var(--accent-purple);
+      color: #fff;
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background-color 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background-color: var(--card-border);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tab {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .nav-tab.active {
+      background-color: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .diagram-panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      min-height: 420px;
+    }
+
+    .dual-stack-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 16px;
+    }
+
+    .stack-card {
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    [data-theme="light"] .stack-card {
+      background: rgba(241, 245, 249, 0.6);
+    }
+
+    .stack-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .stack-repr {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stack-slot {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px dashed transparent;
+      transition: all 0.3s;
+    }
+
+    .slot-normal {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    .slot-shadow {
+      background: rgba(168, 85, 247, 0.15);
+      border-color: var(--accent-purple);
+      color: var(--accent-purple);
+      font-weight: 700;
+    }
+
+    .slot-corrupted {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      font-weight: 700;
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    .slot-protected {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.7; }
+      to { opacity: 1; }
+    }
+
+    .code-box {
+      background: #090d16;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      margin-top: 16px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+
+    .explanation-panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .explanation-title {
+      font-weight: 700;
+      font-size: 1.05rem;
+      margin-bottom: 10px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .explanation-desc {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .feature-tag {
+      display: inline-block;
+      padding: 2px 6px;
+      background: rgba(56, 189, 248, 0.2);
+      color: var(--accent-blue);
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-right: 4px;
+    }
+
+    table.matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.85rem;
+    }
+
+    table.matrix-table th, table.matrix-table td {
+      border: 1px solid var(--card-border);
+      padding: 10px 12px;
+      text-align: left;
+    }
+
+    table.matrix-table th {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-blue);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>ARM64 Shadow Call Stack (SCS)</span>
+        <span class="badge">AArch64 x18 Hardware ABI</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle">🌓 테마 변경</button>
+    </header>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-mode="normal">1. 정상 호출 및 복귀 (Dual-Stack)</button>
+      <button class="nav-tab" data-mode="attack">2. ROP 공격 시도 (SCS 비활성화 Base)</button>
+      <button class="nav-tab" data-mode="defense">3. SCS 복귀 주소 보호 (SCS 활성화 Hardened)</button>
+      <button class="nav-tab" data-mode="matrix">4. ROP 방어 메커니즘 심층 비교</button>
+    </div>
+
+    <div class="diagram-panel" id="diagramContent">
+      <!-- Dynamic Content Rendered by JS -->
+    </div>
+
+    <div class="explanation-panel">
+      <div class="explanation-title" id="expTitle">핵심 아키텍처 설명</div>
+      <div class="explanation-desc" id="expDesc">모드를 선택하여 ARM64 하드웨어 레지스터 x18 기반의 그림자 호출 스택 동작을 확인하세요.</div>
+    </div>
+  </div>
+
+  <script>
+    const themeToggle = document.getElementById('themeToggle');
+    let currentTheme = 'dark';
+
+    themeToggle.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+    });
+
+    const modes = {
+      normal: {
+        title: "Mode 1: 정상 함수 호출 및 이중 스택 (Dual-Stack Prologue & Epilogue)",
+        desc: "ARM64 커널에서 CONFIG_SHADOW_CALL_STACK 활성화 시, 컴파일러는 일반 스택(SP)과 별개로 전용 플랫폼 레지스터 x18이 가리키는 섀도 스택에 복귀 주소(x30/LR)를 보관합니다. 프롤로그에서 'str x30, [x18], #8'로 저장하고 에필로그에서 'ldr x30, [x18, #-8]!'로 복원하여 완벽한 복귀 무결성을 보장합니다.",
+        html: `
+          <div class="dual-stack-grid">
+            <div class="stack-card">
+              <div class="stack-title">
+                <span>일반 스택 (Regular Stack: SP)</span>
+                <span class="feature-tag">변수 및 프레임</span>
+              </div>
+              <div class="stack-repr">
+                <div class="stack-slot slot-normal">[SP + 16] Saved Frame Pointer (x29)</div>
+                <div class="stack-slot slot-normal">[SP + 8]  Saved Link Register (x30 / LR)</div>
+                <div class="stack-slot slot-normal">[SP + 0]  Local Buffer: buffer[32]</div>
+              </div>
+            </div>
+            <div class="stack-card">
+              <div class="stack-title">
+                <span>그림자 스택 (Shadow Stack: x18)</span>
+                <span class="feature-tag" style="background:rgba(168,85,247,0.2);color:var(--accent-purple);">복귀 주소 전용</span>
+              </div>
+              <div class="stack-repr">
+                <div class="stack-slot slot-shadow">[x18 - 8] Caller Return Addr (Pristine LR)</div>
+                <div class="stack-slot" style="color:var(--text-muted);border:1px dashed var(--card-border);text-align:center;">&lt;-- Top of Shadow Stack (x18)</div>
+              </div>
+            </div>
+          </div>
+          <div class="code-box">
+            ; [Prologue]<br>
+            str   x30, [x18], #8          ; 1. LR을 섀도 스택(x18)에 푸시 (x18 8바이트 증가)<br>
+            stp   x29, x30, [sp, #-32]!   ; 2. 일반 스택에 FP, LR 저장 (디버거/백트레이스용)<br>
+            mov   x29, sp                 ; 3. 새로운 프레임 포인터 설정<br>
+            <br>
+            ; [Epilogue]<br>
+            ldr   x30, [x18, #-8]!        ; 1. 섀도 스택(x18)에서 순수 LR 복원 (일반 스택 무시)<br>
+            ldp   x29, xzr, [sp], #32     ; 2. 일반 스택 프레임 해제<br>
+            ret                           ; 3. 순수 LR(x30)로 안전 복귀
+          </div>
+        `
+      },
+      attack: {
+        title: "Mode 2: ROP 제어 흐름 탈취 공격 (SCS 미적용 취약 커널)",
+        desc: "SCS가 없는 환경에서는 일반 스택에 저장된 복귀 주소(LR)가 단일 신뢰 원천(Single Source of Truth)입니다. 공격자가 버퍼 오버플로우로 저장된 LR을 악성 ROP 가젯이나 타깃 함수 주소(scs_hijacked_target)로 덮어쓰면, 함수 에필로그의 'ret' 명령어가 변조된 주소로 분기하여 커널 제어권이 완전히 탈취됩니다.",
+        html: `
+          <div class="dual-stack-grid">
+            <div class="stack-card">
+              <div class="stack-title">
+                <span style="color:var(--accent-red);">오염된 일반 스택 (Corrupted SP)</span>
+                <span class="feature-tag" style="background:rgba(239,68,68,0.2);color:var(--accent-red);">ROP 탈취 성공</span>
+              </div>
+              <div class="stack-repr">
+                <div class="stack-slot slot-corrupted">[SP + 8]  LR = 0xffff... (scs_hijacked_target)</div>
+                <div class="stack-slot slot-corrupted">[SP + 0]  Buffer Smashed: 0x41414141...</div>
+              </div>
+            </div>
+            <div class="stack-card">
+              <div class="stack-title">
+                <span style="color:var(--text-muted);">그림자 스택 (Shadow Stack)</span>
+                <span class="feature-tag" style="background:rgba(239,68,68,0.2);color:var(--accent-red);">비활성화 (미존재)</span>
+              </div>
+              <div class="stack-repr" style="text-align:center;padding:30px;color:var(--text-muted);">
+                CONFIG_SHADOW_CALL_STACK is NOT set.<br>
+                복귀 주소를 백업하는 별도 하드웨어/소프트웨어 스택 없음.
+              </div>
+            </div>
+          </div>
+          <div class="code-box" style="color:var(--accent-red);border:1px solid var(--accent-red);">
+            ; [Vulnerable Epilogue]<br>
+            ldp   x29, x30, [sp], #32     ; 일반 스택의 오염된 LR(0xffff...)을 그대로 레지스터 x30에 적재!<br>
+            ret                           ; x30으로 무조건 점프 -&gt; [!] CONTROL FLOW HIJACKED!
+          </div>
+        `
+      },
+      defense: {
+        title: "Mode 3: SCS 복귀 주소 무결성 방어 (SCS 활성화 Hardened)",
+        desc: "공격자가 일반 스택(SP)의 로컬 버퍼와 저장된 LR을 100% 임의의 값으로 변조하더라도, 에필로그는 일반 스택의 LR을 완전히 폐기하고 x18 레지스터가 가리키는 고립된 그림자 스택에서만 LR을 복원합니다. 따라서 ROP 페이로드는 완전히 무력화되고 원래 호출자에게 안전하게 복귀합니다.",
+        html: `
+          <div class="dual-stack-grid">
+            <div class="stack-card">
+              <div class="stack-title">
+                <span>일반 스택 (공격당함)</span>
+                <span class="feature-tag" style="background:rgba(239,68,68,0.2);color:var(--accent-red);">변조됨 (무시됨)</span>
+              </div>
+              <div class="stack-repr">
+                <div class="stack-slot slot-corrupted">[SP + 8]  Overwritten LR (0xffff...) [DISCARDED]</div>
+                <div class="stack-slot slot-corrupted">[SP + 0]  Buffer Smashed: 'A' * 32</div>
+              </div>
+            </div>
+            <div class="stack-card">
+              <div class="stack-title">
+                <span style="color:var(--accent-green);">그림자 스택 (x18 보호)</span>
+                <span class="feature-tag" style="background:rgba(34,197,94,0.2);color:var(--accent-green);">100% 무결성 유지</span>
+              </div>
+              <div class="stack-repr">
+                <div class="stack-slot slot-protected">[x18 - 8] Genuine Caller LR (Safe return)</div>
+                <div class="stack-slot" style="color:var(--accent-green);border:1px dashed var(--accent-green);text-align:center;">
+                  [+] 공격자 접근 불가 격리 메모리
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="code-box" style="color:var(--accent-green);border:1px solid var(--accent-green);">
+            ; [Hardened Epilogue with SCS]<br>
+            ldr   x30, [x18, #-8]!        ; [방어 핵심] x18(그림자 스택)에서 오염되지 않은 순수 복귀 주소 인출!<br>
+            ldp   x29, xzr, [sp], #32     ; 일반 스택의 오염된 데이터는 버림(xzr)<br>
+            ret                           ; 원본 호출자(vuln_scs_write)로 정상 복귀 -&gt; ROP 공격 원천 무력화!
+          </div>
+        `
+      },
+      matrix: {
+        title: "Mode 4: ROP 공격 방어 기술 체계 비교 매트릭스",
+        desc: "스택 카나리(Stack Protector), 그림자 호출 스택(Shadow Call Stack), 그리고 인텔 하드웨어 섀도 스택(Intel CET)의 아키텍처적 차이와 보안 보장 수준을 비교합니다.",
+        html: `
+          <table class="matrix-table">
+            <thead>
+              <tr>
+                <th>비교 항목</th>
+                <th>Stack Protector (Canary)</th>
+                <th>Shadow Call Stack (ARM64)</th>
+                <th>Intel CET Shadow Stack (x86)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>동작 계층</strong></td>
+                <td>컴파일러 소프트웨어 삽입</td>
+                <td>컴파일러 + ARM64 x18 레지스터</td>
+                <td>CPU 하드웨어 지원 (MSR / SSP)</td>
+              </tr>
+              <tr>
+                <td><strong>방어 메커니즘</strong></td>
+                <td>카나리 난수 일치 검증</td>
+                <td>복귀 주소 전용 독립 섀도 스택</td>
+                <td>하드웨어 보호 전용 섀도 스택 페이지</td>
+              </tr>
+              <tr>
+                <td><strong>우회 취약점</strong></td>
+                <td>메모리 누출(Leak) / 인덱스 건너뛰기</td>
+                <td>x18 포인터 조작 (메모리 임의 쓰기 시)</td>
+                <td>ROP 가젯 사용 불가 (하드웨어 차단)</td>
+              </tr>
+              <tr>
+                <td><strong>지원 아키텍처</strong></td>
+                <td>x86_64, ARM64 등 범용</td>
+                <td><strong>ARM64 전용</strong> (x18 플랫폼 레지스터)</td>
+                <td><strong>x86_64 전용</strong> (Tiger Lake 이후)</td>
+              </tr>
+              <tr>
+                <td><strong>런타임 오버헤드</strong></td>
+                <td>0.1% 미만</td>
+                <td>0.5% 미만 (스택 분기 명령어)</td>
+                <td>0.1% 미만 (하드웨어 고속 처리)</td>
+              </tr>
+            </tbody>
+          </table>
+        `
+      }
+    };
+
+    function renderMode(modeKey) {
+      const mode = modes[modeKey];
+      document.getElementById('diagramContent').innerHTML = mode.html;
+      document.getElementById('expTitle').innerText = mode.title;
+      document.getElementById('expDesc').innerHTML = mode.desc;
+
+      document.querySelectorAll('.nav-tab').forEach(tab => {
+        if (tab.getAttribute('data-mode') === modeKey) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+    }
+
+    document.querySelectorAll('.nav-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        const mode = tab.getAttribute('data-mode');
+        renderMode(mode);
+      });
+    });
+
+    // Initial render
+    renderMode('normal');
+  </script>
+</body>
+</html>
+
