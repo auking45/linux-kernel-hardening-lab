@@ -164,3 +164,48 @@
 3. **`main "$@"` 진입점 구조 의무화**:
    - 모든 셸 스크립트는 상단에 설정 및 모듈화된 서브루틴 함수들을 정의하고, 스크립트의 실행 흐름을 한눈에 파악할 수 있도록 `main "$@"` 구조로 작성함.
    - 절차적 단계(인자 파싱 -> 환경 검증 -> 빌드/생성 -> 산출물 검증)가 `main` 함수 내에 명확히 드러나도록 구현함.
+
+---
+
+## 6. Continuous Integration (CI) Matrix Standards (CI 자동화 표준)
+
+모든 하드닝 기능(Feature)이 새로 구현되거나 수정될 때, GitHub Actions CI 워크플로(`.github/workflows/test.yml`)의 `verify-features` Job에 해당 피처의 자동 검증을 **필수로 등록**해야 함:
+
+1. **Feature Matrix 등록 규격**:
+   - 피처 구현 완료 시 `.github/workflows/test.yml`의 `verify-features` 매트릭스에 해당 항목을 추가함.
+   - 듀얼 아키텍처(x86_64, arm64)를 원칙으로 지원하되, 특정 아키텍처 전용 기능(예: ARM64 Shadow Call Stack)은 지원 아키텍처만 등록함.
+   ```yaml
+   # 예시: 새로운 피처 등록 (include 매트릭스)
+   - arch: x86_64
+     feature: <feature-name>
+     test: test_<clean_name>
+   - arch: arm64
+     feature: <feature-name>
+     test: test_<clean_name>
+   ```
+2. **원클릭 자동 오케스트레이션 러너 연동**:
+   - 각 매트릭스 실행은 `run_lab.sh`를 통해 일관되게 실행함:
+     ```bash
+     docker compose run --rm lab ./scripts/run_lab.sh --arch ${{ matrix.arch }} --feature ${{ matrix.feature }} --test ${{ matrix.test }} --no-kvm --timeout 60
+     ```
+   - 이 명령어 하나로 커널 소스 확인 $\rightarrow$ rootfs 준비 $\rightarrow$ 하드닝 커널 컴파일 $\rightarrow$ QEMU 부팅 $\rightarrow$ 인게스트 Exploit PoC 실행 $\rightarrow$ 안전 종료(`reboot: Power down`)가 완전 자동 검증됨.
+3. **Fail-Fast 방지 및 병렬 격리**:
+   - `strategy.fail-fast: false`를 지정하여 특정 피처의 일시적 장애가 다른 피처의 CI 검증을 조기 중단시키지 않도록 보장함.
+
+---
+
+## 7. Feature Implementation Definition of Done (완료 기준 체크리스트)
+
+새로운 보안 하드닝 피처 작업을 완료로 선언하기 전 반드시 다음 10가지 항목이 100% 충족되었는지 검증함:
+
+- [ ] **Kconfig Fragments**: `configs/features/<feature>.config` 및 `<feature>-disabled.config` 작성 완료
+- [ ] **Vulnerable Driver**: `labs/<id>-<feature>/vuln_<name>.c` 취약 인터페이스 및 격리 설계 구현
+- [ ] **Exploit PoC**: `labs/<id>-<feature>/exploit.c` 비특권 유저(`lab`, UID 1000) 권한 탈취/우회 시연 바이너리 작성
+- [ ] **In-Guest Test Runner**: `labs/<id>-<feature>/test.sh` Exploit PoC + LKDTM 연동 스크립트 작성
+- [ ] **Archify Diagram**: `docs/assets/diagrams/<feature>/architecture.html` 인터랙티브 시각화 제작
+- [ ] **Standard Documentation**: `docs/ko/features/<id>-<feature>.md` (개조식 명사 종결형 엄수, ROP 체인 원리 심층 해설, 실무 영문 대본) 및 영문 문서 동기화 작성
+- [ ] **MkDocs Navigation**: `mkdocs.yml` 메뉴 등록 및 `mkdocs build --strict` 0-error/0-warning 통과
+- [ ] **CI Matrix Integration**: `.github/workflows/test.yml`의 `verify-features` 매트릭스에 피처 등록 완료
+- [ ] **Dual-Arch QEMU Verification**: 로컬 QEMU(x86_64 & arm64)에서 Base(공격 성공) vs Hardened(공격 차단) 실측 검증 완료
+- [ ] **Atomic Git Commit**: Conventional Commits 규격 준수 커밋
+

@@ -13,6 +13,8 @@ BUILD_ONLY=0
 REBUILD=0
 AUTO_TEST=""
 EXTRA_CMDLINE=""
+USE_KVM=1
+TIMEOUT_SEC=0
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -26,6 +28,8 @@ usage() {
     echo "  --rebuild                  Force recompilation of the kernel"
     echo "  --test <script_name>       Run automated in-guest test script and poweroff"
     echo "  --cmdline <string>         Extra kernel boot command-line arguments"
+    echo "  --no-kvm                   Disable KVM acceleration (force TCG emulation)"
+    echo "  --timeout <seconds>        Kill QEMU after specified seconds"
     echo "  -h, --help                 Show this help message"
     echo ""
     echo "Examples:"
@@ -61,6 +65,14 @@ parse_args() {
                 ;;
             --cmdline)
                 EXTRA_CMDLINE="$2"
+                shift 2
+                ;;
+            --no-kvm)
+                USE_KVM=0
+                shift
+                ;;
+            --timeout)
+                TIMEOUT_SEC="$2"
                 shift 2
                 ;;
             -h|--help)
@@ -152,6 +164,12 @@ launch_virtual_machine() {
     fi
     if [[ -n "${EXTRA_CMDLINE}" ]]; then
         qemu_args+=("--cmdline" "${EXTRA_CMDLINE}")
+    fi
+    if [[ "${USE_KVM}" -eq 0 ]]; then
+        qemu_args+=("--no-kvm")
+    fi
+    if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
+        qemu_args+=("--timeout" "${TIMEOUT_SEC}")
     fi
 
     "${SCRIPT_DIR}/run_qemu.sh" "${qemu_args[@]}"

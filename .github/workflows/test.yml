@@ -67,3 +67,58 @@ jobs:
       - name: Verify QEMU Boot Test (${{ matrix.arch }} TCG Emulation)
         run: |
           docker compose run --rm lab ./scripts/run_qemu.sh --arch ${{ matrix.arch }} --no-kvm --test test_smoke --timeout 25
+
+  verify-features:
+    name: "Verify Feature: ${{ matrix.feature }} (${{ matrix.arch }})"
+    runs-on: ubuntu-latest
+    needs: verify-kernel
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Task 3-1: Stack Protector Strong (Dual-Arch)
+          - arch: x86_64
+            feature: stack-protector
+            test: test_stack_protector
+          - arch: arm64
+            feature: stack-protector
+            test: test_stack_protector
+
+          # Task 3-2: FORTIFY_SOURCE (Dual-Arch)
+          - arch: x86_64
+            feature: fortify-source
+            test: test_fortify_source
+          - arch: arm64
+            feature: fortify-source
+            test: test_fortify_source
+
+          # Task 3-3: Shadow Call Stack (ARM64)
+          - arch: arm64
+            feature: shadow-call-stack
+            test: test_shadow_call_stack
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull or Build Docker Lab Image
+        run: |
+          echo "Pulling cache image from GHCR (if available)..."
+          docker compose pull lab || true
+          echo "Building lab image to ensure local Dockerfile changes are applied..."
+          docker compose build lab
+
+      - name: Run Hardening Lab Test (${{ matrix.feature }} on ${{ matrix.arch }})
+        run: |
+          docker compose run --rm lab ./scripts/run_lab.sh --arch ${{ matrix.arch }} --feature ${{ matrix.feature }} --test ${{ matrix.test }} --no-kvm --timeout 60
+
