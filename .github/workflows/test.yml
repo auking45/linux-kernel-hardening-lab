@@ -47,11 +47,10 @@ jobs:
 
       - name: Pull or Build Docker Lab Image
         run: |
-          echo "Attempting to pull lab image from GHCR..."
-          if ! docker compose pull lab; then
-            echo "Pull failed or image not found, falling back to local build..."
-            docker compose build lab
-          fi
+          echo "Pulling cache image from GHCR (if available)..."
+          docker compose pull lab || true
+          echo "Building lab image to ensure local Dockerfile changes are applied..."
+          docker compose build lab
 
       - name: Verify Shell Script Syntax
         run: |

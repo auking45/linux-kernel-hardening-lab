@@ -165,14 +165,24 @@ install_lab_tests() {
 
         # Preflight check: verify C compiler and static libc headers
         if ! echo 'int main(void){return 0;}' | "${cc_bin}" -static -x c - -o /dev/null >/dev/null 2>&1; then
-            echo "[-] Error: Compiler '${cc_bin}' failed to compile a basic static C binary." >&2
-            if [[ "${TARGET_ARCH}" == "arm64" ]]; then
-                echo "    Missing arm64 libc headers? Please install: libc6-dev-arm64-cross" >&2
-                echo "    (e.g., sudo apt-get install -y libc6-dev-arm64-cross)" >&2
-            else
-                echo "    Missing libc dev packages? Please install: libc6-dev" >&2
+            echo "[-] Warning: Compiler '${cc_bin}' failed to compile a basic static C binary." >&2
+            if [[ "${TARGET_ARCH}" == "arm64" ]] && command -v apt-get >/dev/null 2>&1 && [[ "$(id -u)" -eq 0 ]]; then
+                echo "[*] Attempting auto-installation of missing package: libc6-dev-arm64-cross..."
+                apt-get update >/dev/null 2>&1 && apt-get install -y --no-install-recommends libc6-dev-arm64-cross linux-libc-dev-arm64-cross >/dev/null 2>&1 || true
             fi
-            exit 1
+
+            # Re-check after auto-installation attempt
+            if ! echo 'int main(void){return 0;}' | "${cc_bin}" -static -x c - -o /dev/null >/dev/null 2>&1; then
+                echo "[-] Error: Compiler '${cc_bin}' failed to compile a basic static C binary." >&2
+                if [[ "${TARGET_ARCH}" == "arm64" ]]; then
+                    echo "    Missing arm64 libc headers? Please install: libc6-dev-arm64-cross" >&2
+                    echo "    (e.g., sudo apt-get install -y libc6-dev-arm64-cross)" >&2
+                else
+                    echo "    Missing libc dev packages? Please install: libc6-dev" >&2
+                fi
+                exit 1
+            fi
+            echo "[+] Successfully recovered compiler environment with cross libc headers."
         fi
 
         for exploit_src in "${labs_dir}"/*/exploit.c; do
