@@ -45,6 +45,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Cache Kernel Source Tarball
+        uses: actions/cache@v4
+        with:
+          path: downloads/*.tar.xz
+          key: kernel-tarball-6.12.109
+
+      - name: Cache Rootfs Archive (${{ matrix.arch }})
+        uses: actions/cache@v4
+        with:
+          path: rootfs/initramfs-${{ matrix.arch }}.cpio.gz
+          key: rootfs-${{ matrix.arch }}-${{ hashFiles('scripts/build_rootfs.sh', 'labs/**/exploit.c', 'labs/**/test.sh') }}
+          restore-keys: |
+            rootfs-${{ matrix.arch }}-
+
+      - name: Cache Base Kernel Build (${{ matrix.arch }})
+        uses: actions/cache@v4
+        with:
+          path: build_dir/${{ matrix.arch }}-base
+          key: kernel-bin-${{ matrix.arch }}-base-${{ hashFiles('configs/base.config', 'configs/arch/*.config', 'scripts/build_kernel.sh') }}
+          restore-keys: |
+            kernel-bin-${{ matrix.arch }}-base-
+
       - name: Pull or Build Docker Lab Image
         run: |
           echo "Pulling cache image from GHCR (if available)..."
@@ -67,6 +89,11 @@ jobs:
       - name: Verify QEMU Boot Test (${{ matrix.arch }} TCG Emulation)
         run: |
           docker compose run --rm lab ./scripts/run_qemu.sh --arch ${{ matrix.arch }} --no-kvm --test test_smoke --timeout 25
+
+      - name: Ensure Cache Read Permissions
+        if: always()
+        run: |
+          docker compose run --rm lab chmod -R a+rX downloads rootfs build_dir 2>/dev/null || true
 
   verify-features:
     name: "Verify Feature: ${{ matrix.feature }} (${{ matrix.arch }})"
@@ -111,6 +138,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Cache Kernel Source Tarball
+        uses: actions/cache@v4
+        with:
+          path: downloads/*.tar.xz
+          key: kernel-tarball-6.12.109
+
+      - name: Cache Rootfs Archive (${{ matrix.arch }})
+        uses: actions/cache@v4
+        with:
+          path: rootfs/initramfs-${{ matrix.arch }}.cpio.gz
+          key: rootfs-${{ matrix.arch }}-${{ hashFiles('scripts/build_rootfs.sh', 'labs/**/exploit.c', 'labs/**/test.sh') }}
+          restore-keys: |
+            rootfs-${{ matrix.arch }}-
+
+      - name: Cache Feature Kernel Build (${{ matrix.feature }} on ${{ matrix.arch }})
+        uses: actions/cache@v4
+        with:
+          path: build_dir/${{ matrix.arch }}-${{ matrix.feature }}
+          key: kernel-bin-${{ matrix.arch }}-${{ matrix.feature }}-${{ hashFiles('configs/**', 'labs/**/vuln_*.c', 'scripts/build_kernel.sh') }}
+          restore-keys: |
+            kernel-bin-${{ matrix.arch }}-${{ matrix.feature }}-
+
       - name: Pull or Build Docker Lab Image
         run: |
           echo "Pulling cache image from GHCR (if available)..."
@@ -121,4 +170,9 @@ jobs:
       - name: Run Hardening Lab Test (${{ matrix.feature }} on ${{ matrix.arch }})
         run: |
           docker compose run --rm lab ./scripts/run_lab.sh --arch ${{ matrix.arch }} --feature ${{ matrix.feature }} --test ${{ matrix.test }} --no-kvm --timeout 60
+
+      - name: Ensure Cache Read Permissions
+        if: always()
+        run: |
+          docker compose run --rm lab chmod -R a+rX downloads rootfs build_dir 2>/dev/null || true
 
