@@ -107,3 +107,4 @@ nav:
           - Stack Canary: features/01-stack-protector.md
           - Fortify Source: features/02-fortify-source.md
           - Shadow Call Stack: features/03-shadow-call-stack.md
+          - STACKLEAK: features/04-stackleak.md

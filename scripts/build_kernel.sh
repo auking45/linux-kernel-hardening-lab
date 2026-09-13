@@ -88,9 +88,25 @@ integrate_lab_drivers() {
     fi
 }
 
+check_plugin_dev_headers() {
+    local feature_config="${CONFIGS_DIR}/features/${FEATURE_NAME}.config"
+    if [[ -f "${feature_config}" ]] && grep -q "CONFIG_GCC_PLUGIN" "${feature_config}"; then
+        local plugin_dir
+        plugin_dir="$("${CROSS_COMPILE}gcc" -print-file-name=plugin 2>/dev/null || true)"
+        if [[ ! -d "${plugin_dir}/include" ]]; then
+            echo "[-] Warning: GCC plugin headers missing for ${CROSS_COMPILE}gcc (${plugin_dir}/include)" >&2
+            if command -v apt-get >/dev/null 2>&1 && [[ "$(id -u)" -eq 0 ]]; then
+                echo "[*] Attempting auto-installation of missing GCC plugin development packages..."
+                apt-get update >/dev/null 2>&1 && apt-get install -y --no-install-recommends gcc-15-plugin-dev gcc-15-plugin-dev-aarch64-linux-gnu >/dev/null 2>&1 || true
+            fi
+        fi
+    fi
+}
+
 configure_kernel() {
     local target_build_dir="$1"
     integrate_lab_drivers
+    check_plugin_dev_headers
 
     local base_config="${CONFIGS_DIR}/base/${TARGET_ARCH}_defconfig"
 

@@ -126,6 +126,14 @@ jobs:
             feature: shadow-call-stack
             test: test_shadow_call_stack
 
+          # Task 3-4: STACKLEAK (Dual-Arch)
+          - arch: x86_64
+            feature: stackleak
+            test: test_stackleak
+          - arch: arm64
+            feature: stackleak
+            test: test_stackleak
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -179,4 +187,3 @@ jobs:
         if: always()
         run: |
           docker compose run --rm lab chmod -R a+rX downloads rootfs build_dir 2>/dev/null || true
-

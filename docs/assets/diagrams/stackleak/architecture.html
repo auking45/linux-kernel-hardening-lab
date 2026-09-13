@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CONFIG_GCC_PLUGIN_STACKLEAK - Kernel Stack Erasing & Poisoning Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --poison-color: #f97316;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --poison-color: #ea580c;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      background-color: var(--poison-color);
+      color: #fff;
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background-color 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background-color: var(--card-border);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tab {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .nav-tab.active {
+      background-color: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .diagram-panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      min-height: 480px;
+    }
+
+    .stack-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 16px;
+    }
+
+    .stack-card {
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    [data-theme="light"] .stack-card {
+      background: rgba(241, 245, 249, 0.6);
+    }
+
+    .stack-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .stack-repr {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stack-slot {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.84rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px dashed transparent;
+      transition: all 0.3s;
+    }
+
+    .slot-ptregs {
+      background: rgba(148, 163, 184, 0.15);
+      border-color: var(--text-muted);
+      color: var(--text-muted);
+    }
+
+    .slot-active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .slot-kernel-ptr {
+      background: rgba(234, 179, 8, 0.2);
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+      font-weight: 700;
+    }
+
+    .slot-poison {
+      background: rgba(249, 115, 22, 0.25);
+      border-color: var(--poison-color);
+      color: var(--poison-color);
+      font-weight: 700;
+    }
+
+    .slot-leaked {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      font-weight: 700;
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    .slot-unallocated {
+      background: rgba(15, 23, 42, 0.3);
+      border-color: var(--card-border);
+      color: var(--text-muted);
+      opacity: 0.6;
+    }
+
+    .slot-magic {
+      background: rgba(168, 85, 247, 0.2);
+      border-color: var(--accent-purple);
+      color: var(--accent-purple);
+      font-weight: 700;
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.7; }
+      to { opacity: 1; }
+    }
+
+    .code-box {
+      background: #090d16;
+      border-radius: 6px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      margin-top: 16px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+
+    .explanation-panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .explanation-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-blue);
+    }
+
+    .explanation-desc {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: var(--text-main);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      align-items: center;
+    }
+
+    .btn {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--card-border);
+    }
+
+    .btn-primary {
+      background-color: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .pointer-marker {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      background: rgba(255,255,255,0.1);
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>STACKLEAK Stack Erasing Architecture</span>
+        <span class="badge">CONFIG_GCC_PLUGIN_STACKLEAK</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">Light Mode</button>
+    </header>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="setStep(0)">1. 시스템 콜 실행 & lowest_stack 추적</button>
+      <button class="nav-tab" onclick="setStep(1)">2. [취약점] 미소거 스택 잔여물 유출 (Base)</button>
+      <button class="nav-tab" onclick="setStep(2)">3. [하드닝] Syscall Exit 포이즈닝 소거 (STACKLEAK)</button>
+      <button class="nav-tab" onclick="setStep(3)">4. [스택 고갈 방어] lowest_stack 경계 검증</button>
+    </div>
+
+    <div class="diagram-panel" id="diagramPanel">
+      <!-- Dynamic Diagram Contents Rendered via JS -->
+    </div>
+
+    <div class="explanation-panel">
+      <div class="explanation-title" id="expTitle">1. 시스템 콜 실행 & lowest_stack 실시간 추적</div>
+      <div class="explanation-desc" id="expDesc">
+        유저 공간에서 시스템 콜을 호출하면 커널 스택(16KB THREAD_SIZE) 상단에 pt_regs 구조체가 저장됩니다.
+        함수가 호출되면서 스택 포인터(RSP/SP)가 아래로 하향 이동하며, GCC 플러그인에 의해 100바이트 이상의 스택 프레임을 가진 함수 진입 시
+        <code>stackleak_track_stack()</code>이 호출되어 프로세스 구조체의 <code>current->lowest_stack</code> 포인터를 최저 수위로 실시간 갱신합니다.
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="prevStep()">이전 단계</button>
+        <button class="btn btn-primary" onclick="nextStep()">다음 단계</button>
+        <span style="font-size: 0.85rem; color: var(--text-muted); margin-left: 10px;" id="stepCounter">Step 1 of 4</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 0;
+    const totalSteps = 4;
+
+    const stepData = [
+      {
+        title: "1. 시스템 콜 실행 & lowest_stack 실시간 추적",
+        desc: "유저 공간에서 write() 시스템 콜 호출 시 커널 스택 상단에 pt_regs가 push된 후 드라이버 함수가 호출됩니다. 100바이트 이상의 프레임을 가진 함수 진입 시 컴파일러가 주입한 stackleak_track_stack()이 current->lowest_stack을 최저 수위로 하향 갱신합니다. 이때 스택에는 민감한 커널 함수 포인터들이 기록됩니다.",
+        code: `/* GCC Plugin Instrumentation: Inserted into functions with frame >= 100B */\nvoid __used stackleak_track_stack(void) {\n    unsigned long sp = current_stack_pointer;\n    if (sp < current->lowest_stack && sp >= stackleak_task_low_bound(current))\n        current->lowest_stack = sp;\n}`,
+        slotsA: [
+          { name: "Top of Stack (pt_regs)", type: "slot-ptregs", val: "Saved Context: RIP, CS, RSP" },
+          { name: "vuln_stackleak_write()", type: "slot-active", val: "Local Frame (512 Bytes)" },
+          { name: "Kernel Pointers stamped", type: "slot-kernel-ptr", val: "0xffffffff81234567 (&vuln_init)" },
+          { name: "current->lowest_stack", type: "slot-active", val: "<-- Lowest Watermark Tracked" },
+          { name: "Unallocated Stack Space", type: "slot-unallocated", val: "0x0000000000000000" },
+          { name: "Bottom of Stack", type: "slot-magic", val: "STACK_END_MAGIC (0x57ac6e9d)" }
+        ],
+        slotsB: [
+          { name: "task_struct Metrics", type: "slot-active", val: "current->lowest_stack = 0xffff888002a13b80" },
+          { name: "Syscall State", type: "slot-ptregs", val: "IN_SYSCALL (write)" },
+          { name: "Tracking Trigger", type: "slot-kernel-ptr", val: "CONFIG_STACKLEAK_TRACK_MIN_SIZE=100" },
+          { name: "Stack Depth Metric", type: "slot-active", val: "/proc/<pid>/stack_depth: Active" }
+        ]
+      },
+      {
+        title: "2. [취약점] 미소거 스택 잔여물 유출 (Base Kernel)",
+        desc: "CONFIG_GCC_PLUGIN_STACKLEAK이 비활성화된 기본 커널에서는 시스템 콜이 유저 공간으로 복귀(Syscall Exit)해도 스택 영역이 소거되지 않고 방치됩니다. 이후 read() 시스템 콜에서 미초기화된 스택 변수를 읽어 유저 공간으로 copy_to_user()할 때, 직전 write()가 남겨둔 커널 함수 포인터가 유출되어 KASLR(주소 무작위화)이 완전히 무력화됩니다.",
+        code: `/* Vulnerable Base Kernel Flow (Without STACKLEAK) */\n// Syscall 1: write() stamps 0xffffffff81234567 onto stack -> returns to userspace\n// Kernel Stack remains un-erased!\n// Syscall 2: read() allocates uninit_stack[64] -> overlaps stamped area\ncopy_to_user(ubuf, uninit_stack, sizeof(uninit_stack)); // Leaks KASLR base!`,
+        slotsA: [
+          { name: "Top of Stack (pt_regs)", type: "slot-ptregs", val: "Returned to Userspace" },
+          { name: "Residual Stack Frame", type: "slot-leaked", val: "Dangling Frame from write()" },
+          { name: "Leaked Kernel Address", type: "slot-leaked", val: "0xffffffff81234567 (KASLR Bypass!)" },
+          { name: "vuln_stackleak_read()", type: "slot-active", val: "Overlaps Previous Frame" },
+          { name: "Unallocated Stack Space", type: "slot-unallocated", val: "0x0000000000000000" },
+          { name: "Bottom of Stack", type: "slot-magic", val: "STACK_END_MAGIC (0x57ac6e9d)" }
+        ],
+        slotsB: [
+          { name: "Exploit Result (UID 1000)", type: "slot-leaked", val: "[!] KASLR BYPASS CONFIRMED" },
+          { name: "Leaked Pointer", type: "slot-leaked", val: "0xffffffff81234567" },
+          { name: "Kernel Base Computed", type: "slot-kernel-ptr", val: "KASLR Slide = Leaked - Offset" },
+          { name: "Syscall Exit Wipe", type: "slot-ptregs", val: "DISABLED (stackleak=n)" }
+        ]
+      },
+      {
+        title: "3. [하드닝] Syscall Exit 포이즈닝 소거 (STACKLEAK Active)",
+        desc: "CONFIG_GCC_PLUGIN_STACKLEAK이 활성화된 커널은 시스템 콜 복귀 직전 아키텍처별 어셈블리 진입점에서 stackleak_erase()를 호출합니다. stackleak_erase()는 current->lowest_stack부터 스택 상단까지의 모든 메모리를 STACKLEAK_POISON (-0xBEEF = 0xffffffffffff4111)으로 덮어씁니다. 다음 시스템 콜에서 미초기화 변수를 읽더라도 오직 포이즌 값만 읽게 되므로 정보 누출이 원천 차단됩니다.",
+        code: `/* Mainline Kernel: kernel/stackleak.c */\nstatic __always_inline void __stackleak_erase(bool on_task_stack) {\n    erase_low = stackleak_find_top_of_poison(task_stack_low, current->lowest_stack);\n    erase_high = on_task_stack ? current_stack_pointer : task_stack_high;\n    __stackleak_poison(erase_low, erase_high, STACKLEAK_POISON); /* -0xBEEF */\n    current->lowest_stack = task_stack_high; /* Reset watermark */\n}`,
+        slotsA: [
+          { name: "Top of Stack (pt_regs)", type: "slot-ptregs", val: "Syscall Exit Hook" },
+          { name: "Poisoned Stack Memory", type: "slot-poison", val: "0xffffffffffff4111 (-0xBEEF)" },
+          { name: "Poisoned Stack Memory", type: "slot-poison", val: "0xffffffffffff4111 (-0xBEEF)" },
+          { name: "Lowest Watermark Erased", type: "slot-poison", val: "0xffffffffffff4111 (-0xBEEF)" },
+          { name: "Unallocated Stack Space", type: "slot-unallocated", val: "0x0000000000000000" },
+          { name: "Bottom of Stack", type: "slot-magic", val: "STACK_END_MAGIC (Protected)" }
+        ],
+        slotsB: [
+          { name: "Defense Verification", type: "slot-poison", val: "[+] DEFENSE ACTIVE" },
+          { name: "Exploit Read Attempt", type: "slot-active", val: "Receives 0xffffffffffff4111" },
+          { name: "Kernel Address Leak", type: "slot-poison", val: "BLOCKED (0 Leaks Detected)" },
+          { name: "Sysctl stack_erasing", type: "slot-active", val: "/proc/sys/kernel/stack_erasing: 1" }
+        ]
+      },
+      {
+        title: "4. [스택 고갈 방어] lowest_stack 경계 및 Stack Clash 방어",
+        desc: "STACKLEAK은 스택 정보 누출 방지뿐만 아니라 커널 스택 고갈(Stack Exhaustion / Stack Clash) 공격을 방어합니다. 깊은 재귀나 비정상적으로 큰 스택 프레임 할당으로 스택이 task_stack_low_bound (스택 하단 매직 직전)를 침범하려 할 경우, 추적 계측 함수가 이를 감지하여 인접한 구조체 오염을 방지하고 시스템을 안전하게 보호합니다.",
+        code: `/* Stack Boundary Protection */\n#define STACK_END_MAGIC 0x57AC6E9D\nstatic __always_inline unsigned long stackleak_task_low_bound(const struct task_struct *tsk) {\n    return (unsigned long)end_of_stack(tsk) + sizeof(unsigned long);\n}\n/* Guarantees STACK_END_MAGIC is never clobbered, stopping stack clash */`,
+        slotsA: [
+          { name: "Top of Kernel Stack", type: "slot-ptregs", val: "Task pt_regs" },
+          { name: "Normal Stack Frame", type: "slot-active", val: "Deep Kernel Execution Frame" },
+          { name: "Boundary Guard Zone", type: "slot-poison", val: "stackleak_task_low_bound" },
+          { name: "Lowest Bound Check", type: "slot-active", val: "sp >= task_low_bound" },
+          { name: "Protected Magic", type: "slot-magic", val: "STACK_END_MAGIC (0x57ac6e9d)" },
+          { name: "Adjacent Memory (Thread)", type: "slot-unallocated", val: "Protected from Stack Clash!" }
+        ],
+        slotsB: [
+          { name: "Stack Clash Mitigation", type: "slot-magic", val: "Strict Low-Bound Enforcement" },
+          { name: "LKDTM Validation", type: "slot-active", val: "echo STACKLEAK_ERASING > DIRECT" },
+          { name: "Kernel Self-Test Result", type: "slot-poison", val: "OK: thread stack properly erased" },
+          { name: "Performance Cost", type: "slot-ptregs", val: "~1% System Call Overhead" }
+        ]
+      }
+    ];
+
+    function renderDiagram(step) {
+      const data = stepData[step];
+      const panel = document.getElementById('diagramPanel');
+
+      let htmlA = data.slotsA.map(s => `
+        <div class="stack-slot ${s.type}">
+          <span>${s.name}</span>
+          <span>${s.val}</span>
+        </div>
+      `).join('');
+
+      let htmlB = data.slotsB.map(s => `
+        <div class="stack-slot ${s.type}">
+          <span>${s.name}</span>
+          <span>${s.val}</span>
+        </div>
+      `).join('');
+
+      panel.innerHTML = `
+        <div class="stack-grid">
+          <div class="stack-card">
+            <div class="stack-title">
+              <span>Kernel Thread Stack (16KB)</span>
+              <span class="pointer-marker">Stack Memory Layout</span>
+            </div>
+            <div class="stack-repr">
+              ${htmlA}
+            </div>
+          </div>
+          <div class="stack-card">
+            <div class="stack-title">
+              <span>Security Engine & Exploit State</span>
+              <span class="pointer-marker">Verification Status</span>
+            </div>
+            <div class="stack-repr">
+              ${htmlB}
+            </div>
+          </div>
+        </div>
+        <div class="code-box">${data.code}</div>
+      `;
+
+      document.getElementById('expTitle').innerText = data.title;
+      document.getElementById('expDesc').innerText = data.desc;
+      document.getElementById('stepCounter').innerText = `Step ${step + 1} of ${totalSteps}`;
+
+      const tabs = document.querySelectorAll('.nav-tab');
+      tabs.forEach((tab, idx) => {
+        if (idx === step) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+    }
+
+    function setStep(step) {
+      currentStep = step;
+      renderDiagram(currentStep);
+    }
+
+    function nextStep() {
+      currentStep = (currentStep + 1) % totalSteps;
+      renderDiagram(currentStep);
+    }
+
+    function prevStep() {
+      currentStep = (currentStep - 1 + totalSteps) % totalSteps;
+      renderDiagram(currentStep);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const btn = document.getElementById('themeToggle');
+      if (current === 'light') {
+        document.documentElement.removeAttribute('data-theme');
+        btn.innerText = 'Light Mode';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        btn.innerText = 'Dark Mode';
+      }
+    }
+
+    // Initial render
+    renderDiagram(0);
+  </script>
+</body>
+</html>
+
