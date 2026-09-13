@@ -70,8 +70,28 @@ prepare_build_dir() {
     fi
 }
 
+integrate_lab_drivers() {
+    local misc_dir="${KERNEL_SRC_DIR}/drivers/misc"
+    if [[ -d "${misc_dir}" ]]; then
+        for vuln_src in "${LAB_ROOT_DIR}/labs"/*/*vuln*.c; do
+            if [[ -f "${vuln_src}" ]]; then
+                local fname
+                fname="$(basename "${vuln_src}")"
+                local objname="${fname%.c}.o"
+                cp "${vuln_src}" "${misc_dir}/${fname}"
+                if ! grep -q "${objname}" "${misc_dir}/Makefile"; then
+                    echo "obj-y += ${objname}" >> "${misc_dir}/Makefile"
+                    echo "[*] Integrated lab driver: ${fname} into drivers/misc/Makefile"
+                fi
+            fi
+        done
+    fi
+}
+
 configure_kernel() {
     local target_build_dir="$1"
+    integrate_lab_drivers
+
     local base_config="${CONFIGS_DIR}/base/${TARGET_ARCH}_defconfig"
 
     if [[ ! -f "${base_config}" ]]; then

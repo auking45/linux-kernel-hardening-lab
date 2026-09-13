@@ -80,36 +80,51 @@
 
 - Archify 아키텍처 맵 또는 Mermaid 시퀀스 다이어그램 배치.
 - 컴파일러 및 하드웨어 CPU 수준에서의 동작 원리 분석.
+- **실전 ROP 체인 및 공격 메커니즘 심층 해설 (Dual-Arch ROP Mechanics)**:
+  - 스택 프레임 레이아웃 및 가젯(Gadget) 도미노 연쇄 원리.
+  - **x86_64 vs ARM64(AArch64) ROP/JOP 구조 비교**:
+    - x86_64: `ret` (스택 기반 RIP 팝) + 레지스터 인자(`rdi`) + `iretq/KPTI` 트램펄린 복귀.
+    - ARM64: `ret` (`x30/lr` 기반 분기) + 레지스터 인자(`x0`) + `eret/ret_to_user` 복귀.
+  - 커널 자격증명 승격(`commit_creds(&init_cred)`) 및 유저스페이스 안전 복귀 절차.
+  - 해당 하드닝 기능이 ROP 체인의 어느 지점을 절단(Intercept)하여 무력화하는지 명시.
 
 ## 3. Kconfig 설정 및 부팅 파라미터 (Configuration)
 
 - 관련 커널 설정 옵션 (`CONFIG_*`) 및 디펜던시 명시.
 - 런타임 부팅 파라미터 및 sysctl 제어 항목 표 정리.
 
-## 4. 실습 및 검증 (Hands-on Verification)
+## 4. 실습 및 검증 (Hands-on Verification & Exploit PoC)
 
+- 단순 크래시 관찰(LKDTM)과 **실전 권한 상승 ROP Exploit PoC(일반 유저 -> Root 셸)**를 함께 제공:
+  1. **LKDTM 기반 방어 검증**: 커널 내장 모듈의 빠른 차단 여부 확인.
+  2. **실전 ROP Exploit PoC (Dual-Arch: x86_64 & ARM64)**:
+     - 비권한 일반 계정(`lab`, UID 1000)에서 취약 인터페이스를 향해 ROP 페이로드 주입.
+     - **Base 커널 (보호 미적용)**: ROP 체인이 실행되어 `uid=0` (Root) 셸 탈취 성공 또는 통제 불능 크래시(GPF/Fault).
+     - **Hardened 커널 (보호 적용)**: ROP 첫 가젯 실행 직전 해당 하드닝 기능이 즉시 탐지하여 패닉/안전 차단.
 - 듀얼 아키텍처(x86_64 / arm64) 및 Base vs Hardened 탭 제공:
 
-=== "x86_64: Base Kernel (미적용)"
+=== "x86_64: Hardened Kernel (적용: ROP 차단 - 권장)"
     ```bash
-    ./scripts/run_qemu.sh --arch x86_64 --kernel build/linux-base
-    # 결과 로그: Exploit 성공 또는 시스템 크래시
+    ./scripts/run_lab.sh --arch x86_64 --feature <name> --test test_<name>
+    # 결과 로그: ROP 진입 전 커널 패닉 / 안전 차단
     ```
 
-=== "x86_64: Hardened Kernel (적용)"
+=== "x86_64: Base Kernel (미적용: Exploit 성공)"
     ```bash
-    ./scripts/run_qemu.sh --arch x86_64 --kernel build/linux-hardened
-    # 결과 로그: Kernel Panic 또는 안전 차단 메시지
+    ./scripts/run_lab.sh --arch x86_64 --feature <name>-disabled --test test_<name>
+    # 결과 로그: ROP 체인 실행 -> UID=0 (Root Shell 획득) 또는 제어 흐름 탈취 크래시
     ```
 
-=== "ARM64: Base Kernel (미적용)"
+=== "ARM64: Hardened Kernel (적용: ROP 차단)"
     ```bash
-    ./scripts/run_qemu.sh --arch arm64 --kernel build/linux-arm64-base
+    ./scripts/run_lab.sh --arch arm64 --feature <name> --test test_<name>
+    # 결과 로그: ARM64 ROP 진입 전 커널 패닉 / 안전 차단
     ```
 
-=== "ARM64: Hardened Kernel (적용)"
+=== "ARM64: Base Kernel (미적용: Exploit 성공)"
     ```bash
-    ./scripts/run_qemu.sh --arch arm64 --kernel build/linux-arm64-hardened
+    ./scripts/run_lab.sh --arch arm64 --feature <name>-disabled --test test_<name>
+    # 결과 로그: ARM64 ROP/JOP 체인 실행 -> UID=0 획득 또는 분기 실패 예외
     ```
 
 ## 5. 성능 및 호환성 분석 (Performance & Compatibility)
@@ -121,9 +136,9 @@
 
 - 동료 엔지니어, 기술 세미나 청중, 인터뷰어를 대상으로 직접 1인칭 발표를 수행하는 **실전 영문 강의 대본(Spoken Technical English)** 제공.
 - **표준 4단계 대본 구성**:
-  1. **Opening Hook & Problem Statement**: 해당 하드닝 기능이 해결하는 핵심 보안 위협 제시.
-  2. **Diagram & Architecture Walkthrough**: 다이어그램을 짚어가며 내부 메커니즘 설명.
-  3. **Live Demo Commentary**: QEMU 실행 및 익스플로잇/LKDTM 차단 로그 현장 중계.
+  1. **Opening Hook & Problem Statement**: 해당 하드닝 기능이 해결하는 핵심 보안 위협 및 ROP 공격 시나리오 제시.
+  2. **Diagram & Architecture Walkthrough**: 다이어그램을 짚어가며 ROP 체인 vs 하드닝 차단 메커니즘 설명.
+  3. **Live Demo Commentary**: QEMU 실행 및 실제 ROP Exploit 성공(Base) vs 카나리/하드닝 차단(Hardened) 현장 중계.
   4. **Key Takeaways & Production Advice**: 실무 적용 권고 및 요약.
 ````
 

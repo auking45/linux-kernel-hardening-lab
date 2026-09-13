@@ -108,9 +108,6 @@ install_busybox() {
     # Install symlinks (dynamic query if host can run it, fallback to tools array if cross-architecture)
     (
         cd "${rootfs_work_dir}/bin"
-        for applet in $(./busybox --list); do
-            ln -sf busybox "${applet}"
-        done
         if ./busybox --list >/dev/null 2>&1; then
             for applet in $(./busybox --list); do
                 ln -sf busybox "${applet}"
@@ -159,6 +156,26 @@ install_lab_tests() {
                 echo "    Installed: /bin/test_${clean_name}"
             fi
         done
+
+        # Compile and install C exploit PoC binaries for target architecture
+        local cc_bin="${CROSS_COMPILE:-}gcc"
+        if ! command -v "${cc_bin}" >/dev/null 2>&1 && [[ -z "${CROSS_COMPILE:-}" ]]; then
+            cc_bin="x86_64-linux-gnu-gcc"
+        fi
+
+        for exploit_src in "${labs_dir}"/*/exploit.c; do
+            if [[ -f "${exploit_src}" ]]; then
+                local feature_dir
+                feature_dir="$(basename "$(dirname "${exploit_src}")")"
+                local clean_name
+                clean_name="$(echo "${feature_dir}" | sed -E 's/^[0-9]+-//' | tr '-' '_')"
+                local target_bin="${rootfs_work_dir}/bin/exploit_${clean_name}"
+
+                echo "[*] Compiling C exploit PoC: ${exploit_src} -> /bin/exploit_${clean_name} (using ${cc_bin})"
+                "${cc_bin}" -static -O2 "${exploit_src}" -o "${target_bin}"
+                chmod 755 "${target_bin}"
+            fi
+        done
     fi
 }
 
@@ -175,6 +192,13 @@ mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev
 mount -t debugfs debugfs /sys/kernel/debug 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp
+
+# Configure training lab permissions
+echo 0 > /proc/sys/kernel/kptr_restrict 2>/dev/null || true
+echo 0 > /proc/sys/kernel/dmesg_restrict 2>/dev/null || true
+cat /proc/kallsyms > /tmp/kallsyms 2>/dev/null || true
+chmod 666 /tmp/kallsyms 2>/dev/null || true
+chmod 666 /proc/vuln_* 2>/dev/null || true
 
 echo ""
 echo "========================================================="
