@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KASLR Architecture & Memory Layout Randomization</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --slide-color: #06b6d4;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --slide-color: #0891b2;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      background-color: var(--slide-color);
+      color: #fff;
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background-color 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background-color: var(--card-border);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tab {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.88rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .nav-tab.active {
+      background-color: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .diagram-panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+      min-height: 480px;
+    }
+
+    .memory-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 24px;
+      margin-top: 16px;
+    }
+
+    .memory-card {
+      background: rgba(15, 23, 42, 0.4);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    [data-theme="light"] .memory-card {
+      background: rgba(241, 245, 249, 0.6);
+    }
+
+    .memory-title {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .memory-repr {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mem-slot {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.84rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px dashed transparent;
+      transition: all 0.3s;
+    }
+
+    .slot-kernel {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .slot-randomized {
+      background: rgba(6, 182, 212, 0.25);
+      border-color: var(--slide-color);
+      color: var(--slide-color);
+      font-weight: 700;
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    .slot-static {
+      background: rgba(239, 68, 68, 0.25);
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      font-weight: 700;
+    }
+
+    .slot-protected {
+      background: rgba(34, 197, 94, 0.2);
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    .slot-system {
+      background: rgba(148, 163, 184, 0.15);
+      border-color: var(--text-muted);
+      color: var(--text-muted);
+    }
+
+    @keyframes pulse {
+      from { opacity: 0.7; }
+      to { opacity: 1; }
+    }
+
+    .code-box {
+      background: #090d16;
+      border-radius: 6px;
+      padding: 14px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      margin-top: 16px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+
+    .explanation-panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .explanation-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-blue);
+    }
+
+    .explanation-desc {
+      font-size: 0.92rem;
+      line-height: 1.6;
+      color: var(--text-main);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      align-items: center;
+    }
+
+    .btn {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 18px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--card-border);
+    }
+
+    .btn-primary {
+      background-color: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+    }
+
+    .btn-primary:hover {
+      opacity: 0.9;
+    }
+
+    .pointer-marker {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      background: rgba(255,255,255,0.1);
+      margin-left: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>Kernel Address Space Layout Randomization (KASLR)</span>
+        <span class="badge">CONFIG_RANDOMIZE_BASE</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">Light Mode</button>
+    </header>
+
+    <div class="nav-tabs">
+      <button class="nav-tab active" onclick="setStep(0)">1. 커널 상위 가상 주소 구조</button>
+      <button class="nav-tab" onclick="setStep(1)">2. [취약점] 고정 배치 (Base / nokaslr)</button>
+      <button class="nav-tab" onclick="setStep(2)">3. [하드닝] 부팅 시 KASLR Slide 무작위화</button>
+      <button class="nav-tab" onclick="setStep(3)">4. [방어 효과] 고정 주소 공격 차단 & Infoleak 필연성</button>
+    </div>
+
+    <div class="diagram-panel" id="diagramPanel">
+      <!-- Dynamic Diagram Contents Rendered via JS -->
+    </div>
+
+    <div class="explanation-panel">
+      <div class="explanation-title" id="expTitle">1. 커널 상위 가상 주소(Higher Half) 맵 구조</div>
+      <div class="explanation-desc" id="expDesc">
+        64비트 리눅스 커널은 가상 메모리의 상위 절반(Higher Half)을 커널 전용 영역으로 사용합니다.
+        x86_64의 경우 <code>0xffffffff80000000</code>부터 512MB 공간(__START_KERNEL_map)에 커널 코드(Text)와 데이터가 매핑됩니다.
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="prevStep()">이전 단계</button>
+        <button class="btn btn-primary" onclick="nextStep()">다음 단계</button>
+        <span style="font-size: 0.85rem; color: var(--text-muted); margin-left: 10px;" id="stepCounter">Step 1 of 4</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 0;
+    const totalSteps = 4;
+
+    const stepData = [
+      {
+        title: "1. 커널 상위 가상 주소(Higher Half) 맵 구조",
+        desc: "64비트 리눅스 아키텍처는 가상 주소 공간의 상위 절반을 커널 공간으로 엄격히 분리합니다. x86_64는 0xffffffff80000000부터, ARM64는 0xffff800000000000 이상 영역에 커널 텍스트(_text), vmalloc, 직접 물리 매핑(Direct Map)을 배치합니다.",
+        code: `/* Standard 64-bit Kernel Virtual Address Range */\n#define __START_KERNEL_map  0xffffffff80000000ULL\n#define PHYSICAL_START      0x0000000001000000ULL  /* 16MB */\n#define DEFAULT_KERNEL_BASE (__START_KERNEL_map + PHYSICAL_START) /* 0xffffffff81000000 */`,
+        slotsA: [
+          { name: "Top of Virtual Memory", type: "slot-system", val: "0xffffffffffffffff" },
+          { name: "Fixmap & Vsyscall", type: "slot-system", val: "0xffffffffffe00000" },
+          { name: "Kernel Modules Area", type: "slot-kernel", val: "0xffffffffa0000000" },
+          { name: "Kernel Code (_text)", type: "slot-kernel", val: "0xffffffff81000000 (__START_KERNEL_map)" },
+          { name: "Direct Physical Mapping", type: "slot-system", val: "0xffff888000000000" },
+          { name: "Userspace Canonical Limit", type: "slot-system", val: "0x00007fffffffffff" }
+        ],
+        slotsB: [
+          { name: "Memory Model", type: "slot-kernel", val: "x86_64 / ARM64 Higher Half" },
+          { name: "Kernel Base Default", type: "slot-system", val: "0xffffffff81000000" },
+          { name: "Entropy Source", type: "slot-kernel", val: "RDRAND / EFI RNG / virtio-rng" },
+          { name: "Entropy Slots", type: "slot-system", val: "512~1024 slots (9~10 bits)" }
+        ]
+      },
+      {
+        title: "2. [취약점] 고정 배치 (Base / nokaslr: 정적 ROP 노출)",
+        desc: "KASLR이 비활성화(nokaslr)된 커널에서는 커널 텍스트가 항상 정적 주소(0xffffffff81000000)에 결정론적으로 매핑됩니다. 공격자는 빌드된 vmlinux 파일만 분석하면 commit_creds, init_cred, ROP 가젯 주소를 사전에 하드코딩하여 100% 성공하는 Exploit을 제작할 수 있습니다.",
+        code: `/* Exploit without KASLR: Hardcoded Gadgets */\n#define TARGET_GADGET  0xffffffff8143ed5e  /* Fixed in vmlinux */\n#define COMMIT_CREDS   0xffffffff810a4210  /* Fixed in vmlinux */\n/* Single vulnerability -> Instant Root Compromise */\nrop_payload[0] = TARGET_GADGET;\nwrite(vuln_fd, rop_payload, sizeof(rop_payload)); /* 100% SUCCESS */`,
+        slotsA: [
+          { name: "Kernel Modules Area", type: "slot-system", val: "Fixed Offset" },
+          { name: "Target Function (Fixed)", type: "slot-static", val: "0xffffffff8143ed5e (Hardcoded Target)" },
+          { name: "commit_creds() (Fixed)", type: "slot-static", val: "0xffffffff810a4210 (Target Symbol)" },
+          { name: "Kernel Base (_text)", type: "slot-static", val: "0xffffffff81000000 (Predictable Base)" },
+          { name: "Direct Physical Mapping", type: "slot-system", val: "Fixed 0xffff888000000000" }
+        ],
+        slotsB: [
+          { name: "Exploit Status", type: "slot-static", val: "[!] EXPLOIT SUCCESS (100%)" },
+          { name: "KASLR Slide", type: "slot-static", val: "0x0000000000000000 (Disabled)" },
+          { name: "Precalculated ROP Chain", type: "slot-kernel", val: "Fully Deterministic" },
+          { name: "Infoleak Required?", type: "slot-static", val: "NO (Blind Attack Works)" }
+        ]
+      },
+      {
+        title: "3. [하드닝] 부팅 시 KASLR Slide 무작위화 (Hardened)",
+        desc: "CONFIG_RANDOMIZE_BASE=y가 활성화된 커널은 부팅 초기(Early Decompressor)에 하드웨어 난수 기반으로 0~1GB 범위 내에서 무작위 오프셋(KASLR Slide)을 추출합니다. 커널의 전체 코드와 심볼 위치가 슬라이드만큼 통째로 이동하여 부팅할 때마다 다른 주소를 갖게 됩니다.",
+        code: `/* Early Decompressor: arch/x86/boot/compressed/kaslr.c */\nunsigned long choose_random_location(void) {\n    unsigned long random_addr = get_boot_seed();\n    unsigned long slide = (random_addr % MAX_SLOTS) * SLOT_SIZE;\n    return STATIC_TEXT_BASE + slide; /* Dynamic Base */\n}`,
+        slotsA: [
+          { name: "Top of Virtual Memory", type: "slot-system", val: "0xffffffffffffffff" },
+          { name: "Randomized Slide Zone", type: "slot-randomized", val: "Slide = 0x14800000 (+328MB)" },
+          { name: "Target Function (Shifted)", type: "slot-protected", val: "0xffffffff95c3ed5e (Randomized)" },
+          { name: "Kernel Base (_text)", type: "slot-randomized", val: "0xffffffff95800000 (Randomized Base)" },
+          { name: "Old Static Base (Empty)", type: "slot-system", val: "0xffffffff81000000 (Unmapped/Different)" }
+        ],
+        slotsB: [
+          { name: "Defense Verification", type: "slot-protected", val: "[+] KASLR ACTIVE" },
+          { name: "Calculated Slide", type: "slot-randomized", val: "0x0000000014800000" },
+          { name: "Dynamic Base Address", type: "slot-protected", val: "0xffffffff95800000" },
+          { name: "Address Entropy", type: "slot-system", val: "9-bits (512 Possible Slots)" }
+        ]
+      },
+      {
+        title: "4. [방어 효과] 고정 주소 공격 차단 & Infoleak 필연성",
+        desc: "공격자가 커널 주소를 알지 못한 채 하드코딩된 주소로 공격(Blind Attack)하면, 해당 주소는 매핑되지 않은 메모리이거나 잘못된 명령어 위치이므로 즉각적인 Page Fault 또는 실패를 유발합니다. 공격자는 반드시 선행 정보 유출(Infoleak)을 성공시켜야만 KASLR을 우회할 수 있습니다.",
+        code: `/* Attacker Blind Attack Under KASLR */\nattempted_addr = 0xffffffff8143ed5e; /* Static Guess */\nreal_addr      = 0xffffffff95c3ed5e; /* Actual Runtime Address */\n/* Result: Miss by 0x14800000 bytes -> Blocked! */\n/* Key Lesson: Layered defenses like STACKLEAK stop the needed infoleak! */`,
+        slotsA: [
+          { name: "Attacker Guess Address", type: "slot-static", val: "0xffffffff8143ed5e (Static Guess)" },
+          { name: "Memory at Guess Point", type: "slot-system", val: "Unmapped or Crash Point!" },
+          { name: "Actual Target Function", type: "slot-protected", val: "0xffffffff95c3ed5e (Safe)" },
+          { name: "KASLR Gap Protection", type: "slot-randomized", val: "Delta = 0x14800000 (Safe Margin)" }
+        ],
+        slotsB: [
+          { name: "Blind Attack Result", type: "slot-protected", val: "[-] BLOCKED: Address Mismatch" },
+          { name: "Crash / Fault Avoided", type: "slot-protected", val: "Exploit Hijacking Foiled" },
+          { name: "Defense Dependency", type: "slot-randomized", val: "Infoleak Required to Bypass" },
+          { name: "Defense in Depth", type: "slot-protected", val: "STACKLEAK eliminates Infoleaks!" }
+        ]
+      }
+    ];
+
+    function renderDiagram(step) {
+      const data = stepData[step];
+      const panel = document.getElementById('diagramPanel');
+
+      let htmlA = data.slotsA.map(s => `
+        <div class="mem-slot ${s.type}">
+          <span>${s.name}</span>
+          <span>${s.val}</span>
+        </div>
+      `).join('');
+
+      let htmlB = data.slotsB.map(s => `
+        <div class="mem-slot ${s.type}">
+          <span>${s.name}</span>
+          <span>${s.val}</span>
+        </div>
+      `).join('');
+
+      panel.innerHTML = `
+        <div class="memory-grid">
+          <div class="memory-card">
+            <div class="memory-title">
+              <span>Kernel Virtual Address Map</span>
+              <span class="pointer-marker">Layout View</span>
+            </div>
+            <div class="memory-repr">
+              ${htmlA}
+            </div>
+          </div>
+          <div class="memory-card">
+            <div class="memory-title">
+              <span>KASLR Engine & Exploit Analysis</span>
+              <span class="pointer-marker">Security State</span>
+            </div>
+            <div class="memory-repr">
+              ${htmlB}
+            </div>
+          </div>
+        </div>
+        <div class="code-box">${data.code}</div>
+      `;
+
+      document.getElementById('expTitle').innerText = data.title;
+      document.getElementById('expDesc').innerText = data.desc;
+      document.getElementById('stepCounter').innerText = `Step ${step + 1} of ${totalSteps}`;
+
+      const tabs = document.querySelectorAll('.nav-tab');
+      tabs.forEach((tab, idx) => {
+        if (idx === step) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+    }
+
+    function setStep(step) {
+      currentStep = step;
+      renderDiagram(currentStep);
+    }
+
+    function nextStep() {
+      currentStep = (currentStep + 1) % totalSteps;
+      renderDiagram(currentStep);
+    }
+
+    function prevStep() {
+      currentStep = (currentStep - 1 + totalSteps) % totalSteps;
+      renderDiagram(currentStep);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const btn = document.getElementById('themeToggle');
+      if (current === 'light') {
+        document.documentElement.removeAttribute('data-theme');
+        btn.innerText = 'Light Mode';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        btn.innerText = 'Dark Mode';
+      }
+    }
+
+    // Initial render
+    renderDiagram(0);
+  </script>
+</body>
+</html>
+

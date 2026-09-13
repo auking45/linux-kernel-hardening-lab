@@ -134,6 +134,14 @@ jobs:
             feature: stackleak
             test: test_stackleak
 
+          # Task 4-1: KASLR (Dual-Arch)
+          - arch: x86_64
+            feature: kaslr
+            test: test_kaslr
+          - arch: arm64
+            feature: kaslr
+            test: test_kaslr
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

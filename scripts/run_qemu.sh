@@ -68,6 +68,10 @@ parse_args() {
                 USE_KVM=0
                 shift
                 ;;
+            --kaslr)
+                ENABLE_KASLR=1
+                shift
+                ;;
             --timeout)
                 TIMEOUT_SEC="$2"
                 shift 2
@@ -146,7 +150,11 @@ build_kvm_flags() {
 }
 
 assemble_cmdline() {
-    BOOT_ARGS="console=${CONSOLE_DEV} quiet panic=1 nokaslr"
+    local kaslr_arg="nokaslr"
+    if [[ "${ENABLE_KASLR:-0}" -eq 1 ]]; then
+        kaslr_arg="kaslr"
+    fi
+    BOOT_ARGS="console=${CONSOLE_DEV} quiet panic=1 ${kaslr_arg}"
     if [[ -n "${AUTO_TEST}" ]]; then
         BOOT_ARGS="${BOOT_ARGS} lab_test=${AUTO_TEST}"
     fi
@@ -175,6 +183,7 @@ launch_qemu() {
         -smp "${SMP}"
         -kernel "${KERNEL_IMAGE}"
         -initrd "${INITRD_IMAGE}"
+        -device virtio-rng-pci
         -append "${BOOT_ARGS}"
         -nographic
         -no-reboot

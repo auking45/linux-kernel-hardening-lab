@@ -168,6 +168,9 @@ launch_virtual_machine() {
     if [[ "${USE_KVM}" -eq 0 ]]; then
         qemu_args+=("--no-kvm")
     fi
+    if [[ "${FEATURE_NAME}" == "kaslr" ]] || [[ "${ENABLE_KASLR:-0}" -eq 1 ]]; then
+        qemu_args+=("--kaslr")
+    fi
     if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
         qemu_args+=("--timeout" "${TIMEOUT_SEC}")
     fi
