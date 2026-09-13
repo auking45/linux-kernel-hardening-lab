@@ -17,6 +17,17 @@ export BUILD_DIR="${LAB_ROOT_DIR}/build_dir"
 export ROOTFS_DIR="${LAB_ROOT_DIR}/rootfs"
 export CONFIGS_DIR="${LAB_ROOT_DIR}/configs"
 
+# Auto-detect host C compiler for kernel build
+if command -v gcc >/dev/null 2>&1; then
+    export HOSTCC="gcc"
+elif command -v x86_64-linux-gnu-gcc >/dev/null 2>&1; then
+    export HOSTCC="x86_64-linux-gnu-gcc"
+elif command -v clang >/dev/null 2>&1; then
+    export HOSTCC="clang"
+else
+    export HOSTCC="gcc"
+fi
+
 # Architecture specific helper function
 setup_arch_env() {
     local target_arch="$1"

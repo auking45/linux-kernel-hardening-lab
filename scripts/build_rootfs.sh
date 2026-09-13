@@ -58,8 +58,31 @@ install_busybox() {
         local bb_url=""
         if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
             bb_url="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
+            local bb_url="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
+            if command -v curl >/dev/null 2>&1; then
+                curl -L --progress-bar -o "${busybox_bin}" "${bb_url}"
+            else
+                wget --show-progress -O "${busybox_bin}" "${bb_url}"
+            fi
+            chmod +x "${busybox_bin}"
         else
             bb_url="https://busybox.net/downloads/binaries/1.35.0-aarch64-linux-musl/busybox"
+            # Debian Bookworm static busybox for aarch64 (packaged with data.tar.xz)
+            local deb_url="http://ftp.debian.org/debian/pool/main/b/busybox/busybox-static_1.35.0-4+deb12u1+b1_arm64.deb"
+            local tmp_deb="${DOWNLOADS_DIR}/busybox-arm64.deb"
+            if command -v curl >/dev/null 2>&1; then
+                curl -L --progress-bar -o "${tmp_deb}" "${deb_url}"
+            else
+                wget --show-progress -O "${tmp_deb}" "${deb_url}"
+            fi
+            (
+                cd "${DOWNLOADS_DIR}"
+                ar -p "${tmp_deb}" data.tar.xz | tar -xJvf - ./bin/busybox
+                mv bin/busybox "${busybox_bin}"
+                rmdir bin 2>/dev/null || true
+                rm -f "${tmp_deb}"
+            )
+            chmod +x "${busybox_bin}"
         fi
 
         if command -v curl >/dev/null 2>&1; then
@@ -74,11 +97,29 @@ install_busybox() {
     chmod 755 "${rootfs_work_dir}/bin/busybox"
 
     # Install all applet symlinks
+    # Core applets fallback list for cross-architecture builds
+    local tools=(
+        sh ash bash ls cp mv rm cat echo mkdir rmdir dmesg ps grep egrep fgrep
+        id whoami mount umount uname sync sleep poweroff reboot halt
+        sed awk cut tr head tail tee wc date chmod chown chgrp find xargs
+        kill killall pidof df du free top vi env true false test touch
+    )
+
+    # Install symlinks (dynamic query if host can run it, fallback to tools array if cross-architecture)
     (
         cd "${rootfs_work_dir}/bin"
         for applet in $(./busybox --list); do
             ln -sf busybox "${applet}"
         done
+        if ./busybox --list >/dev/null 2>&1; then
+            for applet in $(./busybox --list); do
+                ln -sf busybox "${applet}"
+            done
+        else
+            for tool in "${tools[@]}"; do
+                ln -sf busybox "${tool}"
+            done
+        fi
     )
 }
 

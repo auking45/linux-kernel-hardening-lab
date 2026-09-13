@@ -88,6 +88,7 @@ configure_kernel() {
             O="${target_build_dir}" \
             ARCH="${KERNEL_ARCH}" \
             CROSS_COMPILE="${CROSS_COMPILE}" \
+            HOSTCC="${HOSTCC}" \
             olddefconfig
     else
         echo "[*] Merging base defconfig with feature fragment: ${feature_config}"
@@ -99,6 +100,7 @@ configure_kernel() {
             O="${target_build_dir}" \
             ARCH="${KERNEL_ARCH}" \
             CROSS_COMPILE="${CROSS_COMPILE}" \
+            HOSTCC="${HOSTCC}" \
             olddefconfig
     fi
 }
@@ -120,6 +122,7 @@ compile_kernel() {
         O="${target_build_dir}" \
         ARCH="${KERNEL_ARCH}" \
         CROSS_COMPILE="${CROSS_COMPILE}" \
+        HOSTCC="${HOSTCC}" \
         -j"${BUILD_JOBS}"
 }
 
