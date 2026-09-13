@@ -55,23 +55,20 @@ install_busybox() {
 
     if [[ ! -f "${busybox_bin}" ]]; then
         echo "[*] Downloading static BusyBox binary for ${TARGET_ARCH}..."
-        local bb_url=""
         if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
-            bb_url="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
             local bb_url="https://busybox.net/downloads/binaries/1.35.0-x86_64-linux-musl/busybox"
             if command -v curl >/dev/null 2>&1; then
-                curl -L --progress-bar -o "${busybox_bin}" "${bb_url}"
+                curl -fL --progress-bar -o "${busybox_bin}" "${bb_url}"
             else
                 wget --show-progress -O "${busybox_bin}" "${bb_url}"
             fi
             chmod +x "${busybox_bin}"
         else
-            bb_url="https://busybox.net/downloads/binaries/1.35.0-aarch64-linux-musl/busybox"
             # Debian Bookworm static busybox for aarch64 (packaged with data.tar.xz)
             local deb_url="http://ftp.debian.org/debian/pool/main/b/busybox/busybox-static_1.35.0-4+deb12u1+b1_arm64.deb"
             local tmp_deb="${DOWNLOADS_DIR}/busybox-arm64.deb"
             if command -v curl >/dev/null 2>&1; then
-                curl -L --progress-bar -o "${tmp_deb}" "${deb_url}"
+                curl -fL --progress-bar -o "${tmp_deb}" "${deb_url}"
             else
                 wget --show-progress -O "${tmp_deb}" "${deb_url}"
             fi
@@ -85,12 +82,12 @@ install_busybox() {
             chmod +x "${busybox_bin}"
         fi
 
-        if command -v curl >/dev/null 2>&1; then
-            curl -L --progress-bar -o "${busybox_bin}" "${bb_url}"
-        else
-            wget --show-progress -O "${busybox_bin}" "${bb_url}"
+        # Verify downloaded binary is a valid ELF executable
+        if [[ "$(head -c 4 "${busybox_bin}" 2>/dev/null)" != $'\x7fELF' ]]; then
+            echo "[-] Error: Downloaded busybox binary '${busybox_bin}' is not a valid ELF executable!" >&2
+            rm -f "${busybox_bin}"
+            exit 1
         fi
-        chmod +x "${busybox_bin}"
     fi
 
     cp "${busybox_bin}" "${rootfs_work_dir}/bin/busybox"
