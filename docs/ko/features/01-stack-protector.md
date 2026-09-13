@@ -155,15 +155,15 @@ ROP(Return-Oriented Programming)를 처음 접할 때 복잡한 어셈블리와 
 
 리눅스 커널이 구동되는 양대 아키텍처는 하드웨어 수준의 서브루틴 분기 및 스택 관리 방식에서 근본적인 차이를 보임:
 
-| 비교 항목 | x86_64 아키텍처 | ARM64 (AArch64) 아키텍처 |
-| :--- | :--- | :--- |
-| **함수 복귀 명령어** | `ret` (스택 기반) | `ret` (레지스터 기반) |
-| **복귀 주소 저장소** | 스택 최상단 (`(%rsp)`에서 `%rip`로 팝) | 링크 레지스터 `x30` (`lr`) |
-| **스택 백업 방식** | `call` 실행 시 하드웨어가 자동으로 스택에 Push | 컴파일러가 프롤로그에서 `stp x29, x30, [sp, -N]!` 명시 수행 |
-| **에필로그 복원 방식**| `leave; ret` | `ldp x29, x30, [sp], #N; ret` |
-| **함수 호출 규약 (1st 인자)** | `%rdi` 레지스터 (System V AMD64 ABI) | `x0` 레지스터 (AAPCS64 ABI) |
-| **ROP 가젯 형태** | `pop %rdi; ret` | `ldr x0, [sp, ...]; ldp x29, x30, [sp], ...; ret` |
-| **유저스페이스 복귀** | `swapgs_restore_regs_and_return_to_usermode` / `iretq` | `ret_to_user` / `eret` |
+| 비교 항목                     | x86_64 아키텍처                                        | ARM64 (AArch64) 아키텍처                                    |
+| :---------------------------- | :----------------------------------------------------- | :---------------------------------------------------------- |
+| **함수 복귀 명령어**          | `ret` (스택 기반)                                      | `ret` (레지스터 기반)                                       |
+| **복귀 주소 저장소**          | 스택 최상단 (`(%rsp)`에서 `%rip`로 팝)                 | 링크 레지스터 `x30` (`lr`)                                  |
+| **스택 백업 방식**            | `call` 실행 시 하드웨어가 자동으로 스택에 Push         | 컴파일러가 프롤로그에서 `stp x29, x30, [sp, -N]!` 명시 수행 |
+| **에필로그 복원 방식**        | `leave; ret`                                           | `ldp x29, x30, [sp], #N; ret`                               |
+| **함수 호출 규약 (1st 인자)** | `%rdi` 레지스터 (System V AMD64 ABI)                   | `x0` 레지스터 (AAPCS64 ABI)                                 |
+| **ROP 가젯 형태**             | `pop %rdi; ret`                                        | `ldr x0, [sp, ...]; ldp x29, x30, [sp], ...; ret`           |
+| **유저스페이스 복귀**         | `swapgs_restore_regs_and_return_to_usermode` / `iretq` | `ret_to_user` / `eret`                                      |
 
 - **x86_64의 공격 흐름**:
   - `ret` 명령어는 스택 포인터(`%rsp`)가 가리키는 메모리 값을 즉각 `%rip`로 꺼내어 점프함.
@@ -440,4 +440,3 @@ CONFIG_STACKPROTECTOR_STRONG=y
 | **"즉시/현장에서 차단하다"**        | _"halt execution on the spot"_ / _"intercept the attack"_  | 보안 통제 동작의 신속성 강조                             |
 | **"절충/트레이드오프를 고려할 때"** | _"When considering the trade-offs..."_                     | 성능 vs 보안 수준을 비교 설명할 때 유용                  |
 | **"타협할 수 없는 기본 방어선"**    | _"an absolute, non-negotiable baseline defense"_           | 결론 요약 시 강력한 권고 표현                            |
-

@@ -36,7 +36,11 @@ setup_arch_env() {
             export TARGET_ARCH="x86_64"
             export KERNEL_ARCH="x86_64"
             export QEMU_BIN="qemu-system-x86_64"
-            export CROSS_COMPILE=""
+            if ! command -v gcc >/dev/null 2>&1 && command -v x86_64-linux-gnu-gcc >/dev/null 2>&1; then
+                export CROSS_COMPILE="x86_64-linux-gnu-"
+            else
+                export CROSS_COMPILE=""
+            fi
             export KERNEL_IMAGE_REL="arch/x86/boot/bzImage"
             export CONSOLE_DEV="ttyS0"
             export QEMU_MACHINE="q35"

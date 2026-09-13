@@ -155,15 +155,15 @@ The diagram below illustrates the stack frame layout during a buffer overflow ta
 
 The two primary architectures handle subroutine calls and returns with distinct hardware conventions:
 
-| Comparison Metric | x86_64 Architecture | ARM64 (AArch64) Architecture |
-| :--- | :--- | :--- |
-| **Return Instruction** | `ret` (Stack-based) | `ret` (Register-based) |
-| **Return Target Storage** | Top of stack (Pops `(%rsp)` into `%rip`) | Link Register `x30` (`lr`) |
-| **Stack Backup Mechanism** | Pushed automatically by CPU on `call` | Explicitly stored via `stp x29, x30, [sp, -N]!` in prologue |
-| **Epilogue Restoration** | `leave; ret` | `ldp x29, x30, [sp], #N; ret` |
-| **Calling Convention (1st Arg)** | `%rdi` register (System V AMD64 ABI) | `x0` register (AAPCS64 ABI) |
-| **Gadget Primitive** | `pop %rdi; ret` | `ldr x0, [sp, ...]; ldp x29, x30, [sp], ...; ret` |
-| **Return to Userspace** | `swapgs_restore_regs_and_return_to_usermode` / `iretq` | `ret_to_user` / `eret` |
+| Comparison Metric                | x86_64 Architecture                                    | ARM64 (AArch64) Architecture                                |
+| :------------------------------- | :----------------------------------------------------- | :---------------------------------------------------------- |
+| **Return Instruction**           | `ret` (Stack-based)                                    | `ret` (Register-based)                                      |
+| **Return Target Storage**        | Top of stack (Pops `(%rsp)` into `%rip`)               | Link Register `x30` (`lr`)                                  |
+| **Stack Backup Mechanism**       | Pushed automatically by CPU on `call`                  | Explicitly stored via `stp x29, x30, [sp, -N]!` in prologue |
+| **Epilogue Restoration**         | `leave; ret`                                           | `ldp x29, x30, [sp], #N; ret`                               |
+| **Calling Convention (1st Arg)** | `%rdi` register (System V AMD64 ABI)                   | `x0` register (AAPCS64 ABI)                                 |
+| **Gadget Primitive**             | `pop %rdi; ret`                                        | `ldr x0, [sp, ...]; ldp x29, x30, [sp], ...; ret`           |
+| **Return to Userspace**          | `swapgs_restore_regs_and_return_to_usermode` / `iretq` | `ret_to_user` / `eret`                                      |
 
 - **x86_64 Attack Flow**:
   - `ret` immediately pops the value at `%rsp` into `%rip`. Overwriting the saved return address directly redirects the instruction pointer into a ROP gadget chain.
@@ -428,12 +428,11 @@ This section provides a realistic first-person presentation script and essential
 
 ### 6.2 Key Presentation Phrases & Speaking Patterns
 
-| Intent / Context | Recommended Spoken Phrase | Usage & Delivery Notes |
-| :--- | :--- | :--- |
-| **Breaking the Exploit Chain** | *"cut the domino chain before the first domino falls"* | Vivid metaphor explaining how canaries preempt ROP gadgets. |
-| **Transitioning to Architecture** | *"Under the hood, ..."* / *"If we look under the hood..."* | Natural transition when moving into low-level internals or assembly. |
-| **Describing Memory Corruption** | *"smash through ~"* / *"overwrite the return address"* | Vivid, idiomatic description of buffer overflows bypassing boundaries. |
-| **Emphasizing Immediate Mitigation** | *"halt execution on the spot"* / *"intercept the attack"* | Highlights the immediate fail-safe nature of the panic handler. |
-| **Discussing Engineering Decisions** | *"When considering the trade-offs..."* | Effective segue when weighing CPU overhead against security benefits. |
-| **Concluding with Strong Recommendation** | *"an absolute, non-negotiable baseline defense"* | Authoritative closing statement for production readiness. |
-
+| Intent / Context                          | Recommended Spoken Phrase                                  | Usage & Delivery Notes                                                 |
+| :---------------------------------------- | :--------------------------------------------------------- | :--------------------------------------------------------------------- |
+| **Breaking the Exploit Chain**            | _"cut the domino chain before the first domino falls"_     | Vivid metaphor explaining how canaries preempt ROP gadgets.            |
+| **Transitioning to Architecture**         | _"Under the hood, ..."_ / _"If we look under the hood..."_ | Natural transition when moving into low-level internals or assembly.   |
+| **Describing Memory Corruption**          | _"smash through ~"_ / _"overwrite the return address"_     | Vivid, idiomatic description of buffer overflows bypassing boundaries. |
+| **Emphasizing Immediate Mitigation**      | _"halt execution on the spot"_ / _"intercept the attack"_  | Highlights the immediate fail-safe nature of the panic handler.        |
+| **Discussing Engineering Decisions**      | _"When considering the trade-offs..."_                     | Effective segue when weighing CPU overhead against security benefits.  |
+| **Concluding with Strong Recommendation** | _"an absolute, non-negotiable baseline defense"_           | Authoritative closing statement for production readiness.              |

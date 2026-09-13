@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CONFIG_FORTIFY_SOURCE Architecture & Defense Map</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background-color: rgba(56, 189, 248, 0.2);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      background-color: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      border-color: var(--accent-blue);
+    }
+
+    button.active {
+      background-color: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .diagram-board {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Memory Layout Visualizer */
+    .memory-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .layout-header {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .buf-block {
+      border: 2px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px;
+      text-align: center;
+      font-size: 0.85rem;
+      font-weight: 600;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .block-dest {
+      background-color: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+      height: 90px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .block-barrier {
+      border: 2px dashed var(--accent-green);
+      background-color: rgba(34, 197, 94, 0.1);
+      color: var(--accent-green);
+      padding: 8px;
+      font-size: 0.8rem;
+    }
+
+    .block-adjacent {
+      background-color: rgba(168, 85, 247, 0.15);
+      border-color: var(--accent-purple);
+      color: var(--accent-purple);
+      height: 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* State Variations */
+    .mode-blocked .block-barrier {
+      border-color: var(--accent-red);
+      background-color: rgba(239, 68, 68, 0.2);
+      color: var(--accent-red);
+      animation: pulse 1s infinite alternate;
+    }
+
+    .mode-blocked .block-adjacent {
+      opacity: 0.4;
+    }
+
+    .mode-compile-error .block-dest {
+      border-color: var(--accent-yellow);
+      background-color: rgba(234, 179, 8, 0.2);
+      color: var(--accent-yellow);
+    }
+
+    @keyframes pulse {
+      from { box-shadow: 0 0 4px var(--accent-red); }
+      to { box-shadow: 0 0 16px var(--accent-red); }
+    }
+
+    /* Detail Panel */
+    .detail-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .status-card {
+      background-color: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .status-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-desc {
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .code-box {
+      background-color: #0b1120;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: "JetBrains Mono", Consolas, "Fira Code", monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      line-height: 1.4;
+    }
+
+    .code-box .kw { color: #f43f5e; font-weight: 600; }
+    .code-box .fn { color: #38bdf8; }
+    .code-box .str { color: #a3e635; }
+    .code-box .cmt { color: #64748b; font-style: italic; }
+    .code-box .warn { color: #eab308; font-weight: bold; }
+    .code-box .err { color: #ef4444; font-weight: bold; }
+
+    footer {
+      margin-top: 15px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>FORTIFY_SOURCE 시스템 맵</span>
+        <span class="badge">CONFIG_FORTIFY_SOURCE</span>
+      </h1>
+      <div class="controls">
+        <button id="btn-normal" class="active" onclick="setMode('normal')">정상 복사</button>
+        <button id="btn-runtime" onclick="setMode('runtime')">런타임 차단 (__fortify_panic)</button>
+        <button id="btn-compile" onclick="setMode('compile')">컴파일 타임 에러</button>
+        <button id="btn-compare" onclick="setMode('compare')">vs Stack Protector</button>
+      </div>
+    </header>
+
+    <div id="diagram-board" class="diagram-board">
+      <!-- Left: Memory & Inspection Barrier -->
+      <div class="memory-layout">
+        <div class="layout-header">메모리 복사 대상 버퍼 & 검증 경계</div>
+
+        <div class="buf-block block-dest">
+          <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 4px;">Destination Buffer</div>
+          <div>char target[64]</div>
+          <div id="dest-size-label" style="font-size: 0.75rem; color: var(--accent-green); margin-top: 4px;">
+            __builtin_object_size = 64 Bytes
+          </div>
+        </div>
+
+        <div id="barrier-block" class="buf-block block-barrier">
+          <span id="barrier-label">🛡️ fortify_memcpy_chk: (size &le; 64) PASS</span>
+        </div>
+
+        <div class="buf-block block-adjacent">
+          <div style="font-size: 0.75rem; color: var(--text-muted);">인접 메모리 영역 (보호 대상)</div>
+          <div>Adjacent Struct Fields / Frame Data</div>
+        </div>
+      </div>
+
+      <!-- Right: Explanation & Dynamic Code -->
+      <div class="detail-panel">
+        <div class="status-card">
+          <div id="status-title" class="status-title" style="color: var(--accent-green);">
+            <span>●</span> <span>정상 범위 내 메모리 복사 (size &le; p_size)</span>
+          </div>
+          <div id="status-desc" class="status-desc">
+            컴파일러가 목적지 버퍼 크기(64바이트)를 추론하고, 전달된 복사 크기(32바이트)가 안전 범위를 만족함을 확인하여 오버헤드 없이 인라인 메모리 복사를 수행함.
+          </div>
+        </div>
+
+        <div class="code-box">
+          <pre id="code-content"></pre>
+        </div>
+      </div>
+    </div>
+
+    <footer>Linux Kernel Hardening Lab &bull; Architecture Visualizer</footer>
+  </div>
+
+  <script>
+    const modes = {
+      normal: {
+        boardClass: '',
+        title: '● 정상 범위 내 메모리 복사 (size <= p_size)',
+        titleColor: 'var(--accent-green)',
+        desc: '컴파일러가 목적지 버퍼 크기(64바이트)를 추론하고, 전달된 복사 크기(32바이트)가 안전 범위를 만족함을 확인하여 오버헤드 없이 인라인 메모리 복사를 수행함.',
+        barrierText: '🛡️ fortify_memcpy_chk: (32 <= 64) PASS',
+        destLabel: '__builtin_object_size = 64 Bytes',
+        code: `<span class="cmt">// 1. 컴파일러가 목적지 버퍼 크기 정적 파악</span>
+<span class="kw">size_t</span> p_size = <span class="fn">__builtin_object_size</span>(target, <span class="str">0</span>); <span class="cmt">// 64</span>
+
+<span class="cmt">// 2. 복사 요청 (32바이트)</span>
+<span class="kw">if</span> (p_size != SIZE_MAX &amp;&amp; p_size &lt; size)
+    <span class="fn">fortify_panic</span>(...);
+
+<span class="cmt">// 3. 안전 검증 통과 -> 실제 __memcpy 실행</span>
+<span class="fn">__memcpy</span>(target, src, <span class="str">32</span>);`
+      },
+      runtime: {
+        boardClass: 'mode-blocked',
+        title: '▲ 런타임 오버플로우 즉각 차단 (__fortify_panic)',
+        titleColor: 'var(--accent-red)',
+        desc: '런타임에 104바이트 복사 시도 감지. fortify_memcpy_chk()가 (p_size < size: 64 < 104) 조건을 감지하여 실제 복사 루프 진입 전 __fortify_panic()을 호출해 인접 메모리 오염을 원천 차단함.',
+        barrierText: '🚨 fortify_memcpy_chk: (104 > 64) OVERFLOW BLOCKED',
+        destLabel: '__builtin_object_size = 64 Bytes (침범 시도 차단)',
+        code: `<span class="cmt">// 런타임 변수: size = 104 (공격자 조작 입력)</span>
+<span class="kw">size_t</span> p_size = <span class="fn">__builtin_object_size</span>(target, <span class="str">0</span>); <span class="cmt">// 64</span>
+
+<span class="kw">if</span> (p_size &lt; size) { <span class="cmt">// 64 &lt; 104 : 참!</span>
+    <span class="err">__fortify_panic</span>(FORTIFY_FUNC_memcpy, FORTIFY_WRITE, <span class="str">64</span>, <span class="str">104</span>);
+    <span class="cmt">// -> WARN("memcpy: detected buffer overflow: 104 byte write...")</span>
+    <span class="cmt">// -> BUG() 호출 -> 커널 패닉 즉시 안전 정지!</span>
+}`
+      },
+      compile: {
+        boardClass: 'mode-compile-error',
+        title: '■ 컴파일 타임 상수 오버플로우 사전 검출',
+        titleColor: 'var(--accent-yellow)',
+        desc: '복사 크기가 상수(128)로 주어질 경우, __builtin_constant_p(size)가 참이 되어 컴파일 시점에 __write_overflow() 에러를 유발함. 취약한 코드가 커널 바이너리로 빌드되는 것을 사전에 차단함.',
+        barrierText: '⚠️ Compile-Time Error: __write_overflow()',
+        destLabel: '__builtin_object_size = 64 Bytes (컴파일 빌드 실패)',
+        code: `<span class="cmt">// 상수 크기 복사: memcpy(target, src, 128);</span>
+<span class="kw">if</span> (<span class="fn">__builtin_constant_p</span>(size)) {
+    <span class="kw">if</span> (p_size &lt; size) {
+        <span class="warn">__write_overflow</span>();
+        <span class="cmt">// GCC Error: detected write beyond size of object</span>
+        <span class="cmt">// 커널 컴파일 즉시 중단 (런타임 배포 차단)</span>
+    }
+}`
+      },
+      compare: {
+        boardClass: 'mode-blocked',
+        title: '◆ FORTIFY_SOURCE vs Stack Protector 비교',
+        titleColor: 'var(--accent-purple)',
+        desc: 'Stack Protector는 함수 반환 시점(에필로그)에 카나리 손상을 사후 감지하지만, FORTIFY_SOURCE는 복사 함수(memcpy) 호출 시점에 즉시 차단하여 ROP 체인이 스택에 쓰이는 것 자체를 미연에 방지함.',
+        barrierText: '🛡️ In-Flight Check vs Post-Execution Check',
+        destLabel: '스택/힙/구조체 전 영역 복사 시점 실시간 검증',
+        code: `<span class="cmt">// [Stack Protector]</span>
+<span class="cmt">// 1. memcpy로 스택 오염 발생 허용</span>
+<span class="cmt">// 2. 함수 반환(ret) 직전 에필로그에서 카나리 불일치 감지 -> 패닉</span>
+
+<span class="cmt">// [FORTIFY_SOURCE]</span>
+<span class="cmt">// 1. memcpy 진입 즉시 경계 초과 검출</span>
+<span class="cmt">// 2. 메모리 쓰기 자체를 중단하고 즉시 패닉 -> 도미노 생성 자체 원천 봉쇄!</span>`
+      }
+    };
+
+    function setMode(modeKey) {
+      document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById('btn-' + modeKey);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const data = modes[modeKey];
+      const board = document.getElementById('diagram-board');
+      board.className = 'diagram-board ' + data.boardClass;
+
+      const titleEl = document.getElementById('status-title');
+      titleEl.style.color = data.titleColor;
+      titleEl.innerHTML = `<span>●</span> <span>\${data.title}</span>`;
+
+      document.getElementById('status-desc').textContent = data.desc;
+      document.getElementById('barrier-label').textContent = data.barrierText;
+      document.getElementById('dest-size-label').textContent = data.destLabel;
+      document.getElementById('code-content').innerHTML = data.code;
+    }
+
+    setMode('normal');
+  </script>
+</body>
+</html>
