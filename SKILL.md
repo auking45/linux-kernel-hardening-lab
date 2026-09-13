@@ -191,8 +191,9 @@
    - 이 명령어 하나로 커널 소스 확인 $\rightarrow$ rootfs 준비 $\rightarrow$ 하드닝 커널 컴파일 $\rightarrow$ QEMU 부팅 $\rightarrow$ 인게스트 Exploit PoC 실행 $\rightarrow$ 안전 종료(`reboot: Power down`)가 완전 자동 검증됨.
 3. **Fail-Fast 방지 및 병렬 격리**:
    - `strategy.fail-fast: false`를 지정하여 특정 피처의 일시적 장애가 다른 피처의 CI 검증을 조기 중단시키지 않도록 보장함.
-4. **스마트 캐싱(Smart Caching) 표준**:
+4. **동적 스마트 캐싱(Dynamic Smart Caching) 표준**:
    - `actions/cache@v4`를 통해 ① 커널 소스 타르볼(`downloads/*.tar.xz`), ② 루트 파일시스템(`rootfs/*.cpio.gz`), ③ 커널 빌드 디렉토리(`build_dir/<arch>-<feature>`)의 3단계 해시 기반 캐싱을 적용함.
+   - 캐시 키에 하드코딩된 버전 문자열 대신 `hashFiles('scripts/env.sh')`를 필수로 포함하여, `scripts/env.sh`에서 커널 버전이 갱신되면 모든 CI 캐시가 자동으로 동기화되도록 설계함.
    - Kconfig 및 드라이버 소스가 수정되지 않은 경우 커널 컴파일(3~4분)을 완전 생략(0초)하고 QEMU 테스트(3~4초)만 즉시 수행하여, 전체 CI를 15~20초 내에 초고속 완결하도록 함.
 
 ---

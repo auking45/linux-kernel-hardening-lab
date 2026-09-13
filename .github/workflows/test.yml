@@ -49,13 +49,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: downloads/*.tar.xz
-          key: kernel-tarball-6.12.109
+          key: kernel-tarball-${{ hashFiles('scripts/env.sh') }}
+          restore-keys: |
+            kernel-tarball-
 
       - name: Cache Rootfs Archive (${{ matrix.arch }})
         uses: actions/cache@v4
         with:
           path: rootfs/initramfs-${{ matrix.arch }}.cpio.gz
-          key: rootfs-${{ matrix.arch }}-${{ hashFiles('scripts/build_rootfs.sh', 'labs/**/exploit.c', 'labs/**/test.sh') }}
+          key: rootfs-${{ matrix.arch }}-${{ hashFiles('scripts/env.sh', 'scripts/build_rootfs.sh', 'labs/**/exploit.c', 'labs/**/test.sh') }}
           restore-keys: |
             rootfs-${{ matrix.arch }}-
 
@@ -63,7 +65,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build_dir/${{ matrix.arch }}-base
-          key: kernel-bin-${{ matrix.arch }}-base-${{ hashFiles('configs/base.config', 'configs/arch/*.config', 'scripts/build_kernel.sh') }}
+          key: kernel-bin-${{ matrix.arch }}-base-${{ hashFiles('scripts/env.sh', 'configs/base.config', 'configs/arch/*.config', 'scripts/build_kernel.sh') }}
           restore-keys: |
             kernel-bin-${{ matrix.arch }}-base-
 
@@ -142,13 +144,15 @@ jobs:
         uses: actions/cache@v4
         with:
           path: downloads/*.tar.xz
-          key: kernel-tarball-6.12.109
+          key: kernel-tarball-${{ hashFiles('scripts/env.sh') }}
+          restore-keys: |
+            kernel-tarball-
 
       - name: Cache Rootfs Archive (${{ matrix.arch }})
         uses: actions/cache@v4
         with:
           path: rootfs/initramfs-${{ matrix.arch }}.cpio.gz
-          key: rootfs-${{ matrix.arch }}-${{ hashFiles('scripts/build_rootfs.sh', 'labs/**/exploit.c', 'labs/**/test.sh') }}
+          key: rootfs-${{ matrix.arch }}-${{ hashFiles('scripts/env.sh', 'scripts/build_rootfs.sh', 'labs/**/exploit.c', 'labs/**/test.sh') }}
           restore-keys: |
             rootfs-${{ matrix.arch }}-
 
@@ -156,7 +160,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build_dir/${{ matrix.arch }}-${{ matrix.feature }}
-          key: kernel-bin-${{ matrix.arch }}-${{ matrix.feature }}-${{ hashFiles('configs/**', 'labs/**/vuln_*.c', 'scripts/build_kernel.sh') }}
+          key: kernel-bin-${{ matrix.arch }}-${{ matrix.feature }}-${{ hashFiles('scripts/env.sh', 'configs/**', 'labs/**/vuln_*.c', 'scripts/build_kernel.sh') }}
           restore-keys: |
             kernel-bin-${{ matrix.arch }}-${{ matrix.feature }}-
 
