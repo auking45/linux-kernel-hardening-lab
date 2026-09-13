@@ -17,33 +17,38 @@
 #define FORTIFY_BUF_SIZE 64
 #define CANARY_MAGIC 0x1122334455667788ULL
 
-struct fortify_victim {
+struct fortify_victim
+{
     char buf[FORTIFY_BUF_SIZE];
     unsigned long canary_marker;
 };
 
+static struct fortify_victim global_victim;
+
 /*
  * Deliberately vulnerable write handler.
  * Performs memcpy() into a 64-byte buffer inside struct fortify_victim.
+ * Using a static/global struct ensures this specifically tests FORTIFY_SOURCE
+ * bounds checking without interfering with stack canary (Stack Protector) checks.
  *
  * When CONFIG_FORTIFY_SOURCE is ENABLED:
- *   __builtin_object_size(victim.buf, 0) detects that the target buffer is 64 bytes.
- *   When count > 64, fortify_memcpy_chk() catches the overflow during the memcpy() call,
- *   invoking __fortify_panic() before adjacent data (canary_marker) is ever overwritten!
+ *   __builtin_object_size(global_victim.buf, 0) detects the target buffer size.
+ *   When count > 64 (or > sizeof(global_victim)), fortify_memcpy_chk() catches the
+ *   overflow during the memcpy() call, invoking __fortify_panic() immediately!
  *
  * When CONFIG_FORTIFY_SOURCE is DISABLED:
  *   memcpy() performs raw, unbounded byte copying.
- *   The 64-byte boundary is smashed, corrupting canary_marker and adjacent stack memory.
+ *   The 64-byte boundary is smashed, corrupting canary_marker without crashing stack,
+ *   proving that memory corruption succeeded in the absence of FORTIFY_SOURCE.
  */
 static noinline ssize_t vuln_fortify_write(struct file *file, const char __user *ubuf,
                                            size_t count, loff_t *ppos)
 {
-    struct fortify_victim victim;
     char *kbuf;
     size_t copy_len = count > 256 ? 256 : count;
 
-    victim.canary_marker = CANARY_MAGIC;
-    memset(victim.buf, 0, sizeof(victim.buf));
+    global_victim.canary_marker = CANARY_MAGIC;
+    memset(global_victim.buf, 0, sizeof(global_victim.buf));
 
     pr_info("[vuln_fortify] Write received: %zu bytes from PID %d (%s)\n",
             count, current->pid, current->comm);
@@ -64,14 +69,14 @@ static noinline ssize_t vuln_fortify_write(struct file *file, const char __user 
 
     /*
      * TARGET POINT: If CONFIG_FORTIFY_SOURCE=y, fortify_memcpy_chk()
-     * intercepts this call immediately because copy_len > sizeof(victim.buf).
+     * intercepts this call immediately because copy_len > sizeof(global_victim.buf).
      */
-    memcpy(victim.buf, kbuf, copy_len);
+    memcpy(global_victim.buf, kbuf, copy_len);
 
     /* Code below only executes if FORTIFY_SOURCE did NOT panic */
-    if (victim.canary_marker != CANARY_MAGIC) {
+    if (global_victim.canary_marker != CANARY_MAGIC) {
         pr_warn("[vuln_fortify] OVERFLOW DETECTED: canary_marker smashed to 0x%lx (expected 0x%llx)!\n",
-                victim.canary_marker, CANARY_MAGIC);
+                global_victim.canary_marker, CANARY_MAGIC);
     } else {
         pr_info("[vuln_fortify] Write safely bounded or untouched.\n");
     }
@@ -95,7 +100,8 @@ static int __init vuln_fortify_init(void)
     struct proc_dir_entry *entry;
 
     entry = proc_create(VULN_PROC_NAME, 0666, NULL, &vuln_fortify_proc_ops);
-    if (!entry) {
+    if (!entry)
+    {
         pr_err("[vuln_fortify] Failed to create /proc/%s\n", VULN_PROC_NAME);
         return -ENOMEM;
     }

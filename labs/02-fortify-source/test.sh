@@ -23,6 +23,8 @@ run_realworld_fortify_exploit() {
         # Execute exploit as non-root 'lab' user
         su - lab -c "${EXPLOIT_BIN}" || true
         echo ""
+        dmesg | grep "vuln_fortify" | tail -n 10 || true
+        echo ""
     fi
 }
 
@@ -48,3 +50,4 @@ main() {
 }
 
 main "$@"
+

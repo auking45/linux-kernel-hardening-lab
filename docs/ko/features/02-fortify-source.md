@@ -65,12 +65,12 @@ GCC 및 Clang 컴파일러는 `CONFIG_FORTIFY_SOURCE=y` 활성화 시 표준 메
 
 컴파일러는 포인터가 가리키는 객체의 크기를 정적으로 추론하기 위해 `type` 인자에 따른 분석을 수행함:
 
-| Type 플래그 | 대상 범위 (Scope) | 알 수 없을 때 반환값 | 주요 용도 |
-| :--- | :--- | :--- | :--- |
-| **Type 0** | 전체 둘러싼 객체(Enclosing Object) 최대 크기 | `(size_t)-1` (`SIZE_MAX`) | 일반적인 버퍼 전체 크기 검증 |
-| **Type 1** | 가장 안쪽 서브 객체(Innermost Subobject) 크기 | `(size_t)-1` (`SIZE_MAX`) | 구조체 내부 특정 배열 멤버 검증 |
-| **Type 2** | 전체 둘러싼 객체 최소 크기 | `0` | 언더플로우 방어 |
-| **Type 3** | 가장 안쪽 서브 객체 최소 크기 | `0` | 정밀 검증 |
+| Type 플래그 | 대상 범위 (Scope)                             | 알 수 없을 때 반환값      | 주요 용도                       |
+| :---------- | :-------------------------------------------- | :------------------------ | :------------------------------ |
+| **Type 0**  | 전체 둘러싼 객체(Enclosing Object) 최대 크기  | `(size_t)-1` (`SIZE_MAX`) | 일반적인 버퍼 전체 크기 검증    |
+| **Type 1**  | 가장 안쪽 서브 객체(Innermost Subobject) 크기 | `(size_t)-1` (`SIZE_MAX`) | 구조체 내부 특정 배열 멤버 검증 |
+| **Type 2**  | 전체 둘러싼 객체 최소 크기                    | `0`                       | 언더플로우 방어                 |
+| **Type 3**  | 가장 안쪽 서브 객체 최소 크기                 | `0`                       | 정밀 검증                       |
 
 #### (2) 인라인 검증 분기 로직 (`fortify_memcpy_chk`)
 
@@ -142,11 +142,11 @@ __FORTIFY_INLINE bool fortify_memcpy_chk(__kernel_size_t size,
 
 ### 3.1 GCC / Clang 포티파이 매크로 레벨 비교
 
-| 플래그 및 매크로 | 방어 범위 | 구현 방식 | 런타임 오버헤드 |
-| :--- | :--- | :--- | :--- |
-| `_FORTIFY_SOURCE=1` | 정적 크기(Type 0/1) 버퍼 검증 | `__builtin_object_size` | 0.05% 미만 |
-| **`_FORTIFY_SOURCE=2`** | **정적 크기 + 인라인 함수 엄격 검증** | **`__builtin_object_size` (커널 기본값)** | **0.1% 미만** |
-| `_FORTIFY_SOURCE=3` | 런타임 동적 할당 크기 추론 | `__builtin_dynamic_object_size` | 0.2% 미만 |
+| 플래그 및 매크로        | 방어 범위                             | 구현 방식                                 | 런타임 오버헤드 |
+| :---------------------- | :------------------------------------ | :---------------------------------------- | :-------------- |
+| `_FORTIFY_SOURCE=1`     | 정적 크기(Type 0/1) 버퍼 검증         | `__builtin_object_size`                   | 0.05% 미만      |
+| **`_FORTIFY_SOURCE=2`** | **정적 크기 + 인라인 함수 엄격 검증** | **`__builtin_object_size` (커널 기본값)** | **0.1% 미만**   |
+| `_FORTIFY_SOURCE=3`     | 런타임 동적 할당 크기 추론            | `__builtin_dynamic_object_size`           | 0.2% 미만       |
 
 ### 3.2 리눅스 커널 Kconfig 설정값
 
@@ -166,8 +166,9 @@ CONFIG_FORTIFY_SOURCE=y
 
 1. **[Test 1/2] 실전 커널 FORTIFY_SOURCE Exploit PoC (`/bin/exploit_fortify_source`)**:
    - 일반 사용자 `lab`이 64바이트 버퍼에 104바이트를 기록하는 시스템 콜(`write`) 수행.
-   - **Hardened 커널**: `memcpy` 진입 즉시 `fortify_memcpy_chk`에 의해 `__fortify_panic()` 유발 (`memcpy: detected buffer overflow`).
-   - **Base 커널**: 경계 검사 없이 104바이트가 복사되어 인접 멤버(`canary_marker`)가 `0x4242424242424242`로 파괴됨.
+   - **보호 기법 간섭 격리 설계 (Isolation Design)**: 취약점 드라이버(`vuln_fortify.c`)는 대상 구조체(`struct fortify_victim`)를 함수 스택 프레임이 아닌 전역 정적 메모리(`static struct fortify_victim global_victim;`)에 배치함. 스택 로컬 변수로 둘 경우 기본 활성화된 Stack Protector의 카나리가 함께 훼손되어 함수 에필로그에서 `stack-protector` 패닉이 유발될 수 있으므로, 전역 메모리로 분리하여 순수하게 `FORTIFY_SOURCE`의 `memcpy` 인라인 경계 검사 메커니즘만을 독립 검증함.
+   - **Hardened 커널**: `memcpy` 진입 즉시 `fortify_memcpy_chk`에 의해 `__fortify_panic()` 및 `kernel BUG at lib/string_helpers.c:1040!` 유발. 인접 메모리 변조 전 실행 안전 차단.
+   - **Base 커널**: 경계 검사 없이 104바이트가 복사되어 인접 멤버(`canary_marker`)가 `0x4242424242424242`로 파괴되나 패닉 없이 정상 반환됨.
 2. **[Test 2/2] 커널 내장 LKDTM 표준 테스트 (`FORTIFY_MEM_OBJECT`)**:
    - 커널 충돌 주입 프레임워크를 통해 구조체 크기를 초과하는 `memcpy()` 차단 동작 검증.
 
@@ -201,26 +202,29 @@ CONFIG_FORTIFY_SOURCE=y
     [*] Target buffer size: 64 bytes
     [*] Prepared overflow payload size: 104 bytes
     [*] Injecting payload into /proc/vuln_fortify...
+    [*] [Hardened Kernel Expected]: fortify_memcpy_chk catches size > 64 -> Instant __fortify_panic().
+    [*] [Vulnerable Kernel Expected]: memcpy blindly overwrites memory without bounds checking.
 
-    [    2.124510] vuln_fortify: [vuln_fortify] Write received: 104 bytes from PID 73 (exploit_fortify)
-    [    2.125211] vuln_fortify: [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
-    [    2.126012] vuln_fortify: [vuln_fortify] Triggering memcpy()...
-    [    2.126780] ------------[ cut here ]------------
-    [    2.127110] memcpy: detected buffer overflow: 104 byte write of buffer size 64
-    [    2.127810] WARNING: CPU: 0 PID: 73 at lib/string_helpers.c:1032 __fortify_report+0x45/0x50
-    [    2.128710] CPU: 0 UID: 1000 PID: 73 Comm: exploit_fortify Not tainted 6.12.109 #1
-    [    2.129412] Call Trace:
-    [    2.129650]  <TASK>
-    [    2.129880]  __fortify_panic+0x18/0x20
-    [    2.130250]  vuln_fortify_write+0xdc/0x110 [vuln_fortify]
-    [    2.130750]  proc_reg_write+0x57/0xa0
-    [    2.131100]  vfs_write+0xd2/0x450
-    [    2.131420]  ksys_write+0x65/0xf0
-    [    2.131750]  do_syscall_64+0x68/0x140
-    [    2.132100]  entry_SYSCALL_64_after_hwframe+0x76/0x7e
-    [    2.132600] Kernel panic - not syncing: Fatal exception
+    [    1.516484] kernel BUG at lib/string_helpers.c:1040!
+    [    1.518278] Oops: invalid opcode: 0000 [#1] PREEMPT SMP NOPTI
+    [    1.518806] CPU: 1 UID: 1000 PID: 47 Comm: exploit_fortify Tainted: G        W          6.12.109 #2
+    [    1.519879] RIP: 0010:__fortify_panic+0xd/0x10
+    [    1.523774] Call Trace:
+    [    1.524355]  <TASK>
+    [    1.524427]  vuln_fortify_write+0xcf/0x1f0
+    [    1.524593]  proc_reg_write+0x54/0xa0
+    [    1.524711]  vfs_write+0xf7/0x480
+    [    1.524827]  ksys_write+0x6a/0xf0
+    [    1.524982]  do_syscall_64+0x54/0x110
+    [    1.525119]  entry_SYSCALL_64_after_hwframe+0x76/0x7e
+    [    1.527679]  </TASK>
+    Segmentation fault
+
+    [    1.915296] [vuln_fortify] Write received: 104 bytes from PID 46 (exploit_fortify)
+    [    1.915523] [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
+    [    1.915551] [vuln_fortify] Triggering memcpy()...
     ```
-    > **분석:** 공격자가 104바이트를 주입하는 순간, `memcpy` 내부의 `fortify_memcpy_chk`가 목적지 버퍼 크기(64바이트)와 복사 크기(104바이트)를 비교하여 `__fortify_panic()`을 즉시 호출함. 인접한 메모리나 스택 카나리가 변조되기 전에 커널 실행을 안전하게 정지시킴.
+    > **분석:** 공격자가 104바이트를 주입하는 순간, `memcpy` 내부의 `fortify_memcpy_chk`가 목적지 버퍼 크기(64바이트)와 복사 크기(104바이트)를 감지하여 `__fortify_panic()` 및 `kernel BUG`를 즉시 유발함. 인접한 `canary_marker` 데이터가 단 1바이트도 변조되기 전에 커널 실행을 즉각 정지시킴.
 
 === "x86_64: Base (보호 비활성화: 메모리 오염 허용)"
 
@@ -237,17 +241,31 @@ CONFIG_FORTIFY_SOURCE=y
       Exploit:      /bin/exploit_fortify_source
       Runner:       lab (UID 1000, non-privileged)
     =========================================================
+    [*] Launching overflow payload against 64-byte memcpy target...
+    [*] If CONFIG_FORTIFY_SOURCE is active, kernel will panic in memcpy()!
+
+    =========================================================
+      Linux Kernel Hardening Lab - FORTIFY_SOURCE Exploit PoC
+      Target Architecture: x86_64
+      Current User: UID = 1000 (non-root)
+    =========================================================
+    [*] Target buffer size: 64 bytes
+    [*] Prepared overflow payload size: 104 bytes
     [*] Injecting payload into /proc/vuln_fortify...
-    [    2.104100] vuln_fortify: [vuln_fortify] Write received: 104 bytes from PID 73 (exploit_fortify)
-    [    2.104810] vuln_fortify: [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
-    [    2.105610] vuln_fortify: [vuln_fortify] Triggering memcpy()...
-    [    2.106412] vuln_fortify: [vuln_fortify] OVERFLOW DETECTED: canary_marker smashed to 0x4242424242424242 (expected 0x1122334455667788)!
+    [*] [Hardened Kernel Expected]: fortify_memcpy_chk catches size > 64 -> Instant __fortify_panic().
+    [*] [Vulnerable Kernel Expected]: memcpy blindly overwrites memory without bounds checking.
+
     [+] Successfully wrote 104 bytes to device
 
     [*] Write completed without kernel panic!
     [!] WARNING: FORTIFY_SOURCE is NOT active or failed to intercept the overflow.
+
+    [    1.820786] [vuln_fortify] Write received: 104 bytes from PID 48 (exploit_fortify)
+    [    1.821200] [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
+    [    1.821242] [vuln_fortify] Triggering memcpy()...
+    [    1.821374] [vuln_fortify] OVERFLOW DETECTED: canary_marker smashed to 0x4242424242424242 (expected 0x1122334455667788)!
     ```
-    > **분석:** `CONFIG_FORTIFY_SOURCE`가 꺼져 있어 `memcpy`가 64바이트 경계를 무시하고 104바이트를 그대로 복사함. 그 결과 인접한 `canary_marker`가 공격자의 페이로드(`0x4242424242424242`)로 덮어써졌으며, 아무런 경고나 패닉 없이 시스템 콜이 성공적으로 완료됨.
+    > **분석:** `CONFIG_FORTIFY_SOURCE`가 꺼져 있어 `memcpy`가 64바이트 경계를 무시하고 104바이트를 그대로 복사함. 그 결과 인접한 `canary_marker`가 공격자의 페이로드(`0x4242424242424242`)로 덮어써졌으며, 전역 메모리 영역이므로 스택 카나리 간섭 없이 시스템 콜이 성공적으로 완료되어 침해가 발생함을 명확히 증명함.
 
 === "ARM64: Hardened (보호 활성화: memcpy 차단)"
 
@@ -342,10 +360,10 @@ CONFIG_FORTIFY_SOURCE=y
 
 ### 6.2 핵심 프레젠테이션 영어 표현 (Key Presentation Phrases)
 
-| 한국어 표현 | 권장 영어 스피킹 표현 | 용례 및 발화 팁 |
-| :--- | :--- | :--- |
-| **"진행 중인 동작을 즉시 멈추다"** | _"stop buffer overflows right in their tracks"_ | 공격의 즉각적인 차단 효과를 역동적으로 묘사 |
-| **"복사가 일어나는 그 순간에"** | _"in-flight bounds checking"_ | 사후 검증(Epilogue)과 대비되는 실시간 검증 강조 |
-| **"컴파일러가 빌드 자체를 거부하다"** | _"the compiler literally refuses to build the kernel"_ | 정적 컴파일 타임 방어의 강력함 표현 |
-| **"단 1바이트도 오염되지 않음"** | _"before a single byte of adjacent memory can be touched"_ | 침해 피해가 0(Zero)임을 설명할 때 활용 |
-| **"심층 방어 진지를 구축하다"** | _"forms an airtight defense-in-depth perimeter"_ | 결론부에서 보안 계층화의 가치 요약 시 사용 |
+| 한국어 표현                           | 권장 영어 스피킹 표현                                      | 용례 및 발화 팁                                 |
+| :------------------------------------ | :--------------------------------------------------------- | :---------------------------------------------- |
+| **"진행 중인 동작을 즉시 멈추다"**    | _"stop buffer overflows right in their tracks"_            | 공격의 즉각적인 차단 효과를 역동적으로 묘사     |
+| **"복사가 일어나는 그 순간에"**       | _"in-flight bounds checking"_                              | 사후 검증(Epilogue)과 대비되는 실시간 검증 강조 |
+| **"컴파일러가 빌드 자체를 거부하다"** | _"the compiler literally refuses to build the kernel"_     | 정적 컴파일 타임 방어의 강력함 표현             |
+| **"단 1바이트도 오염되지 않음"**      | _"before a single byte of adjacent memory can be touched"_ | 침해 피해가 0(Zero)임을 설명할 때 활용          |
+| **"심층 방어 진지를 구축하다"**       | _"forms an airtight defense-in-depth perimeter"_           | 결론부에서 보안 계층화의 가치 요약 시 사용      |

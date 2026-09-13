@@ -65,12 +65,12 @@ When `CONFIG_FORTIFY_SOURCE=y` is active, the compiler routes standard memory ca
 
 The compiler statically infers object boundaries based on the `type` parameter:
 
-| Type Flag | Inspection Scope | Return on Unknown | Primary Purpose |
-| :--- | :--- | :--- | :--- |
-| **Type 0** | Maximum size of enclosing object | `(size_t)-1` (`SIZE_MAX`) | Whole buffer boundary protection |
-| **Type 1** | Size of innermost subobject | `(size_t)-1` (`SIZE_MAX`) | Intra-struct field and array protection |
-| **Type 2** | Minimum size of enclosing object | `0` | Buffer underflow protection |
-| **Type 3** | Minimum size of innermost subobject | `0` | Strict fine-grained boundary check |
+| Type Flag  | Inspection Scope                    | Return on Unknown         | Primary Purpose                         |
+| :--------- | :---------------------------------- | :------------------------ | :-------------------------------------- |
+| **Type 0** | Maximum size of enclosing object    | `(size_t)-1` (`SIZE_MAX`) | Whole buffer boundary protection        |
+| **Type 1** | Size of innermost subobject         | `(size_t)-1` (`SIZE_MAX`) | Intra-struct field and array protection |
+| **Type 2** | Minimum size of enclosing object    | `0`                       | Buffer underflow protection             |
+| **Type 3** | Minimum size of innermost subobject | `0`                       | Strict fine-grained boundary check      |
 
 #### (2) Verification Logic (`fortify_memcpy_chk`)
 
@@ -142,11 +142,11 @@ In the previous lab, Return-Oriented Programming (ROP) was described as a chain 
 
 ### 3.1 GCC / Clang Fortify Levels
 
-| Macro Level | Scope of Protection | Mechanism | Runtime Overhead |
-| :--- | :--- | :--- | :--- |
-| `_FORTIFY_SOURCE=1` | Static size buffers | `__builtin_object_size` | < 0.05% |
-| **`_FORTIFY_SOURCE=2`** | **Static size + strict inlined calls** | **`__builtin_object_size` (Kernel Default)** | **< 0.1%** |
-| `_FORTIFY_SOURCE=3` | Dynamic allocation sizing | `__builtin_dynamic_object_size` | < 0.2% |
+| Macro Level             | Scope of Protection                    | Mechanism                                    | Runtime Overhead |
+| :---------------------- | :------------------------------------- | :------------------------------------------- | :--------------- |
+| `_FORTIFY_SOURCE=1`     | Static size buffers                    | `__builtin_object_size`                      | < 0.05%          |
+| **`_FORTIFY_SOURCE=2`** | **Static size + strict inlined calls** | **`__builtin_object_size` (Kernel Default)** | **< 0.1%**       |
+| `_FORTIFY_SOURCE=3`     | Dynamic allocation sizing              | `__builtin_dynamic_object_size`              | < 0.2%           |
 
 ### 3.2 Linux Kernel Kconfig Configuration
 
@@ -166,8 +166,9 @@ This lab verifies defenses using both a **real-world C exploit PoC executed by a
 
 1. **[Test 1/2] Real-World Kernel FORTIFY_SOURCE Exploit PoC (`/bin/exploit_fortify_source`)**:
    - Non-privileged user `lab` attempts a 104-byte write into a 64-byte `memcpy` buffer.
-   - **Hardened Kernel**: Catches overflow in `memcpy` and triggers `__fortify_panic()`, printing `memcpy: detected buffer overflow`.
-   - **Base Kernel**: Unchecked copy overwrites adjacent struct member (`canary_marker`) with `0x4242424242424242`.
+   - **Isolation Design**: The vulnerability driver (`vuln_fortify.c`) allocates `struct fortify_victim` in static global memory (`static struct fortify_victim global_victim;`) rather than on the local stack frame. If allocated as a local stack variable, the overwrite would also corrupt the compiler stack canary under `CONFIG_STACKPROTECTOR_STRONG`, triggering a stack protector panic during function return. Placing it in static storage completely decouples the test, allowing pure verification of `FORTIFY_SOURCE`'s in-flight bounds check.
+   - **Hardened Kernel**: Intercepts the overflow directly inside `memcpy`, triggering `__fortify_panic()` and `kernel BUG at lib/string_helpers.c:1040!` before adjacent memory can be altered.
+   - **Base Kernel**: Unchecked copy overwrites adjacent struct member (`canary_marker`) with `0x4242424242424242` without triggering any stack panic, clearly demonstrating memory corruption.
 2. **[Test 2/2] In-Kernel LKDTM Standard Test (`FORTIFY_MEM_OBJECT`)**:
    - Verifies kernel dump test module crash injection against fortified routines.
 
@@ -201,26 +202,29 @@ This lab verifies defenses using both a **real-world C exploit PoC executed by a
     [*] Target buffer size: 64 bytes
     [*] Prepared overflow payload size: 104 bytes
     [*] Injecting payload into /proc/vuln_fortify...
+    [*] [Hardened Kernel Expected]: fortify_memcpy_chk catches size > 64 -> Instant __fortify_panic().
+    [*] [Vulnerable Kernel Expected]: memcpy blindly overwrites memory without bounds checking.
 
-    [    2.124510] vuln_fortify: [vuln_fortify] Write received: 104 bytes from PID 73 (exploit_fortify)
-    [    2.125211] vuln_fortify: [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
-    [    2.126012] vuln_fortify: [vuln_fortify] Triggering memcpy()...
-    [    2.126780] ------------[ cut here ]------------
-    [    2.127110] memcpy: detected buffer overflow: 104 byte write of buffer size 64
-    [    2.127810] WARNING: CPU: 0 PID: 73 at lib/string_helpers.c:1032 __fortify_report+0x45/0x50
-    [    2.128710] CPU: 0 UID: 1000 PID: 73 Comm: exploit_fortify Not tainted 6.12.109 #1
-    [    2.129412] Call Trace:
-    [    2.129650]  <TASK>
-    [    2.129880]  __fortify_panic+0x18/0x20
-    [    2.130250]  vuln_fortify_write+0xdc/0x110 [vuln_fortify]
-    [    2.130750]  proc_reg_write+0x57/0xa0
-    [    2.131100]  vfs_write+0xd2/0x450
-    [    2.131420]  ksys_write+0x65/0xf0
-    [    2.131750]  do_syscall_64+0x68/0x140
-    [    2.132100]  entry_SYSCALL_64_after_hwframe+0x76/0x7e
-    [    2.132600] Kernel panic - not syncing: Fatal exception
+    [    1.516484] kernel BUG at lib/string_helpers.c:1040!
+    [    1.518278] Oops: invalid opcode: 0000 [#1] PREEMPT SMP NOPTI
+    [    1.518806] CPU: 1 UID: 1000 PID: 47 Comm: exploit_fortify Tainted: G        W          6.12.109 #2
+    [    1.519879] RIP: 0010:__fortify_panic+0xd/0x10
+    [    1.523774] Call Trace:
+    [    1.524355]  <TASK>
+    [    1.524427]  vuln_fortify_write+0xcf/0x1f0
+    [    1.524593]  proc_reg_write+0x54/0xa0
+    [    1.524711]  vfs_write+0xf7/0x480
+    [    1.524827]  ksys_write+0x6a/0xf0
+    [    1.524982]  do_syscall_64+0x54/0x110
+    [    1.525119]  entry_SYSCALL_64_after_hwframe+0x76/0x7e
+    [    1.527679]  </TASK>
+    Segmentation fault
+
+    [    1.915296] [vuln_fortify] Write received: 104 bytes from PID 46 (exploit_fortify)
+    [    1.915523] [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
+    [    1.915551] [vuln_fortify] Triggering memcpy()...
     ```
-    > **Analysis:** As soon as 104 bytes are passed, `fortify_memcpy_chk` verifies that `p_size (64) < size (104)`, immediately routing into `__fortify_panic()`. Execution safely terminates before adjacent memory or stack canaries can be tainted.
+    > **Analysis:** As soon as 104 bytes are passed, `fortify_memcpy_chk` verifies that `p_size (64) < size (104)`, immediately routing into `__fortify_panic()` and triggering a `kernel BUG`. Execution terminates immediately before the adjacent `canary_marker` is touched.
 
 === "x86_64: Base (Disabled: Memory Corruption Allowed)"
 
@@ -237,17 +241,31 @@ This lab verifies defenses using both a **real-world C exploit PoC executed by a
       Exploit:      /bin/exploit_fortify_source
       Runner:       lab (UID 1000, non-privileged)
     =========================================================
+    [*] Launching overflow payload against 64-byte memcpy target...
+    [*] If CONFIG_FORTIFY_SOURCE is active, kernel will panic in memcpy()!
+
+    =========================================================
+      Linux Kernel Hardening Lab - FORTIFY_SOURCE Exploit PoC
+      Target Architecture: x86_64
+      Current User: UID = 1000 (non-root)
+    =========================================================
+    [*] Target buffer size: 64 bytes
+    [*] Prepared overflow payload size: 104 bytes
     [*] Injecting payload into /proc/vuln_fortify...
-    [    2.104100] vuln_fortify: [vuln_fortify] Write received: 104 bytes from PID 73 (exploit_fortify)
-    [    2.104810] vuln_fortify: [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
-    [    2.105610] vuln_fortify: [vuln_fortify] Triggering memcpy()...
-    [    2.106412] vuln_fortify: [vuln_fortify] OVERFLOW DETECTED: canary_marker smashed to 0x4242424242424242 (expected 0x1122334455667788)!
+    [*] [Hardened Kernel Expected]: fortify_memcpy_chk catches size > 64 -> Instant __fortify_panic().
+    [*] [Vulnerable Kernel Expected]: memcpy blindly overwrites memory without bounds checking.
+
     [+] Successfully wrote 104 bytes to device
 
     [*] Write completed without kernel panic!
     [!] WARNING: FORTIFY_SOURCE is NOT active or failed to intercept the overflow.
+
+    [    1.820786] [vuln_fortify] Write received: 104 bytes from PID 48 (exploit_fortify)
+    [    1.821200] [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
+    [    1.821242] [vuln_fortify] Triggering memcpy()...
+    [    1.821374] [vuln_fortify] OVERFLOW DETECTED: canary_marker smashed to 0x4242424242424242 (expected 0x1122334455667788)!
     ```
-    > **Analysis:** Without `CONFIG_FORTIFY_SOURCE`, `memcpy` blindly copies 104 bytes over the 64-byte buffer. The adjacent `canary_marker` is overwritten with `0x4242424242424242`, allowing corrupted execution without detection.
+    > **Analysis:** Without `CONFIG_FORTIFY_SOURCE`, `memcpy` blindly copies 104 bytes over the 64-byte buffer. The adjacent `canary_marker` is overwritten with `0x4242424242424242`. Because the victim struct resides in static memory, no stack protector panic occurs, clearly demonstrating the unrestricted memory corruption when FORTIFY_SOURCE is absent.
 
 === "ARM64: Hardened (Enabled: memcpy Intercepted)"
 
@@ -337,10 +355,10 @@ This section provides a realistic first-person presentation script and essential
 
 ### 6.2 Key Presentation Phrases & Speaking Patterns
 
-| Intent / Context | Recommended Spoken Phrase | Usage & Delivery Notes |
-| :--- | :--- | :--- |
-| **Stopping Threats Instantly** | *"stop buffer overflows right in their tracks"* | Vivid description of immediate mitigation at the point of copy. |
-| **Real-Time Validation** | *"in-flight bounds checking"* | Contrast against deferred epilogue checking. |
-| **Compile-Time Refusal** | *"the compiler literally refuses to build the kernel"* | Emphasizes zero-cost build-time security. |
-| **Zero Memory Taint** | *"before a single byte of adjacent memory can be touched"* | Highlights absolute protection of adjacent data. |
-| **Layered Defense Strategy** | *"forms an airtight defense-in-depth perimeter"* | Concluding recommendation for combining mitigations. |
+| Intent / Context               | Recommended Spoken Phrase                                  | Usage & Delivery Notes                                          |
+| :----------------------------- | :--------------------------------------------------------- | :-------------------------------------------------------------- |
+| **Stopping Threats Instantly** | _"stop buffer overflows right in their tracks"_            | Vivid description of immediate mitigation at the point of copy. |
+| **Real-Time Validation**       | _"in-flight bounds checking"_                              | Contrast against deferred epilogue checking.                    |
+| **Compile-Time Refusal**       | _"the compiler literally refuses to build the kernel"_     | Emphasizes zero-cost build-time security.                       |
+| **Zero Memory Taint**          | _"before a single byte of adjacent memory can be touched"_ | Highlights absolute protection of adjacent data.                |
+| **Layered Defense Strategy**   | _"forms an airtight defense-in-depth perimeter"_           | Concluding recommendation for combining mitigations.            |
