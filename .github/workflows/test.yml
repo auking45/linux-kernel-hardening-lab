@@ -67,4 +67,4 @@ jobs:
 
       - name: Verify QEMU Boot Test (${{ matrix.arch }} TCG Emulation)
         run: |
-          docker compose run --rm lab ./scripts/run_qemu.sh --arch ${{ matrix.arch }} --no-kvm --timeout 30 || true
+          docker compose run --rm lab ./scripts/run_qemu.sh --arch ${{ matrix.arch }} --no-kvm --test test_smoke --timeout 25
