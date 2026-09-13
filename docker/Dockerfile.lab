@@ -39,6 +39,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     llvm \
     gcc-x86-64-linux-gnu \
     gcc-aarch64-linux-gnu \
+    libc6-dev-arm64-cross \
+    linux-libc-dev-arm64-cross \
     qemu-system-x86 \
     qemu-system-arm \
     ca-certificates \
