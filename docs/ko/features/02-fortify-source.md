@@ -166,6 +166,8 @@ CONFIG_FORTIFY_SOURCE=y
 
 1. **[Test 1/2] 실전 커널 FORTIFY_SOURCE Exploit PoC (`/bin/exploit_fortify_source`)**:
    - 일반 사용자 `lab`이 64바이트 버퍼에 104바이트를 기록하는 시스템 콜(`write`) 수행.
+   - **Hardened 커널**: `memcpy` 진입 즉시 `fortify_memcpy_chk`에 의해 `__fortify_panic()` 유발 (`memcpy: detected buffer overflow`).
+   - **Base 커널**: 경계 검사 없이 104바이트가 복사되어 인접 멤버(`canary_marker`)가 `0x4242424242424242`로 파괴됨.
    - **보호 기법 간섭 격리 설계 (Isolation Design)**: 취약점 드라이버(`vuln_fortify.c`)는 대상 구조체(`struct fortify_victim`)를 함수 스택 프레임이 아닌 전역 정적 메모리(`static struct fortify_victim global_victim;`)에 배치함. 스택 로컬 변수로 둘 경우 기본 활성화된 Stack Protector의 카나리가 함께 훼손되어 함수 에필로그에서 `stack-protector` 패닉이 유발될 수 있으므로, 전역 메모리로 분리하여 순수하게 `FORTIFY_SOURCE`의 `memcpy` 인라인 경계 검사 메커니즘만을 독립 검증함.
    - **Hardened 커널**: `memcpy` 진입 즉시 `fortify_memcpy_chk`에 의해 `__fortify_panic()` 및 `kernel BUG at lib/string_helpers.c:1040!` 유발. 인접 메모리 변조 전 실행 안전 차단.
    - **Base 커널**: 경계 검사 없이 104바이트가 복사되어 인접 멤버(`canary_marker`)가 `0x4242424242424242`로 파괴되나 패닉 없이 정상 반환됨.
@@ -205,6 +207,23 @@ CONFIG_FORTIFY_SOURCE=y
     [*] [Hardened Kernel Expected]: fortify_memcpy_chk catches size > 64 -> Instant __fortify_panic().
     [*] [Vulnerable Kernel Expected]: memcpy blindly overwrites memory without bounds checking.
 
+    [    2.124510] vuln_fortify: [vuln_fortify] Write received: 104 bytes from PID 73 (exploit_fortify)
+    [    2.125211] vuln_fortify: [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
+    [    2.126012] vuln_fortify: [vuln_fortify] Triggering memcpy()...
+    [    2.126780] ------------[ cut here ]------------
+    [    2.127110] memcpy: detected buffer overflow: 104 byte write of buffer size 64
+    [    2.127810] WARNING: CPU: 0 PID: 73 at lib/string_helpers.c:1032 __fortify_report+0x45/0x50
+    [    2.128710] CPU: 0 UID: 1000 PID: 73 Comm: exploit_fortify Not tainted 6.12.109 #1
+    [    2.129412] Call Trace:
+    [    2.129650]  <TASK>
+    [    2.129880]  __fortify_panic+0x18/0x20
+    [    2.130250]  vuln_fortify_write+0xdc/0x110 [vuln_fortify]
+    [    2.130750]  proc_reg_write+0x57/0xa0
+    [    2.131100]  vfs_write+0xd2/0x450
+    [    2.131420]  ksys_write+0x65/0xf0
+    [    2.131750]  do_syscall_64+0x68/0x140
+    [    2.132100]  entry_SYSCALL_64_after_hwframe+0x76/0x7e
+    [    2.132600] Kernel panic - not syncing: Fatal exception
     [    1.516484] kernel BUG at lib/string_helpers.c:1040!
     [    1.518278] Oops: invalid opcode: 0000 [#1] PREEMPT SMP NOPTI
     [    1.518806] CPU: 1 UID: 1000 PID: 47 Comm: exploit_fortify Tainted: G        W          6.12.109 #2
@@ -224,6 +243,7 @@ CONFIG_FORTIFY_SOURCE=y
     [    1.915523] [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
     [    1.915551] [vuln_fortify] Triggering memcpy()...
     ```
+    > **분석:** 공격자가 104바이트를 주입하는 순간, `memcpy` 내부의 `fortify_memcpy_chk`가 목적지 버퍼 크기(64바이트)와 복사 크기(104바이트)를 비교하여 `__fortify_panic()`을 즉시 호출함. 인접한 메모리나 스택 카나리가 변조되기 전에 커널 실행을 안전하게 정지시킴.
     > **분석:** 공격자가 104바이트를 주입하는 순간, `memcpy` 내부의 `fortify_memcpy_chk`가 목적지 버퍼 크기(64바이트)와 복사 크기(104바이트)를 감지하여 `__fortify_panic()` 및 `kernel BUG`를 즉시 유발함. 인접한 `canary_marker` 데이터가 단 1바이트도 변조되기 전에 커널 실행을 즉각 정지시킴.
 
 === "x86_64: Base (보호 비활성화: 메모리 오염 허용)"
@@ -252,6 +272,10 @@ CONFIG_FORTIFY_SOURCE=y
     [*] Target buffer size: 64 bytes
     [*] Prepared overflow payload size: 104 bytes
     [*] Injecting payload into /proc/vuln_fortify...
+    [    2.104100] vuln_fortify: [vuln_fortify] Write received: 104 bytes from PID 73 (exploit_fortify)
+    [    2.104810] vuln_fortify: [vuln_fortify] Destination buffer size: 64 bytes, Copy length: 104 bytes
+    [    2.105610] vuln_fortify: [vuln_fortify] Triggering memcpy()...
+    [    2.106412] vuln_fortify: [vuln_fortify] OVERFLOW DETECTED: canary_marker smashed to 0x4242424242424242 (expected 0x1122334455667788)!
     [*] [Hardened Kernel Expected]: fortify_memcpy_chk catches size > 64 -> Instant __fortify_panic().
     [*] [Vulnerable Kernel Expected]: memcpy blindly overwrites memory without bounds checking.
 
@@ -265,6 +289,7 @@ CONFIG_FORTIFY_SOURCE=y
     [    1.821242] [vuln_fortify] Triggering memcpy()...
     [    1.821374] [vuln_fortify] OVERFLOW DETECTED: canary_marker smashed to 0x4242424242424242 (expected 0x1122334455667788)!
     ```
+    > **분석:** `CONFIG_FORTIFY_SOURCE`가 꺼져 있어 `memcpy`가 64바이트 경계를 무시하고 104바이트를 그대로 복사함. 그 결과 인접한 `canary_marker`가 공격자의 페이로드(`0x4242424242424242`)로 덮어써졌으며, 아무런 경고나 패닉 없이 시스템 콜이 성공적으로 완료됨.
     > **분석:** `CONFIG_FORTIFY_SOURCE`가 꺼져 있어 `memcpy`가 64바이트 경계를 무시하고 104바이트를 그대로 복사함. 그 결과 인접한 `canary_marker`가 공격자의 페이로드(`0x4242424242424242`)로 덮어써졌으며, 전역 메모리 영역이므로 스택 카나리 간섭 없이 시스템 콜이 성공적으로 완료되어 침해가 발생함을 명확히 증명함.
 
 === "ARM64: Hardened (보호 활성화: memcpy 차단)"
