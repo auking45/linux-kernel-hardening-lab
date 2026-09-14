@@ -171,7 +171,20 @@ ensure_kernel_binary() {
     local target_build_dir="${BUILD_DIR}/${TARGET_ARCH}-${FEATURE_NAME}"
     local kernel_image="${target_build_dir}/${KERNEL_IMAGE_REL}"
 
+    local needs_kernel_rebuild=0
     if [[ ! -f "${kernel_image}" || "${REBUILD}" -eq 1 ]]; then
+        needs_kernel_rebuild=1
+    else
+        for vuln in "${LAB_ROOT_DIR}/labs"/*/*vuln*.c; do
+            if [[ -f "${vuln}" && "${vuln}" -nt "${kernel_image}" ]]; then
+                echo "[*] Detected updated kernel lab driver ($(basename "${vuln}")). Triggering incremental kernel build..."
+                needs_kernel_rebuild=1
+                break
+            fi
+        done
+    fi
+
+    if [[ "${needs_kernel_rebuild}" -eq 1 ]]; then
         local build_args=("--arch" "${TARGET_ARCH}" "--feature" "${FEATURE_NAME}")
         if [[ "${REBUILD}" -eq 1 ]]; then
             build_args+=("--clean")
@@ -197,7 +210,10 @@ launch_virtual_machine() {
     if [[ "${USE_KVM}" -eq 0 ]]; then
         qemu_args+=("--no-kvm")
     fi
-    if [[ "${FEATURE_NAME}" == "kaslr" ]] || [[ "${FEATURE_NAME}" == "fgkaslr"* ]] || [[ "${ENABLE_KASLR:-0}" -eq 1 ]]; then
+    if [[ "${FEATURE_NAME}" == "randomize-memory-disabled" && "${TARGET_ARCH}" == "arm64" ]]; then
+        # ARM64 ties linear mapping randomization directly to KASLR, so baseline requires nokaslr
+        :
+    elif [[ "${FEATURE_NAME}" == "kaslr" ]] || [[ "${FEATURE_NAME}" == "fgkaslr"* ]] || [[ "${FEATURE_NAME}" == "randomize-memory"* ]] || [[ "${ENABLE_KASLR:-0}" -eq 1 ]]; then
         qemu_args+=("--kaslr")
     fi
     if [[ "${FEATURE_NAME}" == "fgkaslr" ]]; then

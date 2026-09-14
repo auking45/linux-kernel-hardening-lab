@@ -111,3 +111,4 @@ nav:
       - 02. Memory Layout & Randomization:
           - KASLR: features/05-kaslr.md
           - FG-KASLR: features/06-fgkaslr.md
+          - Randomize Memory: features/07-randomize-memory.md

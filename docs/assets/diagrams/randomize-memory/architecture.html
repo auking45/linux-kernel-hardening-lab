@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CONFIG_RANDOMIZE_MEMORY Architecture & ret2dir Defense</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --slide-color: #10b981;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --slide-color: #059669;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      background-color: var(--slide-color);
+      color: #fff;
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background-color 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background-color: var(--card-border);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tab {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      border-color: var(--slide-color);
+    }
+
+    .nav-tab.active {
+      background-color: var(--slide-color);
+      color: #fff;
+      border-color: var(--slide-color);
+    }
+
+    .interactive-panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .memory-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 680px) {
+      .memory-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .memory-card {
+      background-color: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .memory-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      color: var(--slide-color);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .memory-repr {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mem-slot {
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .slot-static {
+      background-color: rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.3);
+      color: var(--accent-blue);
+    }
+
+    .slot-vulnerable {
+      background-color: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: var(--accent-red);
+      font-weight: 700;
+    }
+
+    .slot-protected {
+      background-color: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.4);
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    .slot-randomized {
+      background-color: rgba(16, 185, 129, 0.12);
+      border-color: rgba(16, 185, 129, 0.4);
+      color: var(--slide-color);
+    }
+
+    .slot-system {
+      background-color: rgba(148, 163, 184, 0.08);
+      border-color: rgba(148, 163, 184, 0.2);
+      color: var(--text-muted);
+    }
+
+    .code-box {
+      background-color: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: var(--text-main);
+      overflow-x: auto;
+      white-space: pre;
+      margin-top: 14px;
+    }
+
+    .explanation {
+      margin-top: 16px;
+      line-height: 1.6;
+      font-size: 0.92rem;
+    }
+
+    .explanation h3 {
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    .explanation p {
+      color: var(--text-muted);
+    }
+
+    .btn-group {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+
+    .btn {
+      background-color: var(--card-border);
+      color: var(--text-main);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--slide-color);
+      color: #fff;
+    }
+
+    .step-indicator {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      align-self: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        CONFIG_RANDOMIZE_MEMORY Architecture
+        <span class="badge">ret2dir Defense</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">Light Mode</button>
+    </header>
+
+    <div class="nav-tabs" id="stepTabs">
+      <button class="nav-tab active" onclick="setStep(0)">1. 고정 다이렉트 매핑 (Base)</button>
+      <button class="nav-tab" onclick="setStep(1)">2. ret2dir 공격 시나리오</button>
+      <button class="nav-tab" onclick="setStep(2)">3. 3대 메모리 섹션 무작위화</button>
+      <button class="nav-tab" onclick="setStep(3)">4. ret2dir 원천 차단 & 방어</button>
+    </div>
+
+    <div class="interactive-panel">
+      <div id="diagramPanel">
+        <!-- Dynamically populated by renderDiagram() -->
+      </div>
+
+      <div class="explanation">
+        <h3 id="expTitle">1. 고정 다이렉트 매핑 (Base)</h3>
+        <p id="expDesc">설명 내용이 여기에 로드됩니다.</p>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" onclick="prevStep()">&larr; 이전 단계</button>
+        <span class="step-indicator" id="stepCounter">Step 1 of 4</span>
+        <button class="btn" onclick="nextStep()">다음 단계 &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 0;
+    const totalSteps = 4;
+
+    const stepData = [
+      {
+        title: "1. [Base Kernel] 결정론적 물리 메모리 다이렉트 매핑 (Deterministic Direct Map)",
+        desc: "CONFIG_RANDOMIZE_MEMORY가 비활성화된 커널에서는 KASLR이 켜져 있더라도 물리 메모리 다이렉트 매핑 베이스(page_offset_base)가 0xffff888000000000으로 고정됩니다. 모든 물리 주소 P는 커널 가상 주소 0xffff888000000000 + P로 100% 확정 예측 가능합니다.",
+        code: `/* Deterministic Direct Mapping Layout */\npage_offset_base = 0xffff888000000000; /* FIXED! */\nvmalloc_base     = 0xffffc90000000000; /* FIXED! */\nvmemmap_base     = 0xffffea0000000000; /* FIXED! */\n/* Kernel virtual address for phys P: virt = 0xffff888000000000 + P */`,
+        slotsA: [
+          { name: "Direct Mapping Base", type: "slot-static", val: "0xffff888000000000 (Fixed)" },
+          { name: "Physical Page P (RAM)", type: "slot-vulnerable", val: "virt = Base + P (Predictable)" },
+          { name: "Vmalloc Area Base", type: "slot-static", val: "0xffffc90000000000 (Fixed)" },
+          { name: "Vmemmap (struct page)", type: "slot-system", val: "0xffffea0000000000 (Fixed)" }
+        ],
+        slotsB: [
+          { name: "Direct Map Randomization", type: "slot-vulnerable", val: "DISABLED (page_offset_base fixed)" },
+          { name: "ret2dir Vulnerability", type: "slot-vulnerable", val: "HIGH (Predictable Physmap)" },
+          { name: "Heap Spray Reliability", type: "slot-vulnerable", val: "100% Address Determinism" },
+          { name: "Kernel Text KASLR", type: "slot-randomized", val: "Bypassed via Direct Map Payload" }
+        ]
+      },
+      {
+        title: "2. [취약점 악용] ret2dir (Return-to-Direct-Mapped-Memory) 공격",
+        desc: "공격자는 유저 공간에서 대량의 메모리를 할당(Physmap Spraying)하여 악성 페이로드(쉘코드, 가짜 cred 구조체)를 채웁니다. 이후 고정된 다이렉트 매핑 공식을 적용하여 커널 권한에서 해당 물리 페이지의 가상 주소를 역산한 뒤 커널 분기를 유도합니다.",
+        code: `/* Attacker: ret2dir Exploit Sequence */\nvoid *user_buf = mmap_and_spray_payload();\nuint64_t phys  = get_phys_page(user_buf); /* e.g., 0x42000000 */\nuint64_t virt  = 0xffff888000000000 + phys; /* 0xffff888042000000 */\n/* Hijack kernel branch -> Jump to 0xffff888042000000 -> Pwned! */`,
+        slotsA: [
+          { name: "User Mmap Spray", type: "slot-vulnerable", val: "RAM Physical Page 0x42000000" },
+          { name: "Static Calculation", type: "slot-static", val: "0xffff888000000000 + 0x42000000" },
+          { name: "Target Kernel Virt", type: "slot-vulnerable", val: "0xffff888042000000 (Accurate Hit!)" },
+          { name: "Payload Execution", type: "slot-vulnerable", val: "Kernel Mode Execution Achieved" }
+        ],
+        slotsB: [
+          { name: "Attack Method", type: "slot-vulnerable", val: "ret2dir / Physmap Spraying" },
+          { name: "Infoleak Requirement", type: "slot-vulnerable", val: "NONE (Bypasses Text KASLR)" },
+          { name: "Payload Integrity", type: "slot-vulnerable", val: "Kernel Executes User-Sprayed RAM" },
+          { name: "System Impact", type: "slot-vulnerable", val: "Full Kernel Privilege Escalation" }
+        ]
+      },
+      {
+        title: "3. [하드닝] CONFIG_RANDOMIZE_MEMORY 기반 3대 메모리 영역 랜덤화",
+        desc: "CONFIG_RANDOMIZE_MEMORY=y 설정 시 부팅 시점 하드웨어 엔트로피를 기반으로 page_offset_base, vmalloc_base, vmemmap_base의 가상 주소 베이스와 각 영역 사이의 패딩(Padding)을 30,000개 이상의 슬롯으로 무작위화합니다.",
+        code: `/* CONFIG_RANDOMIZE_MEMORY=y Active */\npage_offset_base = 0xffff888000000000 + Rand_Slide1;\nvmalloc_base     = page_offset_base + Phys_Size + Rand_Slide2;\nvmemmap_base     = vmalloc_base + Vmalloc_Size + Rand_Slide3;\n/* Entropy: ~30,000 possible virtual addresses per region */`,
+        slotsA: [
+          { name: "Randomized Direct Base", type: "slot-randomized", val: "0xffff94c000000000 (Randomized)" },
+          { name: "Real Direct Virt (RAM)", type: "slot-protected", val: "0xffff94c042000000 (Secret Base)" },
+          { name: "Randomized Vmalloc Base", type: "slot-randomized", val: "0xffffbf8000000000 (Randomized)" },
+          { name: "Randomized Vmemmap Base", type: "slot-system", val: "0xffffd80000000000 (Randomized)" }
+        ],
+        slotsB: [
+          { name: "Memory Randomization", type: "slot-protected", val: "[+] ACTIVE (CONFIG_RANDOMIZE_MEMORY=y)" },
+          { name: "Slide Entropy", type: "slot-randomized", val: "~30,000 Discrete Slots" },
+          { name: "Multi-Region Shield", type: "slot-protected", val: "Direct Map + Vmalloc + Vmemmap" },
+          { name: "ret2dir Attack State", type: "slot-protected", val: "Completely Disrupted" }
+        ]
+      },
+      {
+        title: "4. [방어 입증] ret2dir 무력화 및 유효하지 않은 메모리 접근 차단",
+        desc: "공격자가 기존의 정적 베이스(0xffff888000000000)를 믿고 물리 메모리 가상 주소로 분기하면, 해당 위치는 매핑되지 않은 홀(Hole)이거나 엉뚱한 페이지이므로 즉각적인 Page Fault 예외가 발생하여 공격이 원천 차단됩니다.",
+        code: `/* Attacker Jump with Static Guess */\nattempted = 0xffff888000000000 + phys; /* 0xffff888042000000 */\nreal_virt = 0xffff94c042000000;       /* Miss by 0xc4000000000 bytes! */\n/* Result: Page fault or Invalid Argument -> Attack neutralized! */`,
+        slotsA: [
+          { name: "Attacker Static Guess", type: "slot-vulnerable", val: "0xffff888042000000 (Blind Guess)" },
+          { name: "Actual Direct Mapping", type: "slot-protected", val: "0xffff94c042000000 (Safe Distance)" },
+          { name: "Randomization Gap", type: "slot-randomized", val: "Diff: 0xc4000000000 bytes" },
+          { name: "Dereference Result", type: "slot-protected", val: "[-] BLOCKED (Page Fault / Reject)" }
+        ],
+        slotsB: [
+          { name: "ret2dir Neutralization", type: "slot-protected", val: "[+] 100% Blocked without Infoleak" },
+          { name: "Heap Spray Defense", type: "slot-protected", val: "Physmap Spray Exploitation Prevented" },
+          { name: "Defense-in-Depth Layer", type: "slot-protected", val: "Complements Code KASLR (.text)" },
+          { name: "Performance Impact", type: "slot-randomized", val: "Zero Runtime Overhead (Boot-time Only)" }
+        ]
+      }
+    ];
+
+    function renderDiagram(step) {
+      const data = stepData[step];
+      const panel = document.getElementById('diagramPanel');
+
+      let htmlA = data.slotsA.map(s => `
+        <div class="mem-slot ${s.type}">
+          <span>${s.name}</span>
+          <span>${s.val}</span>
+        </div>
+      `).join('');
+
+      let htmlB = data.slotsB.map(s => `
+        <div class="mem-slot ${s.type}">
+          <span>${s.name}</span>
+          <span>${s.val}</span>
+        </div>
+      `).join('');
+
+      panel.innerHTML = `
+        <div class="memory-grid">
+          <div class="memory-card">
+            <div class="memory-title">
+              <span>Kernel Virtual Memory Space</span>
+              <span class="pointer-marker">Layout View</span>
+            </div>
+            <div class="memory-repr">
+              ${htmlA}
+            </div>
+          </div>
+          <div class="memory-card">
+            <div class="memory-title">
+              <span>Security Engine & Threat State</span>
+              <span class="pointer-marker">Protection View</span>
+            </div>
+            <div class="memory-repr">
+              ${htmlB}
+            </div>
+          </div>
+        </div>
+        <div class="code-box">${data.code}</div>
+      `;
+
+      document.getElementById('expTitle').innerText = data.title;
+      document.getElementById('expDesc').innerText = data.desc;
+      document.getElementById('stepCounter').innerText = `Step ${step + 1} of ${totalSteps}`;
+
+      const tabs = document.querySelectorAll('.nav-tab');
+      tabs.forEach((tab, idx) => {
+        if (idx === step) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+    }
+
+    function setStep(step) {
+      currentStep = step;
+      renderDiagram(currentStep);
+    }
+
+    function nextStep() {
+      currentStep = (currentStep + 1) % totalSteps;
+      renderDiagram(currentStep);
+    }
+
+    function prevStep() {
+      currentStep = (currentStep - 1 + totalSteps) % totalSteps;
+      renderDiagram(currentStep);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const btn = document.getElementById('themeToggle');
+      if (current === 'light') {
+        document.documentElement.removeAttribute('data-theme');
+        btn.innerText = 'Light Mode';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        btn.innerText = 'Dark Mode';
+      }
+    }
+
+    // Initial render
+    renderDiagram(0);
+  </script>
+</body>
+</html>

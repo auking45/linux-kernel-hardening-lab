@@ -148,6 +148,15 @@ jobs:
             feature: fgkaslr
             test: test_fgkaslr
 
+          # Task 4-3: Randomize Memory (Dual-Arch)
+          - arch: x86_64
+            feature: randomize-memory
+            test: test_randomize_memory
+          - arch: arm64
+            feature: randomize-memory
+            test: test_randomize_memory
+
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

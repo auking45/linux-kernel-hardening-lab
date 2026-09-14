@@ -73,7 +73,7 @@
 
 - [x] **Task 4-1:** KASLR (Kernel Address Space Layout Randomization) & `nokaslr` 부팅 파라미터 비교.
 - [x] **Task 4-2:** FG-KASLR (Function Granular KASLR - 함수 단위 배치 무작위화).
-- [ ] **Task 4-3:** `CONFIG_RANDOMIZE_MEMORY` (물리 메모리 다이렉트 매핑 주소 랜덤화).
+- [x] **Task 4-3:** `CONFIG_RANDOMIZE_MEMORY` (물리 메모리 다이렉트 매핑 주소 랜덤화).
 
 ### [Phase 5] Category 3: Memory Permissions & Access Separation
 
