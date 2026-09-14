@@ -110,3 +110,4 @@ nav:
           - STACKLEAK: features/04-stackleak.md
       - 02. Memory Layout & Randomization:
           - KASLR: features/05-kaslr.md
+          - FG-KASLR: features/06-fgkaslr.md

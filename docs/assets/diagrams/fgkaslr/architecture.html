@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FG-KASLR Architecture & Function-Level Randomization</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --slide-color: #06b6d4;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --slide-color: #0891b2;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      background-color: var(--accent-purple);
+      color: #fff;
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .theme-toggle {
+      background: none;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background-color 0.2s;
+    }
+
+    .theme-toggle:hover {
+      background-color: var(--card-border);
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .nav-tab {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .nav-tab:hover {
+      color: var(--text-main);
+      border-color: var(--accent-purple);
+    }
+
+    .nav-tab.active {
+      background-color: var(--accent-purple);
+      color: #fff;
+      border-color: var(--accent-purple);
+    }
+
+    .interactive-panel {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    .memory-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 680px) {
+      .memory-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .memory-card {
+      background-color: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 16px;
+    }
+
+    .memory-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      color: var(--accent-purple);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .memory-repr {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mem-slot {
+      padding: 10px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .slot-static {
+      background-color: rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.3);
+      color: var(--accent-blue);
+    }
+
+    .slot-vulnerable {
+      background-color: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.4);
+      color: var(--accent-red);
+      font-weight: 700;
+    }
+
+    .slot-protected {
+      background-color: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.4);
+      color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    .slot-randomized {
+      background-color: rgba(168, 85, 247, 0.12);
+      border-color: rgba(168, 85, 247, 0.4);
+      color: var(--accent-purple);
+    }
+
+    .slot-system {
+      background-color: rgba(148, 163, 184, 0.08);
+      border-color: rgba(148, 163, 184, 0.2);
+      color: var(--text-muted);
+    }
+
+    .code-box {
+      background-color: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: monospace;
+      font-size: 0.82rem;
+      color: var(--text-main);
+      overflow-x: auto;
+      white-space: pre;
+      margin-top: 14px;
+    }
+
+    .explanation {
+      margin-top: 16px;
+      line-height: 1.6;
+      font-size: 0.92rem;
+    }
+
+    .explanation h3 {
+      font-size: 1.05rem;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    .explanation p {
+      color: var(--text-muted);
+    }
+
+    .btn-group {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+
+    .btn {
+      background-color: var(--card-border);
+      color: var(--text-main);
+      border: none;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background-color 0.2s;
+    }
+
+    .btn:hover {
+      background-color: var(--accent-purple);
+      color: #fff;
+    }
+
+    .step-indicator {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      align-self: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        FG-KASLR vs Monolithic KASLR
+        <span class="badge">Architecture</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">Light Mode</button>
+    </header>
+
+    <div class="nav-tabs" id="stepTabs">
+      <button class="nav-tab active" onclick="setStep(0)">1. Monolithic KASLR (단일 오프셋)</button>
+      <button class="nav-tab" onclick="setStep(1)">2. Infoleak 악용 (상대 오프셋 계산)</button>
+      <button class="nav-tab" onclick="setStep(2)">3. FG-KASLR 세분화 무작위화</button>
+      <button class="nav-tab" onclick="setStep(3)">4. 공격 차단 & 현대적 대안 (CFI)</button>
+    </div>
+
+    <div class="interactive-panel">
+      <div id="diagramPanel">
+        <!-- Dynamically populated by renderDiagram() -->
+      </div>
+
+      <div class="explanation">
+        <h3 id="expTitle">1. Monolithic KASLR (단일 슬라이드)</h3>
+        <p id="expDesc">설명 내용이 여기에 로드됩니다.</p>
+      </div>
+
+      <div class="btn-group">
+        <button class="btn" onclick="prevStep()">&larr; 이전 단계</button>
+        <span class="step-indicator" id="stepCounter">Step 1 of 4</span>
+        <button class="btn" onclick="nextStep()">다음 단계 &rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 0;
+    const totalSteps = 4;
+
+    const stepData = [
+      {
+        title: "1. [Monolithic KASLR] 단일 슬라이드와 고정 상대 거리 (Constant Delta)",
+        desc: "기존 KASLR은 커널 .text 섹션 전체를 단일 난수(Slide)로 통째로 이동시킵니다. 따라서 _text의 절대 위치는 변하지만, 커널 내 함수 간의 상대 거리(Delta = Target - Leak)는 컴파일 시점과 100% 동일하게 유지됩니다.",
+        code: `/* Monolithic KASLR Memory Layout */\n_text_base  = 0xffffffff81000000 + Slide;\nfunc_leak   = _text_base + 0x440000;\nfunc_target = _text_base + 0x441200;\n/* Delta = func_target - func_leak = +0x1200 (FIXED CONSTANT!) */`,
+        slotsA: [
+          { name: "Kernel .text Start", type: "slot-static", val: "0xffffffff92000000 (Base + Slide)" },
+          { name: "Leak Function (A)", type: "slot-randomized", val: "0xffffffff92440000" },
+          { name: "Target Function (B)", type: "slot-vulnerable", val: "0xffffffff92441200" },
+          { name: "Fixed Relative Delta", type: "slot-static", val: "Delta = +0x1200 (Compile-Time Fixed)" }
+        ],
+        slotsB: [
+          { name: "Kernel Slide Applied", type: "slot-randomized", val: "Slide = 0x11000000 (Monolithic)" },
+          { name: "Function Permutation", type: "slot-system", val: "DISABLED (Sequential Order)" },
+          { name: "Relative Predictability", type: "slot-vulnerable", val: "100% Deterministic Distance" },
+          { name: "ROP Gadget Chaining", type: "slot-vulnerable", val: "Intact across entire binary" }
+        ]
+      },
+      {
+        title: "2. [취약점] 단 1개의 포인터 유출(Infoleak)로 전체 가젯 맵 복원",
+        desc: "공격자가 스택 미초기화나 힙 결함으로 임의의 커널 함수 포인터(func_leak) 단 1개만 유출시키면, 고정된 상대 오프셋(Delta)을 가산하여 원하는 타깃 함수(commit_creds, ROP gadget)의 실제 주소를 완벽하게 계산해냅니다.",
+        code: `/* Attacker Exploit: Relative Offset Calculation */\nuint64_t leaked = leak_from_kernel();  /* e.g., 0xffffffff92440000 */\nuint64_t target = leaked + 0x1200;      /* Known Delta from vmlinux */\n/* Result: Target matches real function address! Exploit succeeds! */`,
+        slotsA: [
+          { name: "Leaked Pointer (Infoleak)", type: "slot-vulnerable", val: "0xffffffff92440000 (Exposed)" },
+          { name: "Offline Static Delta", type: "slot-static", val: "+0x1200 (From System.map)" },
+          { name: "Calculated Target Addr", type: "slot-vulnerable", val: "0xffffffff92441200 (Exact Match!)" },
+          { name: "Target Function Reality", type: "slot-vulnerable", val: "0xffffffff92441200 (Vulnerable)" }
+        ],
+        slotsB: [
+          { name: "Single Infoleak Impact", type: "slot-vulnerable", val: "KASLR Completely Defeated" },
+          { name: "Exploit Accuracy", type: "slot-vulnerable", val: "100% Hit Rate" },
+          { name: "Kernel Control Flow", type: "slot-vulnerable", val: "Hijacked by Attacker" },
+          { name: "Mitigation Need", type: "slot-randomized", val: "Must disrupt Relative Delta!" }
+        ]
+      },
+      {
+        title: "3. [FG-KASLR] -ffunction-sections 기반 함수 단위 무작위 셔플링",
+        desc: "FG-KASLR은 각 함수를 별도의 ELF 섹션으로 컴파일하고, 부팅 시 커널 압축 해제 단계에서 함수들의 배치 순서를 무작위로 섞습니다(Permutation). 그 결과 함수 간의 상대 거리(Delta)가 부팅마다 제각각 달라집니다.",
+        code: `/* FG-KASLR Granular Layout */\n/* Compile with -ffunction-sections */\n/* Boot time decompressor shuffles section order */\nfunc_leak   = Slot 0 -> 0xffffffff92440000;\nfunc_target = Slot 2 -> 0xffffffff92448400 (Randomized Slot!);\n/* Actual Delta = +0x8400 != Static Delta (+0x1200) */`,
+        slotsA: [
+          { name: "Kernel Base", type: "slot-static", val: "0xffffffff92000000" },
+          { name: "Slot 0: func_leak", type: "slot-randomized", val: "0xffffffff92440000" },
+          { name: "Slot 1: func_decoy", type: "slot-system", val: "0xffffffff92444000" },
+          { name: "Slot 2: func_target", type: "slot-protected", val: "0xffffffff92448400 (Shuffled)" }
+        ],
+        slotsB: [
+          { name: "FG-KASLR Engine", type: "slot-protected", val: "[+] ACTIVE (Granular Permutation)" },
+          { name: "Section Granularity", type: "slot-randomized", val: "Per-Function Independent Slots" },
+          { name: "Relative Delta", type: "slot-protected", val: "Dynamic & Randomized" },
+          { name: "ROP Gadget Chaining", type: "slot-protected", val: "Broken across functions" }
+        ]
+      },
+      {
+        title: "4. [방어 효과 & 한계] 공격 차단 및 현대적 CFI로의 진화",
+        desc: "공격자가 유출된 주소에 정적 Delta(+0x1200)를 더해 점프하면, 타깃이 아닌 엉뚱한 위치나 빈 공간으로 떨어져 공격이 무력화됩니다. 하지만 FG-KASLR은 iTLB/캐시 미스 저하 및 ftrace/livepatch 충돌 문제로 메인라인에는 미반영되었으며, 오늘날 FineIBT 및 kCFI(Control Flow Integrity)로 계승되었습니다.",
+        code: `/* Attacker Jump with Static Delta */\nattempted = leaked + 0x1200; /* Points to 0xffffffff92441200 */\nreal_addr = 0xffffffff92448400; /* Miss by 0x7200 bytes! */\n/* Result: Page fault or invalid jump -> Attack blocked! */\n/* Successors: Clang kCFI, Intel FineIBT, ARM PAC/BTI */`,
+        slotsA: [
+          { name: "Attacker Guess Target", type: "slot-vulnerable", val: "0xffffffff92441200 (Miss!)" },
+          { name: "Actual Target Address", type: "slot-protected", val: "0xffffffff92448400 (Safe)" },
+          { name: "Mismatch Distance", type: "slot-randomized", val: "Diff = 0x7200 bytes" },
+          { name: "Branch Execution", type: "slot-protected", val: "[-] THWARTED / Blocked" }
+        ],
+        slotsB: [
+          { name: "Relative Exploit Defense", type: "slot-protected", val: "[+] 100% Protected against Delta Attack" },
+          { name: "Mainline Rejection Reason", type: "slot-vulnerable", val: "iTLB cache misses (~1-3% hit) & ftrace break" },
+          { name: "Modern Evolution", type: "slot-protected", val: "kCFI (Clang) / FineIBT (CET)" },
+          { name: "Hardware Integration", type: "slot-randomized", val: "ARM64 PAC / BTI" }
+        ]
+      }
+    ];
+
+    function renderDiagram(step) {
+      const data = stepData[step];
+      const panel = document.getElementById('diagramPanel');
+
+      let htmlA = data.slotsA.map(s => `
+        <div class="mem-slot ${s.type}">
+          <span>${s.name}</span>
+          <span>${s.val}</span>
+        </div>
+      `).join('');
+
+      let htmlB = data.slotsB.map(s => `
+        <div class="mem-slot ${s.type}">
+          <span>${s.name}</span>
+          <span>${s.val}</span>
+        </div>
+      `).join('');
+
+      panel.innerHTML = `
+        <div class="memory-grid">
+          <div class="memory-card">
+            <div class="memory-title">
+              <span>Code Section Layout</span>
+              <span class="pointer-marker">Function Granularity</span>
+            </div>
+            <div class="memory-repr">
+              ${htmlA}
+            </div>
+          </div>
+          <div class="memory-card">
+            <div class="memory-title">
+              <span>Security State & Analysis</span>
+              <span class="pointer-marker">Mitigation View</span>
+            </div>
+            <div class="memory-repr">
+              ${htmlB}
+            </div>
+          </div>
+        </div>
+        <div class="code-box">${data.code}</div>
+      `;
+
+      document.getElementById('expTitle').innerText = data.title;
+      document.getElementById('expDesc').innerText = data.desc;
+      document.getElementById('stepCounter').innerText = `Step ${step + 1} of ${totalSteps}`;
+
+      const tabs = document.querySelectorAll('.nav-tab');
+      tabs.forEach((tab, idx) => {
+        if (idx === step) {
+          tab.classList.add('active');
+        } else {
+          tab.classList.remove('active');
+        }
+      });
+    }
+
+    function setStep(step) {
+      currentStep = step;
+      renderDiagram(currentStep);
+    }
+
+    function nextStep() {
+      currentStep = (currentStep + 1) % totalSteps;
+      renderDiagram(currentStep);
+    }
+
+    function prevStep() {
+      currentStep = (currentStep - 1 + totalSteps) % totalSteps;
+      renderDiagram(currentStep);
+    }
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const btn = document.getElementById('themeToggle');
+      if (current === 'light') {
+        document.documentElement.removeAttribute('data-theme');
+        btn.innerText = 'Light Mode';
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        btn.innerText = 'Dark Mode';
+      }
+    }
+
+    // Initial render
+    renderDiagram(0);
+  </script>
+</body>
+</html>

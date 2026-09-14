@@ -142,6 +142,14 @@ jobs:
             feature: kaslr
             test: test_kaslr
 
+          # Task 4-2: FG-KASLR (Dual-Arch)
+          - arch: x86_64
+            feature: fgkaslr
+            test: test_fgkaslr
+          - arch: arm64
+            feature: fgkaslr
+            test: test_fgkaslr
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
