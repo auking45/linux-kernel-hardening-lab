@@ -43,7 +43,7 @@ if [ ! -x "${EXPLOIT_BIN}" ]; then
 fi
 
 # Run exploit as unprivileged user 'lab'
-su lab -c "${EXPLOIT_BIN}"
+su - lab -c "${EXPLOIT_BIN}" || true
 echo ""
 
 echo "========================================================="
