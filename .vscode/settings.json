@@ -1,0 +1,44 @@
+{
+  "git.autorefresh": false,
+  "git.autofetch": false,
+  "git.autoRepositoryDetection": false,
+  "git.enableSmartCommit": false,
+  "git.confirmSync": false,
+  "git.openRepositoryInParentFolders": "never",
+  "files.autoSave": "onFocusChange",
+  "files.insertFinalNewline": false,
+  "files.trimTrailingWhitespace": false,
+
+  "editor.formatOnSave": false,
+  "editor.formatOnType": false,
+  "editor.formatOnPaste": false,
+  "C_Cpp.formatting": "disabled",
+  "[c]": {
+    "editor.formatOnSave": false,
+    "editor.formatOnType": false
+  },
+  "[cpp]": {
+    "editor.formatOnSave": false,
+    "editor.formatOnType": false
+  },
+  "[shellscript]": {
+    "editor.formatOnSave": false
+  },
+  "[markdown]": {
+    "editor.formatOnSave": false
+  },
+
+  "gitlens.views.repositories.autoRefresh": false,
+  "gitlens.views.fileHistory.autoRefresh": false,
+  "gitlens.views.lineHistory.autoRefresh": false,
+  "gitlens.views.branches.autoRefresh": false,
+  "gitlens.views.remotes.autoRefresh": false,
+  "gitlens.views.stashes.autoRefresh": false,
+  "gitlens.views.tags.autoRefresh": false,
+  "gitlens.views.contributors.autoRefresh": false,
+  "gitlens.views.searchAndCompare.autoRefresh": false,
+  "gitlens.codeLens.enabled": false,
+  "gitlens.currentLine.enabled": false,
+  "gitlens.hovers.enabled": false,
+  "gitlens.statusBar.enabled": false
+}

@@ -28,7 +28,8 @@ linux-*/
 *.img
 
 # Editor & OS
-.vscode/
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
 *~

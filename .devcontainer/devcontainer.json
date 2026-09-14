@@ -1,0 +1,43 @@
+{
+  "name": "Linux Kernel Hardening Engineering Lab",
+  "dockerComposeFile": ["../compose.yaml"],
+  "service": "lab",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+
+  "postCreateCommand": "git config --global --add safe.directory /workspace",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode.cpptools",
+        "ms-vscode.makefile-tools",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "editor.formatOnSave": false,
+        "editor.formatOnType": false,
+        "editor.formatOnPaste": false,
+        "files.insertFinalNewline": false,
+        "files.trimTrailingWhitespace": false,
+        "C_Cpp.formatting": "disabled",
+        "[c]": {
+          "editor.formatOnSave": false,
+          "editor.formatOnType": false
+        },
+        "[cpp]": {
+          "editor.formatOnSave": false,
+          "editor.formatOnType": false
+        },
+        "[shellscript]": {
+          "editor.formatOnSave": false
+        },
+        "[markdown]": {
+          "editor.formatOnSave": false
+        },
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}
+
