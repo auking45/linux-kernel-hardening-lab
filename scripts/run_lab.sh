@@ -130,8 +130,37 @@ ensure_kernel_source() {
 ensure_rootfs() {
     echo "[3/5] Ensuring initramfs rootfs for ${TARGET_ARCH}..."
     local rootfs_archive="${ROOTFS_DIR}/initramfs-${TARGET_ARCH}.cpio.gz"
-    if [[ ! -f "${rootfs_archive}" ]]; then
-        "${SCRIPT_DIR}/build_rootfs.sh" --arch "${TARGET_ARCH}"
+    local needs_rebuild=0
+
+    if [[ ! -f "${rootfs_archive}" || "${REBUILD}" -eq 1 ]]; then
+        needs_rebuild=1
+    else
+        # Check freshness against build scripts and lab files
+        if [[ "${SCRIPT_DIR}/build_rootfs.sh" -nt "${rootfs_archive}" ]] || \
+           [[ "${SCRIPT_DIR}/env.sh" -nt "${rootfs_archive}" ]]; then
+            echo "[*] Rootfs build scripts modified. Triggering rootfs rebuild..."
+            needs_rebuild=1
+        else
+            for src in "${LAB_ROOT_DIR}/labs"/*/*; do
+                if [[ -f "${src}" && "${src}" -nt "${rootfs_archive}" ]]; then
+                    echo "[*] Detected updated lab component ($(basename "${src}")). Triggering rootfs rebuild..."
+                    needs_rebuild=1
+                    break
+                fi
+            done
+        fi
+    fi
+
+    # Verify requested test script exists in the cpio archive if --test is specified
+    if [[ "${needs_rebuild}" -eq 0 && -n "${AUTO_TEST}" ]]; then
+        if ! zcat "${rootfs_archive}" 2>/dev/null | cpio -t 2>/dev/null | grep -q "bin/${AUTO_TEST}$"; then
+            echo "[-] Warning: Requested test '${AUTO_TEST}' missing from current initramfs. Rebuilding..."
+            needs_rebuild=1
+        fi
+    fi
+
+    if [[ "${needs_rebuild}" -eq 1 ]]; then
+        "${SCRIPT_DIR}/build_rootfs.sh" --arch "${TARGET_ARCH}" --force
     else
         echo "[+] Initramfs ready at: ${rootfs_archive}"
     fi

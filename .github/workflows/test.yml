@@ -58,8 +58,6 @@ jobs:
         with:
           path: rootfs/initramfs-${{ matrix.arch }}.cpio.gz
           key: rootfs-${{ matrix.arch }}-${{ hashFiles('scripts/env.sh', 'scripts/build_rootfs.sh', 'labs/**/exploit.c', 'labs/**/test.sh') }}
-          restore-keys: |
-            rootfs-${{ matrix.arch }}-
 
       - name: Cache Base Kernel Build (${{ matrix.arch }})
         uses: actions/cache@v4
@@ -177,8 +175,6 @@ jobs:
         with:
           path: rootfs/initramfs-${{ matrix.arch }}.cpio.gz
           key: rootfs-${{ matrix.arch }}-${{ hashFiles('scripts/env.sh', 'scripts/build_rootfs.sh', 'labs/**/exploit.c', 'labs/**/test.sh') }}
-          restore-keys: |
-            rootfs-${{ matrix.arch }}-
 
       - name: Cache Feature Kernel Build (${{ matrix.feature }} on ${{ matrix.arch }})
         uses: actions/cache@v4
