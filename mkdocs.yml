@@ -114,3 +114,4 @@ nav:
           - Randomize Memory: features/07-randomize-memory.md
       - 03. Memory Permissions & Access Separation:
           - Strict Kernel RWX (W^X): features/08-strict-rwx.md
+          - SMEP & PXN (ret2usr Defense): features/09-smep-pxn.md

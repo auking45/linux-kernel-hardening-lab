@@ -224,6 +224,10 @@ launch_virtual_machine() {
         qemu_args+=("--cmdline" "rodata=on")
     elif [[ "${FEATURE_NAME}" == "strict-rwx-disabled" ]]; then
         qemu_args+=("--cmdline" "rodata=off")
+    elif [[ "${FEATURE_NAME}" == "smep-pxn" ]]; then
+        qemu_args+=("--cmdline" "smep=on pxn=on")
+    elif [[ "${FEATURE_NAME}" == "smep-pxn-disabled" ]]; then
+        qemu_args+=("--cmdline" "clearcpuid=smep pxn=off")
     fi
     if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
         qemu_args+=("--timeout" "${TIMEOUT_SEC}")

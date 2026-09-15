@@ -164,6 +164,14 @@ jobs:
             feature: strict-rwx
             test: test_strict_rwx
 
+          # Task 5-2: SMEP & PXN (Dual-Arch)
+          - arch: x86_64
+            feature: smep-pxn
+            test: test_smep_pxn
+          - arch: arm64
+            feature: smep-pxn
+            test: test_smep_pxn
+
 
     steps:
       - name: Checkout repository

@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMEP (x86) & PXN (ARM64) Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --perm-user: #f97316;
+      --perm-kernel: #38bdf8;
+      --perm-block: #ef4444;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --perm-block: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.2);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .scenario-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .tab-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+
+    .view-container {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .view-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .diagram-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      min-height: 480px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .info-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 8px;
+    }
+
+    .info-desc {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .metric-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .metric-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: monospace;
+    }
+
+    /* Diagram Elements */
+    .mem-layout {
+      width: 100%;
+      max-width: 650px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .ring-box {
+      border: 2px dashed var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .ring-box.kernel {
+      border-color: var(--accent-blue);
+      background: rgba(56, 189, 248, 0.05);
+    }
+
+    .ring-box.user {
+      border-color: var(--perm-user);
+      background: rgba(249, 115, 22, 0.05);
+    }
+
+    .ring-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ring-box.kernel .ring-label {
+      color: var(--accent-blue);
+    }
+
+    .ring-box.user .ring-label {
+      color: var(--perm-user);
+    }
+
+    .component-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .mem-node {
+      flex: 1;
+      min-width: 120px;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      text-align: center;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+
+    .mem-node:hover {
+      transform: translateY(-2px);
+    }
+
+    .mem-node.kernel-code {
+      background: rgba(56, 189, 248, 0.15);
+      border-color: var(--accent-blue);
+    }
+
+    .mem-node.kernel-vuln {
+      background: rgba(239, 68, 68, 0.15);
+      border-color: var(--accent-red);
+    }
+
+    .mem-node.user-shellcode {
+      background: rgba(249, 115, 22, 0.15);
+      border-color: var(--perm-user);
+    }
+
+    .mem-node.mmu-trap {
+      background: rgba(234, 179, 8, 0.15);
+      border-color: var(--accent-yellow);
+    }
+
+    .node-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .node-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: monospace;
+    }
+
+    .arrow-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 8px 0;
+    }
+
+    .flow-arrow {
+      width: 4px;
+      height: 40px;
+      background: var(--card-border);
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .flow-arrow::after {
+      content: '';
+      position: absolute;
+      bottom: -6px;
+      left: -6px;
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 8px solid var(--card-border);
+      transition: all 0.3s;
+    }
+
+    .flow-arrow.active-attack {
+      background: var(--accent-red);
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+    }
+
+    .flow-arrow.active-attack::after {
+      border-top-color: var(--accent-red);
+    }
+
+    .flow-arrow.active-blocked {
+      background: var(--accent-yellow);
+    }
+
+    .flow-arrow.active-blocked::after {
+      border-top-color: var(--accent-yellow);
+    }
+
+    .shield-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+
+    .danger-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        SMEP & PXN Execution Prevention Architecture
+        <span class="badge">Hardware Protection</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀️ 테마 전환</button>
+    </header>
+
+    <div class="scenario-tabs">
+      <button class="tab-btn active" onclick="switchScenario(1)">1. 권한 분리 모델 (Privilege Model)</button>
+      <button class="tab-btn" onclick="switchScenario(2)">2. ret2usr 공격 흐름 (Attack Vector)</button>
+      <button class="tab-btn" onclick="switchScenario(3)">3. 하드웨어 MMU 차단 (SMEP/PXN Defense)</button>
+      <button class="tab-btn" onclick="switchScenario(4)">4. ROP로의 전이 및 비교 매트릭스</button>
+    </div>
+
+    <div class="view-container">
+      <div class="diagram-panel" id="diagramPanel">
+        <!-- Injected via JavaScript -->
+      </div>
+
+      <div class="info-panel" id="infoPanel">
+        <!-- Injected via JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentScenario = 1;
+
+    const scenarios = {
+      1: {
+        title: "1. 권한 분리 기본 모델 (Privilege Separation Model)",
+        desc: "CPU는 링(Ring 0 / EL1)과 유저(Ring 3 / EL0)의 권한 레벨을 구분하여 가상 주소 공간을 관리합니다. 상위 주소는 커널 전용이며, 하위 주소는 프로세스 유저 공간입니다. 전통적인 커널에서는 슈퍼바이저 모드(Ring 0)가 유저 공간 메모리의 코드를 페치하여 실행하는 것이 하드웨어적으로 허용되었습니다.",
+        metric1Label: "x86 제어 플래그",
+        metric1Val: "CR4.SMEP (Bit 20)",
+        metric2Label: "ARM64 디스크립터",
+        metric2Val: "PTE_PXN (Bit 53)",
+        render: () => `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">
+                <span>Kernel Space (Supervisor: Ring 0 / EL1)</span>
+                <span class="shield-badge">CPL = 0</span>
+              </div>
+              <div class="component-row">
+                <div class="mem-node kernel-code">
+                  <div class="node-title">Kernel Core Code</div>
+                  <div class="node-sub">.text (R-X)</div>
+                </div>
+                <div class="mem-node kernel-code">
+                  <div class="node-title">System Call Handlers</div>
+                  <div class="node-sub">entry_SYSCALL_64</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="arrow-container">
+              <div class="flow-arrow"></div>
+            </div>
+
+            <div class="ring-box user">
+              <div class="ring-label">
+                <span>User Space (Unprivileged: Ring 3 / EL0)</span>
+                <span class="badge">CPL = 3</span>
+              </div>
+              <div class="component-row">
+                <div class="mem-node user-shellcode">
+                  <div class="node-title">User Application</div>
+                  <div class="node-sub">libc / app code</div>
+                </div>
+                <div class="mem-node user-shellcode">
+                  <div class="node-title">User Memory Heap/Stack</div>
+                  <div class="node-sub">&lt; TASK_SIZE</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      2: {
+        title: "2. ret2usr 공격 메커니즘 (Without SMEP/PXN)",
+        desc: "하드닝이 비활성화된 환경(clearcpuid=smep, pxn=off)에서는 공격자가 유저 공간에 권한 상승 쉘코드(예: commit_creds(prepare_kernel_cred(0)))를 배치하고, 커널 함수 포인터나 스택 반환 주소를 유저 공간 주소로 변조합니다. 커널은 Ring 0 상태에서 유저 주소로 분기하여 악성 코드를 그대로 실행(ret2usr)합니다.",
+        metric1Label: "공격 기법",
+        metric1Val: "ret2usr (Return-to-User)",
+        metric2Label: "공격 결과",
+        metric2Val: "루트 권한 즉각 탈취 (VULNERABLE)",
+        render: () => `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">
+                <span>Kernel Space (Ring 0 / EL1)</span>
+                <span class="danger-badge">Hijacked Control Flow</span>
+              </div>
+              <div class="component-row">
+                <div class="mem-node kernel-vuln">
+                  <div class="node-title">Vulnerable Driver Callback</div>
+                  <div class="node-sub">Function Pointer = 0x00401234</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="arrow-container">
+              <div class="flow-arrow active-attack"></div>
+            </div>
+
+            <div class="ring-box user">
+              <div class="ring-label">
+                <span>User Space Memory (&lt; TASK_SIZE)</span>
+                <span class="danger-badge">Arbitrary Shellcode Executed</span>
+              </div>
+              <div class="component-row">
+                <div class="mem-node user-shellcode" style="border-color: var(--accent-red); background: rgba(239, 68, 68, 0.25);">
+                  <div class="node-title">Exploit User Payload</div>
+                  <div class="node-sub">0x00401234: commit_creds(0)</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      3: {
+        title: "3. 하드웨어 MMU 차단 (With SMEP/PXN Enforced)",
+        desc: "SMEP (CR4 Bit 20 = 1) 또는 PXN (PTE Bit 53 = 1)이 활성화되면, CPU가 슈퍼바이저 모드(Ring 0 / EL1)에서 유저 공간 페이지(U/S=1)의 명령어를 페치하려는 즉시 하드웨어 MMU가 명령 실행 전에 Page Fault (#PF, Error: Supervisor Instruction Fetch Violation)를 발생시켜 분기를 원천 차단합니다.",
+        metric1Label: "하드웨어 검증",
+        metric1Val: "CR4.SMEP=1 / PTE_PXN=1",
+        metric2Label: "방어 결과",
+        metric2Val: "MMU #PF Trap (DEFENSE ACTIVE)",
+        render: () => `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">
+                <span>Kernel Space (Supervisor: Ring 0 / EL1)</span>
+                <span class="shield-badge">Protected by MMU</span>
+              </div>
+              <div class="component-row">
+                <div class="mem-node kernel-code">
+                  <div class="node-title">Kernel Execution Context</div>
+                  <div class="node-sub">Attempting branch to user space</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="arrow-container" style="position: relative;">
+              <div class="flow-arrow active-blocked"></div>
+              <div style="position: absolute; background: var(--accent-red); color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">
+                ⛔ MMU TRAP (#PF)
+              </div>
+            </div>
+
+            <div class="ring-box user">
+              <div class="ring-label">
+                <span>User Space (PTE: User=1, PXN=1)</span>
+                <span class="shield-badge">Instruction Fetch Blocked</span>
+              </div>
+              <div class="component-row">
+                <div class="mem-node mmu-trap">
+                  <div class="node-title">User Memory Address</div>
+                  <div class="node-sub">Execution Denied by Hardware</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      4: {
+        title: "4. 보안 비교 매트릭스 및 ROP로의 전이",
+        desc: "SMEP/PXN의 도입으로 유저 공간에 직접 쉘코드를 올리고 점프하는 ret2usr 공격은 영구 무력화되었습니다. 이에 따라 공격자들은 커널 내부의 기존 코드 조각들을 엮는 커널 ROP(Return-Oriented Programming) 및 JOP로 공격 기법을 전환해야만 했습니다.",
+        metric1Label: "ret2usr 공격",
+        metric1Val: "완전 차단 (0% 성공률)",
+        metric2Label: "런타임 오버헤드",
+        metric2Val: "0% (하드웨어 MMU 내장)",
+        render: () => `
+          <div class="mem-layout">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%;">
+              <div class="ring-box" style="border-color: var(--accent-red);">
+                <div class="ring-label" style="color: var(--accent-red);">Without SMEP (Base)</div>
+                <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted);">
+                  ❌ 유저 공간 쉘코드 실행 허용<br>
+                  ❌ 단순 함수 포인터 변조로 루트 탈취<br>
+                  ❌ ROP 불필요 (간단한 익스플로잇)
+                </div>
+              </div>
+              <div class="ring-box" style="border-color: var(--accent-green);">
+                <div class="ring-label" style="color: var(--accent-green);">With SMEP/PXN (Hardened)</div>
+                <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted);">
+                  ✅ 유저 공간 인스트럭션 페치 하드웨어 차단<br>
+                  ✅ ret2usr 공격 원천 방어<br>
+                  ✅ 공격 난이도 극대화 (커널 ROP 강제)
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      }
+    };
+
+    function switchScenario(num) {
+      currentScenario = num;
+      document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === num);
+      });
+
+      const s = scenarios[num];
+      document.getElementById('diagramPanel').innerHTML = s.render();
+      document.getElementById('infoPanel').innerHTML = `
+        <div class="info-title">${s.title}</div>
+        <div class="info-desc">${s.desc}</div>
+        <div class="metric-box">
+          <div class="metric-label">${s.metric1Label}</div>
+          <div class="metric-val">${s.metric1Val}</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">${s.metric2Label}</div>
+          <div class="metric-val">${s.metric2Val}</div>
+        </div>
+      `;
+    }
+
+    function toggleTheme() {
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      document.documentElement.setAttribute('data-theme', isLight ? 'dark' : 'light');
+      document.getElementById('themeToggle').textContent = isLight ? '☀️ 테마 전환' : '🌙 테마 전환';
+    }
+
+    switchScenario(1);
+  </script>
+</body>
+</html>
+
