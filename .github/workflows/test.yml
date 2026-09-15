@@ -156,6 +156,14 @@ jobs:
             feature: randomize-memory
             test: test_randomize_memory
 
+          # Task 5-1: Strict Kernel RWX (Dual-Arch)
+          - arch: x86_64
+            feature: strict-rwx
+            test: test_strict_rwx
+          - arch: arm64
+            feature: strict-rwx
+            test: test_strict_rwx
+
 
     steps:
       - name: Checkout repository

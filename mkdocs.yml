@@ -112,3 +112,5 @@ nav:
           - KASLR: features/05-kaslr.md
           - FG-KASLR: features/06-fgkaslr.md
           - Randomize Memory: features/07-randomize-memory.md
+      - 03. Memory Permissions & Access Separation:
+          - Strict Kernel RWX (W^X): features/08-strict-rwx.md

@@ -220,6 +220,10 @@ launch_virtual_machine() {
         qemu_args+=("--cmdline" "fgkaslr=1")
     elif [[ "${FEATURE_NAME}" == "fgkaslr-disabled" ]]; then
         qemu_args+=("--cmdline" "fgkaslr=0")
+    elif [[ "${FEATURE_NAME}" == "strict-rwx" ]]; then
+        qemu_args+=("--cmdline" "rodata=on")
+    elif [[ "${FEATURE_NAME}" == "strict-rwx-disabled" ]]; then
+        qemu_args+=("--cmdline" "rodata=off")
     fi
     if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
         qemu_args+=("--timeout" "${TIMEOUT_SEC}")

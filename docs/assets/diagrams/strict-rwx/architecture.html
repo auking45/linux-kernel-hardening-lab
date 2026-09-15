@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CONFIG_STRICT_KERNEL_RWX & STRICT_MODULE_RWX Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --perm-rx: #38bdf8;
+      --perm-ro: #a855f7;
+      --perm-rw: #22c55e;
+      --perm-rwx: #ef4444;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --perm-rx: #0284c7;
+      --perm-ro: #9333ea;
+      --perm-rw: #16a34a;
+      --perm-rwx: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 24px;
+      background: var(--card-bg);
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+    }
+
+    .btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .btn.active {
+      background: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 24px;
+    }
+
+    .diagram-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      position: relative;
+      min-height: 520px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .info-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-title {
+      font-size: 1.1rem;
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .info-desc {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .stat-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+
+    .stat-badge.alert {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--accent-red);
+      border-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .stat-badge.success {
+      background: rgba(34, 197, 94, 0.1);
+      color: var(--accent-green);
+      border-color: rgba(34, 197, 94, 0.2);
+    }
+
+    svg {
+      width: 100%;
+      height: 480px;
+    }
+
+    .mem-block {
+      transition: all 0.4s ease;
+      cursor: pointer;
+    }
+
+    .mem-block:hover {
+      filter: brightness(1.2);
+    }
+
+    .arrow {
+      stroke-dasharray: 4;
+      animation: dash 1s linear infinite;
+    }
+
+    @keyframes dash {
+      to {
+        stroke-dashoffset: -8;
+      }
+    }
+
+    .tooltip {
+      position: absolute;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--accent-blue);
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      pointer-events: none;
+      display: none;
+      z-index: 10;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🛡️ CONFIG_STRICT_KERNEL_RWX & W^X Memory Invariants</h1>
+      <button class="theme-toggle" onclick="toggleTheme()">🌓 테마 전환</button>
+    </header>
+
+    <div class="controls">
+      <button class="btn active" onclick="setScenario(1)">1. W^X 메모리 권한 모델 (표준)</button>
+      <button class="btn" onclick="setScenario(2)">2. 공격 시나리오: 코드 변조 (Base 커널)</button>
+      <button class="btn" onclick="setScenario(3)">3. 하드웨어 보호: MMU Page Fault (Hardened)</button>
+      <button class="btn" onclick="setScenario(4)">4. W ∩ X = ∅ 불변성 검증 매트릭스</button>
+    </div>
+
+    <div class="main-grid">
+      <div class="diagram-panel">
+        <div id="tooltip" class="tooltip"></div>
+        <svg viewBox="0 0 740 460" id="mmu-svg">
+          <!-- Definitions -->
+          <defs>
+            <marker id="arrow-blue" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#38bdf8" />
+            </marker>
+            <marker id="arrow-red" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444" />
+            </marker>
+            <marker id="arrow-green" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#22c55e" />
+            </marker>
+          </defs>
+
+          <!-- CPU MMU & Registers Area -->
+          <rect x="20" y="20" width="220" height="420" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2" />
+          <text x="35" y="50" fill="#38bdf8" font-size="14" font-weight="bold">CPU Hardware (Ring 0)</text>
+          
+          <!-- Control Registers -->
+          <rect x="35" y="70" width="190" height="70" rx="4" fill="#0f172a" stroke="#334155" />
+          <text x="45" y="92" fill="#94a3b8" font-size="12">x86: CR0.WP (Bit 16)</text>
+          <text x="45" y="112" id="cr0-wp-val" fill="#22c55e" font-size="13" font-weight="bold">WP = 1 (Write Protect)</text>
+          <text x="45" y="128" fill="#94a3b8" font-size="11">ARM64: SCTLR_EL1.WXN</text>
+
+          <!-- MMU Translation Engine -->
+          <rect x="35" y="155" width="190" height="110" rx="4" fill="#0f172a" stroke="#334155" />
+          <text x="45" y="178" fill="#eab308" font-size="12" font-weight="bold">Memory Management Unit</text>
+          <text x="45" y="200" fill="#94a3b8" font-size="11">PTE Permission Check:</text>
+          <text x="45" y="220" id="mmu-rw-chk" fill="#38bdf8" font-size="11">_PAGE_RW == 0 (RO)</text>
+          <text x="45" y="240" id="mmu-nx-chk" fill="#a855f7" font-size="11">_PAGE_NX == 1 (No-Exec)</text>
+
+          <!-- Attacker Actor -->
+          <g id="attacker-group" opacity="0">
+            <rect x="35" y="280" width="190" height="145" rx="4" fill="#2a1215" stroke="#ef4444" />
+            <text x="45" y="305" fill="#ef4444" font-size="13" font-weight="bold">⚠️ Malicious Vector</text>
+            <text x="45" y="328" fill="#f8fafc" font-size="11">Payload: Kernel Code Patch</text>
+            <text x="45" y="348" fill="#94a3b8" font-size="10">Target: Syscall Hooking</text>
+            <text x="45" y="370" id="attack-status" fill="#ef4444" font-size="11" font-weight="bold">Attempting Write...</text>
+            <path id="attack-arrow" d="M 225 350 L 320 110" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)" class="arrow" />
+          </g>
+
+          <!-- Kernel Virtual Memory Layout -->
+          <rect x="290" y="20" width="430" height="420" rx="8" fill="#1e293b" stroke="#334155" stroke-width="2" />
+          <text x="310" y="50" fill="#38bdf8" font-size="14" font-weight="bold">Kernel Virtual Memory Map</text>
+
+          <!-- Section 1: .text (Code) -->
+          <g class="mem-block" id="block-text" onmouseover="showTip(evt, '.text Section: Kernel instructions (R-X)')" onmouseout="hideTip()">
+            <rect x="310" y="70" width="390" height="75" rx="6" fill="#0f2b3c" stroke="#38bdf8" stroke-width="2" />
+            <text x="325" y="95" fill="#38bdf8" font-size="13" font-weight="bold">.text (Kernel Code / Built-in Functions)</text>
+            <text x="325" y="115" fill="#94a3b8" font-size="11">Address: 0xffffffff81000000 | Size: ~12 MB</text>
+            <rect x="610" y="82" width="75" height="24" rx="4" fill="#0284c7" />
+            <text x="630" y="98" fill="#ffffff" font-size="11" font-weight="bold" id="perm-text">R - X</text>
+            <text x="325" y="133" fill="#38bdf8" font-size="10">Invariants: Read-Only (Non-writable), Executable</text>
+          </g>
+
+          <!-- Section 2: .rodata (Constants & Jump Tables) -->
+          <g class="mem-block" id="block-rodata" onmouseover="showTip(evt, '.rodata Section: Const tables & __ro_after_init (R--)')" onmouseout="hideTip()">
+            <rect x="310" y="155" width="390" height="75" rx="6" fill="#261633" stroke="#a855f7" stroke-width="2" />
+            <text x="325" y="180" fill="#a855f7" font-size="13" font-weight="bold">.rodata & __ro_after_init (Read-Only Data)</text>
+            <text x="325" y="200" fill="#94a3b8" font-size="11">Address: 0xffffffff82000000 | sys_call_table, static ops</text>
+            <rect x="610" y="167" width="75" height="24" rx="4" fill="#9333ea" />
+            <text x="630" y="183" fill="#ffffff" font-size="11" font-weight="bold" id="perm-rodata">R - -</text>
+            <text x="325" y="218" fill="#a855f7" font-size="10">Invariants: Read-Only (Non-writable), Non-Executable (NX=1)</text>
+          </g>
+
+          <!-- Section 3: .data / .bss (Global Variables) -->
+          <g class="mem-block" id="block-data" onmouseover="showTip(evt, '.data/.bss Section: Mutable kernel state (RW-)')" onmouseout="hideTip()">
+            <rect x="310" y="240" width="390" height="75" rx="6" fill="#122a1f" stroke="#22c55e" stroke-width="2" />
+            <text x="325" y="265" fill="#22c55e" font-size="13" font-weight="bold">.data & .bss (Mutable Variables & State)</text>
+            <text x="325" y="285" fill="#94a3b8" font-size="11">Address: 0xffffffff82800000 | Active variables, locks</text>
+            <rect x="610" y="252" width="75" height="24" rx="4" fill="#16a34a" />
+            <text x="630" y="268" fill="#ffffff" font-size="11" font-weight="bold" id="perm-data">R W -</text>
+            <text x="325" y="303" fill="#22c55e" font-size="10">Invariants: Writable, Strictly Non-Executable (NX=1)</text>
+          </g>
+
+          <!-- Section 4: Kernel Stack & Heap (kmalloc/vmalloc) -->
+          <g class="mem-block" id="block-heap" onmouseover="showTip(evt, 'Stack/Heap: Dynamic buffers, NX enforced (RW-)')" onmouseout="hideTip()">
+            <rect x="310" y="325" width="390" height="75" rx="6" fill="#1b2234" stroke="#64748b" stroke-width="2" />
+            <text x="325" y="350" fill="#cbd5e1" font-size="13" font-weight="bold">Kernel Stack & Slab Heap (kmalloc / vmalloc)</text>
+            <text x="325" y="370" fill="#94a3b8" font-size="11">Dynamic memory buffers allocated during runtime</text>
+            <rect x="610" y="337" width="75" height="24" rx="4" fill="#475569" />
+            <text x="630" y="353" fill="#ffffff" font-size="11" font-weight="bold" id="perm-heap">R W -</text>
+            <text x="325" y="388" fill="#cbd5e1" font-size="10">Invariants: Non-Executable (Shellcode execution blocked)</text>
+          </g>
+
+          <!-- Invariant Banner -->
+          <rect x="310" y="408" width="390" height="24" rx="4" fill="#0f172a" stroke="#334155" />
+          <text x="410" y="424" fill="#e2e8f0" font-size="11" font-weight="bold" id="invariant-banner">
+            W^X Invariant: ∀ Page P ∈ Kernel_VA, (Writable(P) ∧ Executable(P)) = False
+          </text>
+        </svg>
+      </div>
+
+      <div class="info-panel">
+        <div class="info-title" id="panel-title">1. W^X 메모리 권한 모델 (표준)</div>
+        <div class="stat-badge success" id="panel-status">CONFIG_STRICT_KERNEL_RWX: ACTIVE</div>
+        
+        <div class="info-desc" id="panel-desc">
+          리눅스 커널은 <code>mark_readonly()</code> 초기화 루틴을 통해 모든 메모리 페이지를 <strong>Write XOR Execute ($W \oplus X$)</strong> 원칙에 따라 분리합니다.<br><br>
+          • <strong>.text (코드)</strong>: $R-X$ (읽기/실행 가능, 수정 불가)<br>
+          • <strong>.rodata (상수)</strong>: $R--$ (읽기 전용, 실행 불가)<br>
+          • <strong>.data/스택/힙</strong>: $RW-$ (읽기/쓰기 가능, 실행 불가)
+        </div>
+
+        <div style="border-top: 1px solid var(--card-border); padding-top: 12px;">
+          <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">하드웨어 통제 메커니즘:</div>
+          <div style="font-size: 0.8rem; line-height: 1.5;" id="panel-hw">
+            • <strong>x86_64</strong>: CPU 레지스터 <code>CR0.WP = 1</code> 활성화로 커널 모드(Ring 0)에서도 RO 페이지 쓰기 금지.<br>
+            • <strong>ARM64</strong>: 페이지 테이블 AP 속성 및 <code>PXN/UXN</code> 비트로 비실행 및 쓰기 통제.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', target);
+    }
+
+    function setScenario(step) {
+      document.querySelectorAll('.btn').forEach((b, idx) => {
+        b.classList.toggle('active', idx + 1 === step);
+      });
+
+      const cr0Val = document.getElementById('cr0-wp-val');
+      const attacker = document.getElementById('attacker-group');
+      const permText = document.getElementById('perm-text');
+      const permRodata = document.getElementById('perm-rodata');
+      const title = document.getElementById('panel-title');
+      const status = document.getElementById('panel-status');
+      const desc = document.getElementById('panel-desc');
+      const hw = document.getElementById('panel-hw');
+      const banner = document.getElementById('invariant-banner');
+
+      if (step === 1) {
+        // Standard W^X
+        cr0Val.textContent = "WP = 1 (Write Protect)";
+        cr0Val.setAttribute("fill", "#22c55e");
+        attacker.setAttribute("opacity", "0");
+        permText.textContent = "R - X";
+        permRodata.textContent = "R - -";
+        banner.textContent = "W^X Invariant: ∀ Page P ∈ Kernel_VA, (Writable(P) ∧ Executable(P)) = False";
+        banner.setAttribute("fill", "#22c55e");
+
+        title.textContent = "1. W^X 메모리 권한 모델 (표준)";
+        status.className = "stat-badge success";
+        status.textContent = "CONFIG_STRICT_KERNEL_RWX: ACTIVE";
+        desc.innerHTML = `리눅스 커널은 <code>mark_readonly()</code> 초기화 루틴을 통해 모든 메모리 페이지를 <strong>Write XOR Execute ($W \\oplus X$)</strong> 원칙에 따라 분리합니다.<br><br>
+        • <strong>.text (코드)</strong>: $R-X$ (읽기/실행 가능, 수정 불가)<br>
+        • <strong>.rodata (상수)</strong>: $R--$ (읽기 전용, 실행 불가)<br>
+        • <strong>.data/스택/힙</strong>: $RW-$ (읽기/쓰기 가능, 실행 불가)`;
+        hw.innerHTML = `• <strong>x86_64</strong>: CPU 레지스터 <code>CR0.WP = 1</code> 활성화로 Ring 0에서도 RO 페이지 쓰기 금지.<br>
+        • <strong>ARM64</strong>: 페이지 테이블 AP 속성 및 <code>PXN/UXN</code> 비트로 비실행 통제.`;
+      } else if (step === 2) {
+        // Vulnerable Base (rodata=off)
+        cr0Val.textContent = "WP = 0 (Protection OFF)";
+        cr0Val.setAttribute("fill", "#ef4444");
+        attacker.setAttribute("opacity", "1");
+        permText.textContent = "R W X";
+        permRodata.textContent = "R W -";
+        banner.textContent = "⚠️ VULNERABLE: W^X Invariant Broken! Kernel .text is Writable!";
+        banner.setAttribute("fill", "#ef4444");
+
+        title.textContent = "2. 공격 시나리오: 코드 변조 (Base 커널)";
+        status.className = "stat-badge alert";
+        status.textContent = "rodata=off (W^X DISABLED)";
+        desc.innerHTML = `부팅 파라미터 <code>rodata=off</code>가 지정되면 커널은 <code>mark_rodata_ro()</code>를 건너뛰어 <strong>.text와 .rodata 영역이 쓰기 가능 상태($RWX$)</strong>로 방치됩니다.<br><br>
+        공격자나 루트킷은 <code>target_function</code> 코드나 <code>sys_call_table</code> 함수 포인터를 자유롭게 덮어써 악성 셸코드로 실행 흐름을 하이재킹할 수 있습니다.`;
+        hw.innerHTML = `• <strong>공격 벡터</strong>: <code>copy_to_kernel_nofault()</code>가 아무런 하드웨어 제약 없이 성공(0 반환).<br>
+        • <strong>보안 위협</strong>: 임의 코드 실행 및 커널 무결성 완전 상실.`;
+      } else if (step === 3) {
+        // Hardened Defense Active
+        cr0Val.textContent = "WP = 1 (Hardware Fault)";
+        cr0Val.setAttribute("fill", "#22c55e");
+        attacker.setAttribute("opacity", "1");
+        permText.textContent = "R - X";
+        permRodata.textContent = "R - -";
+        banner.textContent = "🛡️ DEFENSE ACTIVE: MMU Page Fault Triggered (-EFAULT)! Write Blocked!";
+        banner.setAttribute("fill", "#38bdf8");
+
+        title.textContent = "3. 하드웨어 보호: MMU Page Fault (Hardened)";
+        status.className = "stat-badge success";
+        status.textContent = "CONFIG_STRICT_KERNEL_RWX: VERIFIED";
+        desc.innerHTML = `<code>CONFIG_STRICT_KERNEL_RWX=y</code> 및 <code>rodata=on</code> 상태에서는 공격자가 .text나 .rodata에 단 1바이트라도 쓰기를 시도하는 즉시 <strong>CPU MMU 하드웨어 레벨에서 Page Fault</strong>가 발생합니다.<br><br>
+        커널 예외 핸들러가 이를 감지하여 쓰기를 원천 차단하고 <code>-EFAULT</code>를 반환하므로 커널 코드가 손상되지 않고 안전하게 보존됩니다.`;
+        hw.innerHTML = `• <strong>x86_64</strong>: CPU가 <code>#PF (Page Fault, Error Code Write Violation)</code> 발생.<br>
+        • <strong>ARM64</strong>: MMU Data Abort (Permission Fault) 발생.`;
+      } else if (step === 4) {
+        // Full Invariant Matrix
+        cr0Val.textContent = "WP = 1 (Strict W^X)";
+        cr0Val.setAttribute("fill", "#22c55e");
+        attacker.setAttribute("opacity", "0");
+        permText.textContent = "R - X";
+        permRodata.textContent = "R - -";
+        banner.textContent = "W^X Invariant: W ∩ X = ∅ (Zero Executable Writable Pages)";
+        banner.setAttribute("fill", "#a855f7");
+
+        title.textContent = "4. W ∩ X = ∅ 불변성 검증 매트릭스";
+        status.className = "stat-badge success";
+        status.textContent = "debug_checkwx(): PASSED";
+        desc.innerHTML = `커널 부팅 시 <code>debug_checkwx()</code> 함수가 전체 페이지 테이블을 순회(Walk)하여 쓰기 가능($W$)하면서 동시에 실행 가능($X$)한 페이지가 단 하나라도 존재하는지 전수 검사합니다.<br><br>
+        • .text: W=0, X=1 ($R-X$)<br>
+        • .rodata: W=0, X=0 ($R--$)<br>
+        • .data / Heap / Stack: W=1, X=0 ($RW-$)`;
+        hw.innerHTML = `• <strong>0% 런타임 오버헤드</strong>: 부팅 시 페이지 테이블 속성 설정 이후 하드웨어 MMU가 자동 감시하므로 추가 CPU 지연 없음.<br>
+        • <strong>모듈 보안</strong>: <code>CONFIG_STRICT_MODULE_RWX</code>를 통해 외부 .ko 모듈에도 동일하게 적용.`;
+      }
+    }
+
+    function showTip(evt, text) {
+      const tip = document.getElementById('tooltip');
+      tip.textContent = text;
+      tip.style.display = 'block';
+      tip.style.left = (evt.pageX + 15) + 'px';
+      tip.style.top = (evt.pageY + 15) + 'px';
+    }
+
+    function hideTip() {
+      document.getElementById('tooltip').style.display = 'none';
+    }
+  </script>
+</body>
+</html>
+
