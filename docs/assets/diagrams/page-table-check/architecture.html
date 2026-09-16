@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CONFIG_PAGE_TABLE_CHECK Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --perm-user: #f97316;
+      --perm-kernel: #38bdf8;
+      --perm-block: #ef4444;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --perm-block: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.2);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .scenario-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .tab-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+
+    .view-container {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .view-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .diagram-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      min-height: 520px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .info-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 8px;
+    }
+
+    .info-desc {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .metric-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .metric-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: monospace;
+    }
+
+    /* Diagram Elements */
+    .mem-layout {
+      width: 100%;
+      max-width: 650px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .ring-box {
+      border: 2px dashed var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .ring-box.kernel {
+      background: rgba(56, 189, 248, 0.05);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .ring-box.page-ext {
+      background: rgba(168, 85, 247, 0.05);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+
+    .ring-box.user {
+      background: rgba(249, 115, 22, 0.05);
+      border-color: rgba(249, 115, 22, 0.4);
+    }
+
+    .ring-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ring-box.kernel .ring-label { color: var(--accent-blue); }
+    .ring-box.page-ext .ring-label { color: var(--accent-purple); }
+    .ring-box.user .ring-label { color: var(--perm-user); }
+
+    .block-grid {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .code-block {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      flex: 1;
+      min-width: 180px;
+      position: relative;
+      font-family: monospace;
+      font-size: 0.85rem;
+      transition: all 0.3s;
+    }
+
+    .code-block.active {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+    }
+
+    .code-block.vuln {
+      border-color: var(--accent-red);
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+    }
+
+    .code-block.blocked {
+      border-color: var(--accent-yellow);
+      background: rgba(234, 179, 8, 0.1);
+    }
+
+    .block-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-family: sans-serif;
+    }
+
+    .barrier {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      gap: 12px;
+      position: relative;
+    }
+
+    .barrier.secure {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .barrier.insecure {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .arrow-flow {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 36px;
+      position: relative;
+    }
+
+    .arrow-line {
+      width: 2px;
+      height: 100%;
+      background: var(--card-border);
+      position: relative;
+    }
+
+    .arrow-line.flow-down::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid var(--accent-red);
+    }
+
+    .arrow-line.flow-up::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 6px solid var(--accent-green);
+    }
+
+    .arrow-line.blocked-flow::before {
+      content: '⚡ BUG_ON() TRAP';
+      position: absolute;
+      top: 30%;
+      left: 10px;
+      background: var(--accent-red);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .status-pill.red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+    .status-pill.green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+    .status-pill.yellow { background: rgba(234, 179, 8, 0.2); color: var(--accent-yellow); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        CONFIG_PAGE_TABLE_CHECK
+        <span class="badge">Runtime Page Table Integrity</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle">🌓 Toggle Theme</button>
+    </header>
+
+    <div class="scenario-tabs">
+      <button class="tab-btn active" data-scenario="arch">1. Page Table Check Architecture</button>
+      <button class="tab-btn" data-scenario="doublemap">2. Attack: Illegal Double Mapping (Base)</button>
+      <button class="tab-btn" data-scenario="trap">3. Defense: Synchronous Detection & Trap</button>
+      <button class="tab-btn" data-scenario="matrix">4. Mapping Permission Rules Matrix</button>
+    </div>
+
+    <div class="view-container">
+      <div class="diagram-panel" id="diagramCanvas">
+        <!-- Injected via JavaScript -->
+      </div>
+
+      <div class="info-panel">
+        <h2 class="info-title" id="infoTitle">Scenario Overview</h2>
+        <p class="info-desc" id="infoDesc">Select a scenario above to inspect page table validation, atomic counter tracking, and corruption mitigation.</p>
+
+        <div class="metric-box">
+          <div class="metric-label">PAGE_TABLE_CHECK Kernel Config</div>
+          <div class="metric-val" id="valConfig">CONFIG_PAGE_TABLE_CHECK = y</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-label">Runtime Static Branch Key</div>
+          <div class="metric-val" id="valKey">page_table_check_disabled = false</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-label">Page Extension (page_ext) Tracking</div>
+          <div class="metric-val" id="valExt">struct page_table_check (Atomic Counters)</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-label">Double-Mapping Detection State</div>
+          <div class="metric-val" id="valState">ENFORCED (Synchronous BUG_ON)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const themeBtn = document.getElementById('themeToggle');
+    let currentTheme = 'dark';
+
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+    });
+
+    const scenarios = {
+      arch: {
+        title: "1. CONFIG_PAGE_TABLE_CHECK Core Architecture",
+        desc: "리눅스 커널의 페이지 테이블 검증 기능은 유저 공간 페이지 테이블 엔트리(PTE, PMD, PUD)가 설정되거나 해제될 때마다 동기식(Synchronous)으로 호출됩니다. 물리 페이지마다 할당된 struct page_ext 내부의 struct page_table_check 메타데이터를 통해 anon_map_count와 file_map_count 원자적 카운터를 추적하며, 잘못된 공유나 불법 매핑을 실시간 감지합니다.",
+        config: "CONFIG_PAGE_TABLE_CHECK = y",
+        key: "page_table_check_disabled = false",
+        ext: "anon_map_count / file_map_count",
+        state: "ACTIVE (Synchronous Hooks Armed)",
+        html: `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">⚙️ Page Table Manipulation Hooks (mm/page_table_check.c)</div>
+              <div class="block-grid">
+                <div class="code-block active">
+                  <div class="block-title">PTE / PMD Setter Hooks</div>
+                  <code>page_table_check_ptes_set()<br>page_table_check_pmd_set()<br>page_table_check_pud_set()</code>
+                </div>
+                <div class="code-block">
+                  <div class="block-title">PTE / PMD Clear Hooks</div>
+                  <code>page_table_check_pte_clear()<br>page_table_check_zero()<br>free_pages_prepare()</code>
+                </div>
+              </div>
+            </div>
+
+            <div class="barrier secure">
+              <span>🔍 Synchronous Validation: atomic_inc_return(&ptc->anon_map_count)</span>
+              <span class="status-pill green">ARMED</span>
+            </div>
+
+            <div class="ring-box page-ext">
+              <div class="ring-label">📦 Physical Page Metadata (PAGE_EXTENSION)</div>
+              <div class="block-grid">
+                <div class="code-block">
+                  <div class="block-title">struct page_table_check</div>
+                  <code>atomic_t anon_map_count;<br>atomic_t file_map_count;</code>
+                </div>
+                <div class="code-block">
+                  <div class="block-title">struct page (Physical RAM)</div>
+                  <code>pfn_to_page(pfn)<br>PageAnon(page)<br>PageSlab(page)</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      doublemap: {
+        title: "2. Attack: Illegal Double Mapping & Page UAF (Baseline Mode)",
+        desc: "페이지 테이블 체크가 비활성화(page_table_check=off)된 베이스라인 환경에서는, 커널 내부의 레이스 컨디션, UAF 버그, 또는 잘못된 드라이버 remap_pfn_range() 호출로 인해 동일한 익명 메모리 페이지가 두 개의 서로 다른 프로세스에 Read/Write 권한으로 이중 매핑되는 비정상 상황이 발생할 수 있습니다. 이는 심각한 데이터 오염과 권한 상승으로 이어집니다.",
+        config: "CONFIG_PAGE_TABLE_CHECK = y",
+        key: "page_table_check_disabled = true",
+        ext: "page_ext tracking bypassed",
+        state: "DISABLED (Vulnerable to Silent Corruption)",
+        html: `
+          <div class="mem-layout">
+            <div class="ring-box user">
+              <div class="ring-label">👤 Process A (Attacker / UID 1000)</div>
+              <div class="block-grid">
+                <div class="code-block vuln">
+                  <div class="block-title">VMA 1: Anonymous RW Mapping</div>
+                  <code>va: 0x7f1000 -> PFN: 0x42000<br><span style="color:var(--accent-red)">anon_map_count = 1 (RW)</span></code>
+                </div>
+              </div>
+            </div>
+
+            <div class="arrow-flow">
+              <div class="arrow-line flow-down" style="border-color:var(--accent-red)"></div>
+            </div>
+
+            <div class="barrier insecure">
+              <span>⚠️ Page Table Check Inactive: Silent Double-Map Permitted!</span>
+              <span class="status-pill red">UNCHECKED</span>
+            </div>
+
+            <div class="arrow-flow">
+              <div class="arrow-line flow-down" style="border-color:var(--accent-red)"></div>
+            </div>
+
+            <div class="ring-box user">
+              <div class="ring-label">👤 Process B (Privileged Victim / Root Daemon)</div>
+              <div class="block-grid">
+                <div class="code-block vuln">
+                  <div class="block-title">VMA 2: Anonymous RW Mapping (Aliased!)</div>
+                  <code>va: 0x7f9000 -> PFN: 0x42000<br><span style="color:var(--accent-red)">PFN 0x42000 mapped twice with RW!</span></code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      trap: {
+        title: "3. Defense: Synchronous Detection & Kernel BUG_ON() Trap",
+        desc: "하드닝이 적용된 환경에서는, 익명 페이지를 두 번 이상 Read/Write로 매핑하려고 시도하는 순간 atomic_inc_return(&ptc->anon_map_count) > 1 && rw 조건이 참이 되어 즉각 BUG_ON()이 발동합니다. 잘못된 메모리 매핑이 실제 데이터 오염이나 익스플로잇으로 악용되기 전, 매핑이 일어나는 순간 원천 차단하여 시스템 신뢰성을 보장합니다.",
+        config: "CONFIG_PAGE_TABLE_CHECK = y",
+        key: "page_table_check_disabled = false",
+        ext: "anon_map_count incremented to 2",
+        state: "TRAPPED (Instant BUG_ON Prevention)",
+        html: `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">⚙️ Synchronous Hook: page_table_check_set()</div>
+              <div class="block-grid">
+                <div class="code-block blocked">
+                  <div class="block-title">Double RW Check Assertion</div>
+                  <code>if (anon) {<br>
+                  &nbsp;&nbsp;BUG_ON(atomic_read(&ptc->file_map_count));<br>
+                  &nbsp;&nbsp;<span style="color:var(--accent-red)">BUG_ON(atomic_inc_return(&ptc->anon_map_count) > 1 && rw);</span><br>
+                  }</code>
+                </div>
+              </div>
+            </div>
+
+            <div class="arrow-flow">
+              <div class="arrow-line blocked-flow"></div>
+            </div>
+
+            <div class="barrier secure">
+              <span>🛡️ Illegal Double-Map Detected: Kernel Halted Immediately!</span>
+              <span class="status-pill green">TRAPPED & HALTED</span>
+            </div>
+
+            <div class="ring-box page-ext" style="opacity: 0.7;">
+              <div class="ring-label">📦 Memory Corruption Prevented</div>
+              <div class="block-grid">
+                <div class="code-block">
+                  <div class="block-title">Protected State</div>
+                  <code>PFN 0x42000 cannot be shared as RW!<br>Attacker cannot hijack victim's pages.</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      matrix: {
+        title: "4. Page Table Check Mapping Rules Matrix",
+        desc: "페이지 테이블 체크는 리눅스 커널의 메모리 유형별 불변성을 강제합니다. 익명 메모리 간의 읽기 전용 공유(fork 시 CoW 이전)는 허용되지만, 다중 쓰기(RW)는 엄격히 금지됩니다. 또한 익명 페이지와 파일 페이지가 동일 물리 프레임을 공유하는 타입 혼동은 어떤 권한으로든 완전히 금지됩니다.",
+        config: "CONFIG_PAGE_TABLE_CHECK = y",
+        key: "All rules strictly enforced",
+        ext: "Synchronous verification matrix",
+        state: "ENFORCED (Strict Memory Rules)",
+        html: `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">📋 Kernel Page Table Check Rules (Documentation/mm)</div>
+              <div class="block-grid">
+                <div class="code-block active">
+                  <div class="block-title">Anonymous + Anonymous (RO)</div>
+                  <code>Permission: Read-Only<br><span style="color:var(--accent-green)">Result: ALLOW (CoW Shared)</span></code>
+                </div>
+                <div class="code-block vuln">
+                  <div class="block-title">Anonymous + Anonymous (RW)</div>
+                  <code>Permission: Read / Write<br><span style="color:var(--accent-red)">Result: PROHIBIT (BUG_ON)</span></code>
+                </div>
+              </div>
+              <div class="block-grid" style="margin-top:12px;">
+                <div class="code-block vuln">
+                  <div class="block-title">Anonymous + File/Named</div>
+                  <code>Permission: Any Permission<br><span style="color:var(--accent-red)">Result: PROHIBIT (Type Confusion)</span></code>
+                </div>
+                <div class="code-block active">
+                  <div class="block-title">Named + Named (File-backed)</div>
+                  <code>Permission: Any Permission<br><span style="color:var(--accent-green)">Result: ALLOW (Shared Library/mmap)</span></code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      }
+    };
+
+    function renderScenario(key) {
+      const s = scenarios[key];
+      document.getElementById('diagramCanvas').innerHTML = s.html;
+      document.getElementById('infoTitle').textContent = s.title;
+      document.getElementById('infoDesc').textContent = s.desc;
+      document.getElementById('valConfig').textContent = s.config;
+      document.getElementById('valKey').textContent = s.key;
+      document.getElementById('valExt').textContent = s.ext;
+      document.getElementById('valState').textContent = s.state;
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderScenario(btn.dataset.scenario);
+      });
+    });
+
+    // Initial render
+    renderScenario('arch');
+  </script>
+</body>
+</html>
+

@@ -232,6 +232,10 @@ launch_virtual_machine() {
         qemu_args+=("--cmdline" "smap=on pan=on")
     elif [[ "${FEATURE_NAME}" == "smap-pan-disabled" ]]; then
         qemu_args+=("--cmdline" "clearcpuid=smap pan=off nosmap")
+    elif [[ "${FEATURE_NAME}" == "page-table-check" ]]; then
+        qemu_args+=("--cmdline" "page_table_check=on")
+    elif [[ "${FEATURE_NAME}" == "page-table-check-disabled" ]]; then
+        qemu_args+=("--cmdline" "page_table_check=off")
     fi
     if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
         qemu_args+=("--timeout" "${TIMEOUT_SEC}")

@@ -180,6 +180,14 @@ jobs:
             feature: smap-pan
             test: test_smap_pan
 
+          # Task 5-4: Page Table Check (Dual-Arch)
+          - arch: x86_64
+            feature: page-table-check
+            test: test_page_table_check
+          - arch: arm64
+            feature: page-table-check
+            test: test_page_table_check
+
 
     steps:
       - name: Checkout repository
