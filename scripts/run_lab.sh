@@ -228,6 +228,10 @@ launch_virtual_machine() {
         qemu_args+=("--cmdline" "smep=on pxn=on")
     elif [[ "${FEATURE_NAME}" == "smep-pxn-disabled" ]]; then
         qemu_args+=("--cmdline" "clearcpuid=smep pxn=off")
+    elif [[ "${FEATURE_NAME}" == "smap-pan" ]]; then
+        qemu_args+=("--cmdline" "smap=on pan=on")
+    elif [[ "${FEATURE_NAME}" == "smap-pan-disabled" ]]; then
+        qemu_args+=("--cmdline" "clearcpuid=smap pan=off nosmap")
     fi
     if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
         qemu_args+=("--timeout" "${TIMEOUT_SEC}")

@@ -172,6 +172,14 @@ jobs:
             feature: smep-pxn
             test: test_smep_pxn
 
+          # Task 5-3: SMAP & PAN (Dual-Arch)
+          - arch: x86_64
+            feature: smap-pan
+            test: test_smap_pan
+          - arch: arm64
+            feature: smap-pan
+            test: test_smap_pan
+
 
     steps:
       - name: Checkout repository

@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SMAP (x86) & PAN (ARM64) Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --perm-user: #f97316;
+      --perm-kernel: #38bdf8;
+      --perm-block: #ef4444;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --perm-block: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.2);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .scenario-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .tab-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+
+    .view-container {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .view-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .diagram-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      min-height: 520px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .info-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 8px;
+    }
+
+    .info-desc {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .metric-box {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .metric-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: monospace;
+    }
+
+    /* Diagram Elements */
+    .mem-layout {
+      width: 100%;
+      max-width: 650px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .ring-box {
+      border: 2px dashed var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      position: relative;
+      transition: all 0.3s;
+    }
+
+    .ring-box.kernel {
+      background: rgba(56, 189, 248, 0.05);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    .ring-box.user {
+      background: rgba(249, 115, 22, 0.05);
+      border-color: rgba(249, 115, 22, 0.4);
+    }
+
+    .ring-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .ring-box.kernel .ring-label { color: var(--accent-blue); }
+    .ring-box.user .ring-label { color: var(--perm-user); }
+
+    .block-grid {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .code-block {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px 16px;
+      flex: 1;
+      min-width: 180px;
+      position: relative;
+      font-family: monospace;
+      font-size: 0.85rem;
+      transition: all 0.3s;
+    }
+
+    .code-block.active {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+    }
+
+    .code-block.vuln {
+      border-color: var(--accent-red);
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+    }
+
+    .code-block.blocked {
+      border-color: var(--accent-yellow);
+      background: rgba(234, 179, 8, 0.1);
+    }
+
+    .block-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-family: sans-serif;
+    }
+
+    .barrier {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      gap: 12px;
+      position: relative;
+    }
+
+    .barrier.secure {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+
+    .barrier.insecure {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .arrow-flow {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 36px;
+      position: relative;
+    }
+
+    .arrow-line {
+      width: 2px;
+      height: 100%;
+      background: var(--card-border);
+      position: relative;
+    }
+
+    .arrow-line.flow-down::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-top: 6px solid var(--accent-red);
+    }
+
+    .arrow-line.flow-up::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -4px;
+      border-left: 5px solid transparent;
+      border-right: 5px solid transparent;
+      border-bottom: 6px solid var(--accent-green);
+    }
+
+    .arrow-line.blocked-flow::before {
+      content: '✖ TRAP';
+      position: absolute;
+      top: 30%;
+      left: 10px;
+      background: var(--accent-red);
+      color: #fff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 4px;
+      white-space: nowrap;
+    }
+
+    .status-pill {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .status-pill.red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+    .status-pill.green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+    .status-pill.yellow { background: rgba(234, 179, 8, 0.2); color: var(--accent-yellow); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        SMAP & PAN Hardware Security
+        <span class="badge">Architecture & Threat Model</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle">🌓 Toggle Theme</button>
+    </header>
+
+    <div class="scenario-tabs">
+      <button class="tab-btn active" data-scenario="model">1. SMAP/PAN Access Model</button>
+      <button class="tab-btn" data-scenario="attack">2. Attack: Fake Kernel Object (Base)</button>
+      <button class="tab-btn" data-scenario="defense">3. Defense: MMU Hardware Trap (Hardened)</button>
+      <button class="tab-btn" data-scenario="copy">4. Legitimate User Copy Window</button>
+    </div>
+
+    <div class="view-container">
+      <div class="diagram-panel" id="diagramCanvas">
+        <!-- Injected via JavaScript -->
+      </div>
+
+      <div class="info-panel">
+        <h2 class="info-title" id="infoTitle">Scenario Overview</h2>
+        <p class="info-desc" id="infoDesc">Select a scenario above to inspect hardware register state, memory interaction, and defense mechanics.</p>
+
+        <div class="metric-box">
+          <div class="metric-label">x86 Control Register (SMAP)</div>
+          <div class="metric-val" id="valCr4">CR4.SMAP = 1 (Bit 21)</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-label">x86 EFLAGS Alignment Check (AC)</div>
+          <div class="metric-val" id="valAc">EFLAGS.AC = 0 (Access Blocked)</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-label">ARM64 Status Register (PAN)</div>
+          <div class="metric-val" id="valPan">PSTATE.PAN = 1 (Bit 22)</div>
+        </div>
+
+        <div class="metric-box">
+          <div class="metric-label">Direct User Memory Dereference</div>
+          <div class="metric-val" id="valDirect">BLOCKED (#PF / Data Abort)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const themeBtn = document.getElementById('themeToggle');
+    let currentTheme = 'dark';
+
+    themeBtn.addEventListener('click', () => {
+      currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', currentTheme);
+    });
+
+    const scenarios = {
+      model: {
+        title: "1. SMAP & PAN Memory Access Boundary Model",
+        desc: "하드웨어 MMU는 가상 주소 공간을 커널 공간(Ring 0 / EL1)과 유저 공간(Ring 3 / EL0)으로 격리합니다. x86의 CR4.SMAP 및 ARM64의 PSTATE.PAN이 활성화되면, 커널 모드라 할지라도 U/S=1 (User) 비트가 설정된 메모리 영역을 무단으로 읽거나 쓸 수 없습니다. 오직 명시적인 권한 해제(stac/clac 또는 LDTR/STTR) 루틴을 통해서만 안전한 복사가 허용됩니다.",
+        cr4: "CR4.SMAP = 1 (Active)",
+        ac: "EFLAGS.AC = 0 (Default)",
+        pan: "PSTATE.PAN = 1 (Active)",
+        direct: "STRICTLY FORBIDDEN",
+        html: `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">🛡️ Supervisor Space (Ring 0 / EL1)</div>
+              <div class="block-grid">
+                <div class="code-block active">
+                  <div class="block-title">Kernel Core / Drivers</div>
+                  <code>sys_call_table<br>copy_from_user()<br>vuln_smap_write()</code>
+                </div>
+                <div class="code-block">
+                  <div class="block-title">Kernel Stacks & SLUB</div>
+                  <code>struct task_struct<br>struct cred (Real)<br>kernel_stack</code>
+                </div>
+              </div>
+            </div>
+
+            <div class="barrier secure">
+              <span>⚙️ MMU Hardware Barrier: CR4.SMAP (x86 Bit 21) & PSTATE.PAN (ARM64 Bit 22)</span>
+              <span class="status-pill green">ENFORCED</span>
+            </div>
+
+            <div class="ring-box user">
+              <div class="ring-label">👤 User Space (Ring 3 / EL0)</div>
+              <div class="block-grid">
+                <div class="code-block">
+                  <div class="block-title">Unprivileged Application</div>
+                  <code>exploit_smap_pan<br>glibc.so / heap<br>main()</code>
+                </div>
+                <div class="code-block">
+                  <div class="block-title">User Memory Pages (U/S=1)</div>
+                  <code>fake_kernel_cred<br>0xDEADBEEFCAFE1337<br>user_stack</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      attack: {
+        title: "2. Attack: Confused-Deputy Fake Object (Baseline Mode)",
+        desc: "SMAP/PAN이 비활성화(clearcpuid=smap / pan=off)된 베이스라인 환경에서는, 커널의 댕글링 포인터나 타입 혼동 결함을 악용하여 유저 공간의 가짜 객체(fake_cred)를 커널 포인터로 지정할 수 있습니다. 커널 Ring 0는 아무런 제약 없이 유저 메모리를 직접 역참조(*(volatile unsigned long *)user_addr)하여 공격자가 심어둔 위조 데이터를 신뢰하게 되고, 비특권 사용자가 손쉽게 루트 권한을 탈취합니다.",
+        cr4: "CR4.SMAP = 0 (clearcpuid=smap)",
+        ac: "EFLAGS.AC = 0 (Ignored)",
+        pan: "PSTATE.PAN = 0 (pan=off)",
+        direct: "PERMITTED (CRITICAL VULN)",
+        html: `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">🛡️ Vulnerable Supervisor Space (Ring 0 / EL1)</div>
+              <div class="block-grid">
+                <div class="code-block vuln">
+                  <div class="block-title">Buggy Driver Dereference</div>
+                  <code>val = *(unsigned long *)user_addr;<br><span style="color:var(--accent-red)">// Direct read from Ring 3!</span></code>
+                </div>
+              </div>
+            </div>
+
+            <div class="arrow-flow">
+              <div class="arrow-line flow-down" style="border-color:var(--accent-red)"></div>
+            </div>
+
+            <div class="barrier insecure">
+              <span>⚠️ MMU Hardware Barrier: SMAP & PAN Disabled!</span>
+              <span class="status-pill red">BYPASSED</span>
+            </div>
+
+            <div class="arrow-flow">
+              <div class="arrow-line flow-down" style="border-color:var(--accent-red)"></div>
+            </div>
+
+            <div class="ring-box user">
+              <div class="ring-label">👤 Attacker Process (UID 1000)</div>
+              <div class="block-grid">
+                <div class="code-block vuln">
+                  <div class="block-title">User Space Fake Object (0x7ffe...)</div>
+                  <code>struct fake_kernel_cred {<br>
+                  &nbsp;&nbsp;magic: 0xDEADBEEFCAFE1337;<br>
+                  &nbsp;&nbsp;uid: 0, gid: 0; // ROOT<br>
+                  }</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      defense: {
+        title: "3. Defense: MMU Hardware Trap on Direct Access (Hardened)",
+        desc: "하드웨어 SMAP(CR4.SMAP=1) 및 PAN(PSTATE.PAN=1)이 활성화된 환경에서는, 커널이 유저 메모리 주소를 직접 역참조하려는 순간 CPU MMU가 즉각 예외를 발생시킵니다. x86에서는 Page Fault (#PF, Error Code bit 3=1), ARM64에서는 Data Abort (Permission Fault)가 발동하여 공격자의 위조 객체 접근이 원천 차단됩니다.",
+        cr4: "CR4.SMAP = 1 (Active)",
+        ac: "EFLAGS.AC = 0 (No stac invoked)",
+        pan: "PSTATE.PAN = 1 (Active)",
+        direct: "BLOCKED (Page Fault #PF Trapped)",
+        html: `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">🛡️ Hardened Supervisor Space (Ring 0 / EL1)</div>
+              <div class="block-grid">
+                <div class="code-block blocked">
+                  <div class="block-title">Driver Direct Dereference Attempt</div>
+                  <code>val = *(unsigned long *)user_addr;<br><span style="color:var(--accent-yellow)">// Ring 0 tries direct user read</span></code>
+                </div>
+              </div>
+            </div>
+
+            <div class="arrow-flow">
+              <div class="arrow-line blocked-flow"></div>
+            </div>
+
+            <div class="barrier secure">
+              <span>🛡️ Hardware MMU SMAP/PAN Exception Trap Triggered!</span>
+              <span class="status-pill green">PROTECTED</span>
+            </div>
+
+            <div class="ring-box user" style="opacity: 0.6;">
+              <div class="ring-label">👤 User Space Fake Object (Blocked)</div>
+              <div class="block-grid">
+                <div class="code-block">
+                  <div class="block-title">Unreachable Fake Credential</div>
+                  <code>0xDEADBEEFCAFE1337 (Untrusted)<br><span style="color:var(--accent-red)">Hardware prevents Ring 0 read</span></code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      },
+      copy: {
+        title: "4. Legitimate User Copy Window (stac / clac & LDTR/STTR)",
+        desc: "리눅스 커널이 정상적인 시스템 콜 처리 과정에서 유저 공간 버퍼와 데이터를 주고받을 때(copy_from_user, copy_to_user)는 엄격한 통제하에 임시 윈도우를 엽니다. x86에서는 stac 명령어로 EFLAGS.AC 플래그를 1로 세팅하여 잠시 접근을 허용하고, 복사가 끝나자마자 clac로 닫습니다. ARM64에서는 비특권 로드/스토어 전용 명령어(LDTR/STTR)를 사용하거나 PSTATE.PAN을 임시 클리어합니다.",
+        cr4: "CR4.SMAP = 1 (Always Active)",
+        ac: "EFLAGS.AC: 0 -> stac(1) -> clac(0)",
+        pan: "PSTATE.PAN: 1 -> LDTR / MSR(0) -> 1",
+        direct: "CONTROLLED COPY WINDOW ONLY",
+        html: `
+          <div class="mem-layout">
+            <div class="ring-box kernel">
+              <div class="ring-label">🛡️ Safe Kernel Usercopy API (Ring 0)</div>
+              <div class="block-grid">
+                <div class="code-block active">
+                  <div class="block-title">copy_from_user() Window</div>
+                  <code>1. check_object_size()<br>
+                  2. <span style="color:var(--accent-green)">stac</span> (EFLAGS.AC = 1)<br>
+                  3. rep movsq / safe copy<br>
+                  4. <span style="color:var(--accent-green)">clac</span> (EFLAGS.AC = 0)</code>
+                </div>
+                <div class="code-block">
+                  <div class="block-title">ARM64 Dedicated Instructions</div>
+                  <code>// Uses unprivileged load/store<br>
+                  <span style="color:var(--accent-blue)">LDTR</span> x0, [x1]  // Reads EL0<br>
+                  <span style="color:var(--accent-blue)">STTR</span> x0, [x1]  // Writes EL0<br>
+                  // PAN stays active throughout!</code>
+                </div>
+              </div>
+            </div>
+
+            <div class="barrier secure">
+              <span>⏱️ Temporary Hardware Access Gate (Controlled & Validated)</span>
+              <span class="status-pill green">SAFE USERCOPY</span>
+            </div>
+
+            <div class="ring-box user">
+              <div class="ring-label">👤 User Buffer (Ring 3 / EL0)</div>
+              <div class="block-grid">
+                <div class="code-block">
+                  <div class="block-title">Legitimate Syscall Buffer</div>
+                  <code>read(fd, ubuf, count)<br>write(fd, ubuf, count)</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        `
+      }
+    };
+
+    function renderScenario(key) {
+      const s = scenarios[key];
+      document.getElementById('diagramCanvas').innerHTML = s.html;
+      document.getElementById('infoTitle').textContent = s.title;
+      document.getElementById('infoDesc').textContent = s.desc;
+      document.getElementById('valCr4').textContent = s.cr4;
+      document.getElementById('valAc').textContent = s.ac;
+      document.getElementById('valPan').textContent = s.pan;
+      document.getElementById('valDirect').textContent = s.direct;
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderScenario(btn.dataset.scenario);
+      });
+    });
+
+    // Initial render
+    renderScenario('model');
+  </script>
+</body>
+</html>
+

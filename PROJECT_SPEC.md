@@ -79,7 +79,7 @@
 
 - [x] **Task 5-1:** `CONFIG_STRICT_KERNEL_RWX` & `CONFIG_STRICT_MODULE_RWX` (W^X 메모리 불변 정책).
 - [x] **Task 5-2:** SMEP (x86) / PXN (ARM64) (유저스페이스 코드 커널 모드 실행 차단).
-- [ ] **Task 5-3:** SMAP (x86) / PAN (ARM64) (커널의 무분별한 유저스페이스 메모리 직접 접근 차단).
+- [x] **Task 5-3:** SMAP (x86) / PAN (ARM64) (커널의 무분별한 유저스페이스 메모리 직접 접근 차단).
 - [ ] **Task 5-4:** `CONFIG_PAGE_TABLE_CHECK` (페이지 테이블 오염 및 불법 페이지 매핑 런타임 탐지).
 - [ ] **Task 5-5:** KPTI (Kernel Page Table Isolation - 유저/커널 페이지 테이블 완전 분리 및 Meltdown 방어).
 
