@@ -118,3 +118,5 @@ nav:
           - SMAP & PAN (User Data Access Prevention): features/10-smap-pan.md
           - Page Table Check (Invalid Mapping Detection): features/11-page-table-check.md
           - KPTI (Kernel Page Table Isolation): features/12-kpti.md
+      - 04. Control Flow Integrity (CFI):
+          - Clang kCFI: features/13-kcfi.md

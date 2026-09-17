@@ -248,6 +248,14 @@ launch_virtual_machine() {
         else
             qemu_args+=("--cmdline" "kpti=off")
         fi
+    elif [[ "${FEATURE_NAME}" == "kcfi" ]]; then
+        if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
+            qemu_args+=("--cmdline" "cfi=kcfi")
+        fi
+    elif [[ "${FEATURE_NAME}" == "kcfi-disabled" ]]; then
+        if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
+            qemu_args+=("--cmdline" "cfi=off")
+        fi
     fi
     if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
         qemu_args+=("--timeout" "${TIMEOUT_SEC}")

@@ -196,6 +196,14 @@ jobs:
             feature: kpti
             test: test_kpti
 
+          # Task 6-1: Clang kCFI (Dual-Arch)
+          - arch: x86_64
+            feature: kcfi
+            test: test_kcfi
+          - arch: arm64
+            feature: kcfi
+            test: test_kcfi
+
 
     steps:
       - name: Checkout repository

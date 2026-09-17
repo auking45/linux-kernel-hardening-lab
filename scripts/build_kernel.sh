@@ -10,6 +10,7 @@ TARGET_ARCH="x86_64"
 FEATURE_NAME="base"
 BUILD_JOBS="$(nproc)"
 CLEAN_BUILD=0
+USE_LLVM=0
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -19,6 +20,7 @@ usage() {
     echo "  --feature <feature_name>   Hardening feature fragment from configs/features/ (default: base)"
     echo "  --jobs <N>                 Parallel make jobs (default: $(nproc))"
     echo "  --clean                    Clean build output directory before compiling"
+    echo "  --llvm                     Build with Clang/LLVM toolchain (LLVM=1)"
     echo "  -h, --help                 Show this help message"
     exit 0
 }
@@ -40,6 +42,10 @@ parse_args() {
                 ;;
             --clean)
                 CLEAN_BUILD=1
+                shift
+                ;;
+            --llvm)
+                USE_LLVM=1
                 shift
                 ;;
             -h|--help)
@@ -103,6 +109,13 @@ check_plugin_dev_headers() {
     fi
 }
 
+get_llvm_flags() {
+    local feature_config="${CONFIGS_DIR}/features/${FEATURE_NAME}.config"
+    if [[ "${USE_LLVM}" -eq 1 || "${FEATURE_NAME}" =~ ^kcfi ]] || [[ -f "${feature_config}" && $(grep -c "CONFIG_CFI_CLANG" "${feature_config}") -gt 0 ]]; then
+        echo "LLVM=1"
+    fi
+}
+
 configure_kernel() {
     local target_build_dir="$1"
     integrate_lab_drivers
@@ -116,6 +129,13 @@ configure_kernel() {
     fi
 
     local feature_config="${CONFIGS_DIR}/features/${FEATURE_NAME}.config"
+    local llvm_opt
+    llvm_opt="$(get_llvm_flags)"
+    local llvm_args=()
+    if [[ -n "${llvm_opt}" ]]; then
+        llvm_args+=("${llvm_opt}")
+        echo "[*] Using Clang/LLVM toolchain (${llvm_opt})"
+    fi
 
     if [[ "${FEATURE_NAME}" == "base" || ! -f "${feature_config}" ]]; then
         echo "[*] Applying base defconfig: ${base_config}"
@@ -125,6 +145,7 @@ configure_kernel() {
             ARCH="${KERNEL_ARCH}" \
             CROSS_COMPILE="${CROSS_COMPILE}" \
             HOSTCC="${HOSTCC}" \
+            "${llvm_args[@]}" \
             olddefconfig
     else
         echo "[*] Merging base defconfig with feature fragment: ${feature_config}"
@@ -137,19 +158,28 @@ configure_kernel() {
             ARCH="${KERNEL_ARCH}" \
             CROSS_COMPILE="${CROSS_COMPILE}" \
             HOSTCC="${HOSTCC}" \
+            "${llvm_args[@]}" \
             olddefconfig
     fi
 }
 
 compile_kernel() {
     local target_build_dir="$1"
+    local llvm_opt
+    llvm_opt="$(get_llvm_flags)"
+    local llvm_args=()
+    local compiler_name="${CROSS_COMPILE}gcc"
+    if [[ -n "${llvm_opt}" ]]; then
+        llvm_args+=("${llvm_opt}")
+        compiler_name="Clang/LLVM (${llvm_opt})"
+    fi
 
     echo "========================================================="
     echo "  Building Linux Kernel (${KERNEL_VERSION})"
     echo "  Architecture:  ${TARGET_ARCH}"
     echo "  Feature:       ${FEATURE_NAME}"
     echo "  Build Dir:     ${target_build_dir}"
-    echo "  Compiler:      ${CROSS_COMPILE}gcc"
+    echo "  Compiler:      ${compiler_name}"
     echo "  Parallel Jobs: ${BUILD_JOBS}"
     echo "========================================================="
 
@@ -159,6 +189,7 @@ compile_kernel() {
         ARCH="${KERNEL_ARCH}" \
         CROSS_COMPILE="${CROSS_COMPILE}" \
         HOSTCC="${HOSTCC}" \
+        "${llvm_args[@]}" \
         -j"${BUILD_JOBS}"
 }
 
