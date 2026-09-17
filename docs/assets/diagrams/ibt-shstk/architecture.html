@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>x86 Intel CET: Kernel IBT & User Shadow Stack Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --perm-user: #f97316;
+      --perm-kernel: #38bdf8;
+      --perm-block: #ef4444;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --perm-block: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 9999px;
+      background: var(--accent-purple);
+      color: white;
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 8px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+    }
+
+    .scene-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .scene-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scene-desc {
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+    }
+
+    .canvas-container {
+      width: 100%;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      min-width: 900px;
+    }
+
+    .interactive-panel {
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .ctrl-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #0f172a;
+    }
+    .btn-danger {
+      background: var(--accent-red);
+      color: white;
+    }
+    .btn-success {
+      background: var(--accent-green);
+      color: #0f172a;
+    }
+
+    .status-box {
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      color: var(--accent-blue);
+      line-height: 1.5;
+    }
+
+    /* SVG styling */
+    .svg-box {
+      fill: var(--card-bg);
+      stroke: var(--card-border);
+      stroke-width: 2;
+      rx: 8;
+    }
+
+    .svg-box-danger {
+      fill: var(--card-bg);
+      stroke: var(--accent-red);
+      stroke-width: 2;
+      rx: 8;
+    }
+
+    .svg-box-safe {
+      fill: var(--card-bg);
+      stroke: var(--accent-green);
+      stroke-width: 2;
+      rx: 8;
+    }
+
+    .svg-box-highlight {
+      fill: var(--card-bg);
+      stroke: var(--accent-purple);
+      stroke-width: 2;
+      rx: 8;
+    }
+
+    .svg-title {
+      font-size: 14px;
+      font-weight: 700;
+      fill: var(--text-main);
+    }
+
+    .svg-text {
+      font-size: 12px;
+      fill: var(--text-muted);
+    }
+
+    .svg-code {
+      font-family: monospace;
+      font-size: 11px;
+      fill: var(--accent-blue);
+    }
+
+    .svg-arrow {
+      stroke: var(--text-muted);
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrow);
+    }
+
+    .svg-arrow-danger {
+      stroke: var(--accent-red);
+      stroke-width: 2;
+      stroke-dasharray: 4,4;
+      fill: none;
+      marker-end: url(#arrow-danger);
+    }
+
+    .svg-arrow-safe {
+      stroke: var(--accent-green);
+      stroke-width: 2;
+      fill: none;
+      marker-end: url(#arrow-safe);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 20px;
+      padding: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      font-size: 0.85rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-color {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+    }
+
+    table.matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 0.9rem;
+    }
+
+    table.matrix-table th, table.matrix-table td {
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    table.matrix-table th {
+      background: var(--bg-color);
+      color: var(--accent-blue);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>x86 Intel CET: Kernel IBT & User Shadow Stack</span>
+        <span class="badge">Linux 6.12+</span>
+      </h1>
+      <button class="theme-toggle" onclick="toggleTheme()">
+        <span id="theme-icon">☀️</span> <span id="theme-text">Light Mode</span>
+      </button>
+    </header>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchScene(1)">1. x86_64 Hardened (IBT + Shadow Stack)</button>
+      <button class="tab-btn" onclick="switchScene(2)">2. x86_64 Baseline (미보호 JOP/ROP 탈취)</button>
+      <button class="tab-btn" onclick="switchScene(3)">3. ARM64 아키텍처 대비 (BTI & PAC)</button>
+      <button class="tab-btn" onclick="switchScene(4)">4. 하드웨어 CFI 종합 비교 & 상태 머신</button>
+    </div>
+
+    <!-- Scene 1: x86_64 Hardened -->
+    <div id="scene-1" class="scene-card">
+      <div class="scene-title">1. x86_64 Hardened: Intel CET (IBT 순방향 + Shadow Stack 역방향 보호)</div>
+      <div class="scene-desc">
+        Intel CET는 하드웨어 수준에서 순방향(Forward-edge)과 역방향(Backward-edge) 제어 흐름을 동시에 강제함.<br>
+        <strong>1) Kernel IBT (Indirect Branch Tracking)</strong>: 모든 유효한 간접 분기 타깃 함수의 첫 명령어는 반드시 <code>endbr64</code> (<code>0xf3 0f 1e fa</code>)여야 함. 간접 분기(<code>call *%rax</code>) 즉시 CPU는 <code>WAIT_FOR_ENDBRANCH</code> 상태로 전이하며, 다음 인스트럭션이 <code>endbr64</code>가 아닐 경우 즉시 <code>#CP</code> (Control Protection Exception, vector 21) 트랩을 발생시킴.<br>
+        <strong>2) User Shadow Stack</strong>: 유저 공간의 반환 주소를 격리된 전용 섀도 스택 포인터(<code>SSP</code> / <code>MSR_IA32_PL3_SSP</code>)에 동시 기록하여, <code>ret</code> 시 메인 스택과 섀도 스택의 주소를 상호 대조함.
+      </div>
+      <div class="canvas-container">
+        <svg viewBox="0 0 1000 420">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+            </marker>
+            <marker id="arrow-danger" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"/>
+            </marker>
+            <marker id="arrow-safe" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#22c55e"/>
+            </marker>
+          </defs>
+
+          <!-- Caller / Dispatcher -->
+          <rect x="40" y="50" width="260" height="150" class="svg-box"/>
+          <text x="60" y="80" class="svg-title">간접 호출 발신부 (Dispatcher)</text>
+          <text x="60" y="105" class="svg-code">call *%rax</text>
+          <text x="60" y="130" class="svg-text">MSR_IA32_S_CET: CET_ENDBR_EN</text>
+          <text x="60" y="150" class="svg-text">CPU 상태: WAIT_FOR_ENDBRANCH</text>
+          <text x="60" y="170" class="svg-code">IP = %rax (분기 실행)</text>
+
+          <!-- Valid Target with ENDBR64 -->
+          <rect x="370" y="30" width="280" height="130" class="svg-box-safe"/>
+          <text x="390" y="60" class="svg-title" fill="#22c55e">정상 간접 분기 타깃 (ibt_legit)</text>
+          <text x="390" y="85" class="svg-code">[+0] f3 0f 1e fa  endbr64</text>
+          <text x="390" y="105" class="svg-code">[+4] 55          push %rbp</text>
+          <text x="390" y="125" class="svg-text">상태 전이: WAIT_FOR_ENDBR -> IDLE (성공)</text>
+
+          <!-- Invalid Target lacking ENDBR64 -->
+          <rect x="370" y="190" width="280" height="140" class="svg-box-danger"/>
+          <text x="390" y="220" class="svg-title" fill="#ef4444">변조된 분기 타깃 (Missing ENDBR)</text>
+          <text x="390" y="245" class="svg-code">[+0] 55          push %rbp (NO ENDBR!)</text>
+          <text x="390" y="265" class="svg-code">[+1] 48 89 e5    mov %rsp, %rbp</text>
+          <text x="390" y="295" class="svg-text" fill="#ef4444">하드웨어 #CP Exception (Vector 21)</text>
+
+          <!-- CET Shadow Stack Panel -->
+          <rect x="710" y="30" width="260" height="300" class="svg-box-highlight"/>
+          <text x="730" y="60" class="svg-title" fill="#a855f7">User Shadow Stack (SSP)</text>
+          <text x="730" y="85" class="svg-text">MSR_IA32_PL3_SSP (하드웨어 포인터)</text>
+          <text x="730" y="115" class="svg-code">call foo -> push main stack</text>
+          <text x="730" y="135" class="svg-code">         -> push shadow stack</text>
+          <line x1="730" y1="150" x2="950" y2="150" stroke="var(--card-border)"/>
+          <text x="730" y="175" class="svg-title" fill="#38bdf8">ROP 가젯 변조 시도 시:</text>
+          <text x="730" y="200" class="svg-text">Main Stack:  0xdeadbeef (변조됨)</text>
+          <text x="730" y="220" class="svg-text">Shadow Stack:0x7fff8123 (불변)</text>
+          <text x="730" y="245" class="svg-code">ret 실행 시 불일치 감지!</text>
+          <text x="730" y="270" class="svg-text" fill="#ef4444">-> #CP Fault (CP_RET) 발생</text>
+          <text x="730" y="290" class="svg-text" fill="#ef4444">-> SIGSEGV (SEGV_CPERR) 종료</text>
+
+          <!-- Arrows -->
+          <path d="M 300 100 L 370 80" class="svg-arrow-safe"/>
+          <path d="M 300 140 L 370 230" class="svg-arrow-danger"/>
+          <path d="M 650 250 L 710 250" class="svg-arrow"/>
+        </svg>
+      </div>
+
+      <div class="interactive-panel">
+        <div class="ctrl-row">
+          <button class="action-btn btn-success" onclick="simHardenedLegit()">정상 간접 분기 테스트 (with ENDBR)</button>
+          <button class="action-btn btn-danger" onclick="simHardenedNoEndbr()">위조 분기 테스트 (Missing ENDBR)</button>
+          <button class="action-btn btn-primary" onclick="simHardenedRop()">Shadow Stack ROP 방어 테스트</button>
+        </div>
+        <div id="sim-hardened-status" class="status-box">
+          [대기 중] 위 버튼을 클릭하여 하드닝 상태의 IBT 및 섀도 스택 방어 메커니즘을 테스트하십시오.
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 2: x86_64 Baseline -->
+    <div id="scene-2" class="scene-card" style="display: none;">
+      <div class="scene-title">2. x86_64 Baseline: 제어 흐름 보호 미적용 (JOP 및 ROP 성공)</div>
+      <div class="scene-desc">
+        베이스라인 커널(<code>CONFIG_X86_KERNEL_IBT=n</code> 및 <code>CONFIG_X86_USER_SHADOW_STACK=n</code>)에서는 컴파일러 플래그 <code>-fcf-protection=none</code>으로 빌드되어 <code>endbr64</code> 인스트럭션이 생성되지 않으며, 하드웨어 CET MSR이 비활성화됨. 공격자가 함수 포인터나 스택 반환 주소를 변조하면 CPU는 아무런 제약 없이 임의 코드를 실행함.
+      </div>
+      <div class="canvas-container">
+        <svg viewBox="0 0 1000 380">
+          <!-- Attacker Compromise -->
+          <rect x="50" y="50" width="280" height="150" class="svg-box-danger"/>
+          <text x="70" y="80" class="svg-title" fill="#ef4444">공격자 메모리 오염 (Heap / Stack)</text>
+          <text x="70" y="110" class="svg-text">1. Heap UAF로 구조체 함수 포인터 덮어쓰기</text>
+          <text x="70" y="135" class="svg-code">func_ptr = &arbitrary_gadget;</text>
+          <text x="70" y="160" class="svg-text">2. 스택 버퍼 오버플로우로 Return Address 덮어쓰기</text>
+
+          <!-- Caller Indirect Call -->
+          <rect x="390" y="50" width="270" height="150" class="svg-box"/>
+          <text x="410" y="80" class="svg-title">간접 분기 실행 (Unchecked)</text>
+          <text x="410" y="105" class="svg-code">call *%rax</text>
+          <text x="410" y="130" class="svg-text">CPU 상태: 일반 실행 (IDLE)</text>
+          <text x="410" y="150" class="svg-text">ENDBR64 검사 없음 (IBT 비활성)</text>
+          <text x="410" y="170" class="svg-text">Shadow Stack 포인터 없음 (단일 스택)</text>
+
+          <!-- Hijacked Execution Target -->
+          <rect x="720" y="50" width="240" height="150" class="svg-box-danger"/>
+          <text x="740" y="80" class="svg-title" fill="#ef4444">임의 코드 실행 (HIJACKED)</text>
+          <text x="740" y="105" class="svg-text">임의의 가젯으로 제어 흐름 분기:</text>
+          <text x="740" y="130" class="svg-code">pop %rdi; ret; (ROP Gadget)</text>
+          <text x="740" y="155" class="svg-text" fill="#ef4444">경고/트랩 없이 권한 상승 성공</text>
+
+          <!-- Arrows -->
+          <path d="M 330 120 L 390 120" class="svg-arrow-danger"/>
+          <path d="M 660 120 L 720 120" class="svg-arrow-danger"/>
+        </svg>
+      </div>
+
+      <div class="interactive-panel">
+        <div class="ctrl-row">
+          <button class="action-btn btn-danger" onclick="simBaseJop()">베이스라인 간접 분기 변조 (JOP)</button>
+          <button class="action-btn btn-danger" onclick="simBaseRop()">베이스라인 스택 반환 주소 변조 (ROP)</button>
+        </div>
+        <div id="sim-base-status" class="status-box">
+          [대기 중] 베이스라인 커널의 무제한 분기 및 가젯 실행 위험을 확인하십시오.
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 3: ARM64 Architecture Contrast -->
+    <div id="scene-3" class="scene-card" style="display: none;">
+      <div class="scene-title">3. ARM64 아키텍처 대비: BTI & PAC (Hardware CFI 대조)</div>
+      <div class="scene-desc">
+        ARM64 아키텍처는 Intel CET와 유사한 보안 목적을 달성하기 위해 별도의 하드웨어 확장 기능을 제공함:<br>
+        <strong>1) 순방향 간접 분기 보호</strong>: Intel IBT(<code>endbr64</code>) vs ARM64 BTI(<code>bti c</code> / <code>bti j</code>, Branch Target Identification).<br>
+        <strong>2) 역방향 반환 주소 보호</strong>: Intel Shadow Stack(하드웨어 섀도 스택 <code>SSP</code>) vs ARM64 PAC(Pointer Authentication Code, <code>pacia</code>/<code>autia</code>) 및 소프트웨어 Clang Shadow Call Stack(<code>x18</code> 전용 레지스터).
+      </div>
+      <div class="canvas-container">
+        <svg viewBox="0 0 1000 360">
+          <!-- x86 CET Column -->
+          <rect x="50" y="40" width="420" height="280" class="svg-box-highlight"/>
+          <text x="70" y="70" class="svg-title" fill="#38bdf8">x86_64: Intel CET (Control-flow Enforcement)</text>
+          <text x="70" y="100" class="svg-text">순방향 (Forward): Kernel IBT (CONFIG_X86_KERNEL_IBT)</text>
+          <text x="70" y="125" class="svg-code">  인스트럭션: endbr64 (0xf3 0f 1e fa)</text>
+          <text x="70" y="145" class="svg-code">  MSR 레지스터: MSR_IA32_S_CET (CET_ENDBR_EN)</text>
+          <text x="70" y="165" class="svg-code">  위반 예외: #CP (Control Protection, Vector 21)</text>
+          <line x1="70" y1="185" x2="440" y2="185" stroke="var(--card-border)"/>
+          <text x="70" y="210" class="svg-text">역방향 (Backward): User Shadow Stack (SHSTK)</text>
+          <text x="70" y="235" class="svg-code">  하드웨어 레지스터: MSR_IA32_PL3_SSP</text>
+          <text x="70" y="255" class="svg-code">  시스템 콜 제어: arch_prctl(ARCH_SHSTK_ENABLE)</text>
+          <text x="70" y="275" class="svg-code">  특수 인스트럭션: WRSS (Shadow Stack Write)</text>
+
+          <!-- ARM64 Column -->
+          <rect x="530" y="40" width="420" height="280" class="svg-box-safe"/>
+          <text x="550" y="70" class="svg-title" fill="#22c55e">ARM64: BTI & PAC (Lab 15 연계)</text>
+          <text x="550" y="100" class="svg-text">순방향 (Forward): ARM64 BTI (CONFIG_ARM64_BTI_KERNEL)</text>
+          <text x="550" y="125" class="svg-code">  인스트럭션: bti c / bti j (Branch Target Identification)</text>
+          <text x="550" y="145" class="svg-code">  시스템 제어: SCTLR_EL1.BT0 / BT1</text>
+          <text x="550" y="165" class="svg-code">  위반 예외: Branch Target Exception (ESR.EC = 0x34)</text>
+          <line x1="550" y1="185" x2="920" y2="185" stroke="var(--card-border)"/>
+          <text x="550" y="210" class="svg-text">역방향 (Backward): Pointer Authentication (PAC)</text>
+          <text x="550" y="235" class="svg-code">  인스트럭션: paciasp / autiasp (암호학적 서명)</text>
+          <text x="550" y="255" class="svg-code">  소프트웨어 섀도 스택: Clang SCS (-fsanitize=shadow-call-stack, x18)</text>
+          <text x="550" y="275" class="svg-code">  위반 예외: Pointer Authentication Failure Trap</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Scene 4: Comprehensive Comparison & State Machine -->
+    <div id="scene-4" class="scene-card" style="display: none;">
+      <div class="scene-title">4. 하드웨어 CFI 종합 비교 & IBT CPU 상태 머신</div>
+      <div class="scene-desc">
+        Intel CET IBT는 하드웨어 파이프라인에서 CPU 상태를 실시간 감시함. 아래 상태 머신 시뮬레이터를 통해 간접 분기 발생 시의 상태 전이 과정을 단계별로 확인할 수 있음.
+      </div>
+
+      <div class="canvas-container">
+        <svg viewBox="0 0 1000 240">
+          <!-- State: IDLE -->
+          <circle id="sm-idle" cx="150" cy="120" r="55" fill="var(--card-bg)" stroke="var(--accent-blue)" stroke-width="3"/>
+          <text x="150" y="115" text-anchor="middle" class="svg-title" fill="#38bdf8">IDLE</text>
+          <text x="150" y="135" text-anchor="middle" class="svg-text">정상 실행 상태</text>
+
+          <!-- State: WAIT_FOR_ENDBRANCH -->
+          <circle id="sm-wfe" cx="500" cy="120" r="65" fill="var(--card-bg)" stroke="var(--accent-yellow)" stroke-width="3"/>
+          <text x="500" y="115" text-anchor="middle" class="svg-title" fill="#eab308">WAIT_FOR_ENDBR</text>
+          <text x="500" y="135" text-anchor="middle" class="svg-text">다음 명령 대기 중</text>
+
+          <!-- State: #CP Fault -->
+          <circle id="sm-fault" cx="850" cy="120" r="55" fill="var(--card-bg)" stroke="var(--accent-red)" stroke-width="3"/>
+          <text x="850" y="115" text-anchor="middle" class="svg-title" fill="#ef4444">#CP TRAP</text>
+          <text x="850" y="135" text-anchor="middle" class="svg-text">예외 벡터 21</text>
+
+          <!-- Transitions -->
+          <path d="M 210 100 L 430 100" class="svg-arrow"/>
+          <text x="320" y="90" text-anchor="middle" class="svg-code">call *%rax / jmp *%rax</text>
+
+          <path d="M 440 140 L 210 140" class="svg-arrow-safe"/>
+          <text x="320" y="160" text-anchor="middle" class="svg-code" fill="#22c55e">다음 명령 == endbr64 (성공)</text>
+
+          <path d="M 570 120 L 790 120" class="svg-arrow-danger"/>
+          <text x="680" y="110" text-anchor="middle" class="svg-code" fill="#ef4444">다음 명령 != endbr64 (위반)</text>
+        </svg>
+      </div>
+
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th>비교 항목</th>
+            <th>x86_64 Baseline</th>
+            <th>x86_64 Hardened (CET)</th>
+            <th>ARM64 Baseline</th>
+            <th>ARM64 Hardened (BTI/PAC)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>순방향 간접 분기 보호</strong></td>
+            <td>미보호 (-fcf-protection=none)</td>
+            <td><strong>Kernel IBT (endbr64 강제)</strong></td>
+            <td>미보호</td>
+            <td><strong>ARM64 BTI (bti c)</strong></td>
+          </tr>
+          <tr>
+            <td><strong>역방향 반환 주소 보호</strong></td>
+            <td>미보호 (단일 스택)</td>
+            <td><strong>User Shadow Stack (SSP)</strong></td>
+            <td>미보호</td>
+            <td><strong>PAC / Shadow Call Stack</strong></td>
+          </tr>
+          <tr>
+            <td><strong>위반 시 CPU 동작</strong></td>
+            <td>제어 흐름 즉시 탈취</td>
+            <td><strong>#CP (Control Protection)</strong></td>
+            <td>제어 흐름 즉시 탈취</td>
+            <td><strong>Branch Target Exception / PAC Fail</strong></td>
+          </tr>
+          <tr>
+            <td><strong>컴파일러 / 도구 지원</strong></td>
+            <td>일반 GCC/Clang</td>
+            <td><strong>GCC -fcf-protection + objtool</strong></td>
+            <td>일반 GCC/Clang</td>
+            <td><strong>GCC/Clang -mbranch-protection</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend">
+      <div class="legend-item">
+        <div class="legend-color" style="background: var(--accent-green);"></div>
+        <span>정상 간접 분기 (ENDBR64 인증)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: var(--accent-red);"></div>
+        <span>위조 분기 / #CP 예외 트랩</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: var(--accent-purple);"></div>
+        <span>하드웨어 Shadow Stack (SSP)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: var(--accent-blue);"></div>
+        <span>CPU 상태 제어 레지스터</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const body = document.body;
+      const themeIcon = document.getElementById('theme-icon');
+      const themeText = document.getElementById('theme-text');
+      if (body.getAttribute('data-theme') === 'light') {
+        body.removeAttribute('data-theme');
+        themeIcon.textContent = '☀️';
+        themeText.textContent = 'Light Mode';
+      } else {
+        body.setAttribute('data-theme', 'light');
+        themeIcon.textContent = '🌙';
+        themeText.textContent = 'Dark Mode';
+      }
+    }
+
+    function switchScene(num) {
+      document.querySelectorAll('.scene-card').forEach(card => card.style.display = 'none');
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+      document.getElementById('scene-' + num).style.display = 'block';
+      event.target.classList.add('active');
+    }
+
+    function simHardenedLegit() {
+      const out = document.getElementById('sim-hardened-status');
+      out.innerHTML = `
+        <span style="color: var(--accent-green);">[정상 간접 호출 성공]</span><br>
+        1. call *%rax 디스패처 호출 -> CPU 상태: WAIT_FOR_ENDBRANCH<br>
+        2. 타깃 함수 ibt_legit 진입: 첫 4바이트에서 'f3 0f 1e fa' (endbr64) 확인 완료!<br>
+        3. CPU 상태 IDLE로 복귀하여 정상 루틴 실행 완료.
+      `;
+    }
+
+    function simHardenedNoEndbr() {
+      const out = document.getElementById('sim-hardened-status');
+      out.innerHTML = `
+        <span style="color: var(--accent-red);">[#CP Control Protection Exception 차단 발생!]</span><br>
+        1. call *%rax 호출 -> 대상 주소 ibt_noendbr로 간접 점프<br>
+        2. CPU 상태: WAIT_FOR_ENDBRANCH<br>
+        3. 대상 주소의 첫 인스트럭션: '55' (push %rbp) -> endbr64 아님!<br>
+        4. 하드웨어 트랩 발생: #CP Exception (Vector 21, CP_ENDBR)<br>
+        5. 커널 메시지: "Missing ENDBR: ibt_noendbr+0x0/0x20", 공격 원천 무력화.
+      `;
+    }
+
+    function simHardenedRop() {
+      const out = document.getElementById('sim-hardened-status');
+      out.innerHTML = `
+        <span style="color: var(--accent-purple);">[Shadow Stack ROP 방어 동작]</span><br>
+        1. arch_prctl(ARCH_SHSTK_ENABLE)로 태스크 Shadow Stack 활성화<br>
+        2. 스택 오버플로우로 Data Stack 반환 주소를 임의 가젯(0xdeadbeef)으로 변조<br>
+        3. 함수 에필로그 ret 인스트럭션 실행<br>
+        4. CPU가 RSP의 반환 주소(0xdeadbeef)와 SSP의 반환 주소(0x7fff8123)를 동시 팝 후 대조<br>
+        5. 불일치 감지: 하드웨어 #CP (CP_RET) 발생 -> 프로세스 SIGSEGV (SEGV_CPERR) 강제 종료!
+      `;
+    }
+
+    function simBaseJop() {
+      const out = document.getElementById('sim-base-status');
+      out.innerHTML = `
+        <span style="color: var(--accent-red);">[VULNERABLE: 제어 흐름 탈취 완료]</span><br>
+        1. 변조된 함수 포인터(func_ptr)로 간접 호출 실행<br>
+        2. 커널에 CONFIG_X86_KERNEL_IBT가 없거나 ibt=off 설정됨<br>
+        3. CPU가 대상 주소의 유효성을 검사하지 않고 임의 가젯으로 무조건 분기<br>
+        4. 공격자가 의도한 커널 권한 상승 코드 실행 성공.
+      `;
+    }
+
+    function simBaseRop() {
+      const out = document.getElementById('sim-base-status');
+      out.innerHTML = `
+        <span style="color: var(--accent-red);">[VULNERABLE: ROP 체인 실행 성공]</span><br>
+        1. CONFIG_X86_USER_SHADOW_STACK 비활성화로 단일 Data Stack만 존재<br>
+        2. ret 인스트럭션 실행 시 변조된 반환 주소로 무조건 복귀<br>
+        3. ROP 체인이 연속적으로 실행되며 공격자 셸 획득.
+      `;
+    }
+  </script>
+</body>
+</html>
+

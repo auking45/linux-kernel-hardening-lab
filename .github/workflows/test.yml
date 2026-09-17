@@ -204,6 +204,14 @@ jobs:
             feature: kcfi
             test: test_kcfi
 
+          # Task 6-2: x86 IBT & Shadow Stack (Dual-Arch)
+          - arch: x86_64
+            feature: ibt-shstk
+            test: test_ibt_shstk
+          - arch: arm64
+            feature: ibt-shstk
+            test: test_ibt_shstk
+
 
     steps:
       - name: Checkout repository

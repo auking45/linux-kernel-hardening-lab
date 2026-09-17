@@ -256,6 +256,14 @@ launch_virtual_machine() {
         if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
             qemu_args+=("--cmdline" "cfi=off")
         fi
+    elif [[ "${FEATURE_NAME}" == "ibt-shstk" ]]; then
+        if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
+            qemu_args+=("--cmdline" "ibt=warn")
+        fi
+    elif [[ "${FEATURE_NAME}" == "ibt-shstk-disabled" ]]; then
+        if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
+            qemu_args+=("--cmdline" "ibt=off")
+        fi
     fi
     if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
         qemu_args+=("--timeout" "${TIMEOUT_SEC}")

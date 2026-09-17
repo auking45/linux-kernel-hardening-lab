@@ -120,3 +120,4 @@ nav:
           - KPTI (Kernel Page Table Isolation): features/12-kpti.md
       - 04. Control Flow Integrity (CFI):
           - Clang kCFI: features/13-kcfi.md
+          - x86 IBT & Shadow Stack: features/14-ibt-shstk.md

@@ -86,7 +86,7 @@
 ### [Phase 6] Category 4: Control Flow Integrity (CFI)
 
 - [x] **Task 6-1:** Clang kCFI (컴파일 타임 순방향 간접 함수 호출 무결성 검증).
-- [ ] **Task 6-2:** x86 IBT & Shadow Stack (Intel CET 기반 하드웨어 지원 간접 분기 추적 및 섀도 스택).
+- [x] **Task 6-2:** x86 IBT & Shadow Stack (Intel CET 기반 하드웨어 지원 간접 분기 추적 및 섀도 스택).
 - [ ] **Task 6-3:** ARM64 BTI & PAC (Branch Target Identification 및 Pointer Authentication Code).
 
 ### [Phase 7] Category 5: Heap & Slab Allocator Hardening
