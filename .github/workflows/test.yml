@@ -188,6 +188,14 @@ jobs:
             feature: page-table-check
             test: test_page_table_check
 
+          # Task 5-5: KPTI (Dual-Arch)
+          - arch: x86_64
+            feature: kpti
+            test: test_kpti
+          - arch: arm64
+            feature: kpti
+            test: test_kpti
+
 
     steps:
       - name: Checkout repository

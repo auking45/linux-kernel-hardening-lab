@@ -236,6 +236,18 @@ launch_virtual_machine() {
         qemu_args+=("--cmdline" "page_table_check=on")
     elif [[ "${FEATURE_NAME}" == "page-table-check-disabled" ]]; then
         qemu_args+=("--cmdline" "page_table_check=off")
+    elif [[ "${FEATURE_NAME}" == "kpti" ]]; then
+        if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
+            qemu_args+=("--cmdline" "pti=on")
+        else
+            qemu_args+=("--cmdline" "kpti=on")
+        fi
+    elif [[ "${FEATURE_NAME}" == "kpti-disabled" ]]; then
+        if [[ "${TARGET_ARCH}" == "x86_64" ]]; then
+            qemu_args+=("--cmdline" "pti=off nopti")
+        else
+            qemu_args+=("--cmdline" "kpti=off")
+        fi
     fi
     if [[ "${TIMEOUT_SEC}" -gt 0 ]]; then
         qemu_args+=("--timeout" "${TIMEOUT_SEC}")
