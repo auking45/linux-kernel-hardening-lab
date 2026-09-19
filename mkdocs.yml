@@ -127,6 +127,8 @@ nav:
           - Heap Zeroing (Alloc & Free): features/17-heap-init.md
           - Hardened Usercopy: features/18-hardened-usercopy.md
           - KFENCE (Memory Safety Detector): features/19-kfence.md
+      - 06. Structure & Compiler Level Protections:
+          - Structleak (Stack Auto-Initialization): features/20-structleak.md
 
 
 

@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CONFIG_INIT_STACK_ALL_ZERO / STRUCTLEAK Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --perm-user: #fb923c;
+      --perm-kernel: #38bdf8;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    /* Simulation Toolbar (STYLE_GUIDE.md Standard) */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      gap: 12px;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--accent-blue);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: var(--accent-blue);
+      color: #0b132b;
+    }
+
+    .btn.active {
+      background: var(--accent-blue);
+      color: #0b132b;
+    }
+
+    .btn-danger {
+      border-color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .btn-danger:hover, .btn-danger.active {
+      background: var(--accent-red);
+      color: #ffffff;
+    }
+
+    .btn-success {
+      border-color: var(--accent-green);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .btn-success:hover, .btn-success.active {
+      background: var(--accent-green);
+      color: #ffffff;
+    }
+
+    .sim-ticker {
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      border: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ticker-led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+
+    .ticker-led.vulnerable {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--accent-red);
+    }
+
+    /* Diagram Canvas Container */
+    .diagram-wrapper {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      position: relative;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    /* SVG Animation Styles */
+    @keyframes flowDash {
+      to { stroke-dashoffset: -48; }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.3; transform: scale(0.98); }
+      50% { opacity: 0.9; transform: scale(1.02); }
+    }
+
+    @keyframes zeroingSweep {
+      0% { width: 0; opacity: 0.9; }
+      100% { width: 320px; opacity: 0.1; }
+    }
+
+    .flow-normal {
+      stroke-dasharray: 8 6;
+      animation: flowDash 1.2s linear infinite;
+    }
+
+    .flow-attack {
+      stroke-dasharray: 8 6;
+      animation: flowDash 0.8s linear infinite;
+      filter: drop-shadow(0 0 6px var(--accent-red));
+    }
+
+    .flow-shield {
+      stroke-dasharray: 6 4;
+      animation: flowDash 1.0s linear infinite;
+      filter: drop-shadow(0 0 6px var(--accent-green));
+    }
+
+    .paused * {
+      animation-play-state: paused !important;
+    }
+
+    /* Info Cards Grid */
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .info-card h3 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-card p, .info-card li {
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .info-card ul {
+      margin-left: 18px;
+      margin-top: 6px;
+    }
+
+    .code-snippet {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      margin: 8px 0;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>
+        <span>CONFIG_INIT_STACK_ALL_ZERO / STRUCTLEAK Simulator</span>
+        <span class="badge">Category 6: Structure Hardening</span>
+      </h1>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
+        Interactive Visualization of Kernel Stack Alignment Padding & Structure Zero-Initialization
+      </p>
+    </div>
+    <div>
+      <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ Light Mode</button>
+    </div>
+  </header>
+
+  <!-- Control Toolbar -->
+  <div class="sim-toolbar">
+    <div class="toolbar-group">
+      <button class="btn" id="playBtn" onclick="togglePlay()">⏸️ 일시정지</button>
+      <button class="btn" id="resetBtn" onclick="resetSim()">🔄 초기화</button>
+      <div style="border-left: 1px solid var(--card-border); height: 24px; margin: 0 4px;"></div>
+      <button class="btn btn-danger" id="vulnModeBtn" onclick="setMode('vuln')">❌ 취약 흐름 (Baseline)</button>
+      <button class="btn btn-success active" id="hardenedModeBtn" onclick="setMode('hardened')">🛡️ 방어 흐름 (Hardened)</button>
+    </div>
+
+    <div class="toolbar-group">
+      <span style="font-size: 0.8rem; color: var(--text-muted);">배속:</span>
+      <button class="btn" id="spd05" onclick="setSpeed(0.5)">0.5x</button>
+      <button class="btn active" id="spd10" onclick="setSpeed(1.0)">1.0x</button>
+      <button class="btn" id="spd15" onclick="setSpeed(1.5)">1.5x</button>
+    </div>
+
+    <div class="sim-ticker">
+      <div class="ticker-led" id="tickerLed"></div>
+      <span id="tickerText">INIT_STACK_ALL_ZERO Active: Stack Frame & Padding Holes 100% Zeroed</span>
+    </div>
+  </div>
+
+  <!-- Interactive SVG Canvas -->
+  <div class="diagram-wrapper" id="canvasWrapper">
+    <svg viewBox="0 0 960 520" id="mainSvg">
+      <defs>
+        <!-- Filter Glows -->
+        <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        <!-- Linear Gradients -->
+        <linearGradient id="gradKernel" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#1e293b" />
+          <stop offset="100%" stop-color="#0f172a" />
+        </linearGradient>
+        <linearGradient id="gradUser" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#2d1b11" />
+          <stop offset="100%" stop-color="#1c120c" />
+        </linearGradient>
+        <linearGradient id="gradPaddingLeak" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#ef4444" stop-opacity="0.8" />
+          <stop offset="100%" stop-color="#b91c1c" stop-opacity="0.9" />
+        </linearGradient>
+        <linearGradient id="gradPaddingZero" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#22c55e" stop-opacity="0.8" />
+          <stop offset="100%" stop-color="#15803d" stop-opacity="0.9" />
+        </linearGradient>
+      </defs>
+
+      <!-- ============================================================ -->
+      <!-- Background Domains: Kernel Space (Ring 0) vs User Space (Ring 3) -->
+      <!-- ============================================================ -->
+      <rect x="20" y="20" width="570" height="480" rx="10" fill="url(#gradKernel)" stroke="var(--card-border)" stroke-width="1.5" />
+      <text x="40" y="48" fill="var(--accent-blue)" font-size="14" font-weight="700">KERNEL SPACE (Ring 0 / EL1) - Function Call Stack Frame</text>
+
+      <rect x="620" y="20" width="320" height="480" rx="10" fill="url(#gradUser)" stroke="var(--card-border)" stroke-width="1.5" />
+      <text x="640" y="48" fill="var(--perm-user)" font-size="14" font-weight="700">USER SPACE (Ring 3 / EL0) - Target App Buffer</text>
+
+      <!-- Boundary Barrier line between Kernel and User -->
+      <line x1="605" y1="20" x2="605" y2="500" stroke="var(--accent-yellow)" stroke-width="2" stroke-dasharray="4 4" opacity="0.6" />
+      <text x="605" y="270" fill="var(--accent-yellow)" font-size="11" font-weight="600" text-anchor="middle" transform="rotate(-90 605 270)">
+        copy_to_user() Boundary
+      </text>
+
+      <!-- ============================================================ -->
+      <!-- Kernel Stack Layout (High Memory -> Low Memory)              -->
+      <!-- ============================================================ -->
+      <!-- Caller Stack Frame (Dirty Memory) -->
+      <g transform="translate(45, 70)">
+        <rect x="0" y="0" width="280" height="45" rx="6" fill="#334155" stroke="#475569" stroke-width="1" />
+        <text x="12" y="22" fill="#94a3b8" font-size="11" font-weight="700">이전 호출자 스택 프레임 (Caller Stack Frame)</text>
+        <text x="12" y="38" fill="#f87171" font-size="10" font-family="monospace">잔여 데이터: 0x53544b5f4c45414b ("STK_LEAK")</text>
+
+        <path d="M 140 45 L 140 60" stroke="#64748b" stroke-width="2" marker-end="url(#arrow-down)" />
+      </g>
+
+      <!-- Current Frame: Prologue & Structure Allocation -->
+      <g transform="translate(45, 135)">
+        <rect x="0" y="0" width="280" height="345" rx="8" fill="#1e293b" stroke="var(--card-border)" stroke-width="1.5" />
+        <text x="14" y="24" fill="var(--text-main)" font-size="12" font-weight="700">현재 함수 스택 프레임 (vuln_structleak)</text>
+
+        <!-- Frame Elements -->
+        <!-- 1. Saved Frame Pointer & Return Address -->
+        <g transform="translate(12, 38)">
+          <rect x="0" y="0" width="256" height="30" rx="4" fill="#0f172a" stroke="#3b82f6" stroke-width="1" />
+          <text x="10" y="20" fill="#93c5fd" font-size="10" font-family="monospace">Return Address / FP (0xffff800008...)</text>
+        </g>
+
+        <!-- 2. Stack Canary -->
+        <g transform="translate(12, 74)">
+          <rect x="0" y="0" width="256" height="30" rx="4" fill="#0f172a" stroke="#a855f7" stroke-width="1" />
+          <text x="10" y="20" fill="#d8b4fe" font-size="10" font-family="monospace">Stack Canary (0xdeadbeef1337cafe)</text>
+        </g>
+
+        <!-- 3. Local Variable: struct demo_padding_leak (32 Bytes) -->
+        <g transform="translate(12, 112)">
+          <rect x="0" y="0" width="256" height="215" rx="6" fill="#090d16" stroke="var(--accent-blue)" stroke-width="1.5" />
+          <text x="10" y="18" fill="var(--accent-blue)" font-size="11" font-weight="700">struct demo_padding_leak (32B on Stack)</text>
+
+          <!-- Member 1: header (4 Bytes, Offset 0..3) -->
+          <g transform="translate(8, 28)">
+            <rect x="0" y="0" width="240" height="34" rx="4" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1" />
+            <text x="8" y="16" fill="#ffffff" font-size="10" font-weight="600">uint32_t header [4B] (명시적 대입)</text>
+            <text x="8" y="28" fill="#93c5fd" font-size="9" font-family="monospace">0x44454d4f ("DEMO")</text>
+          </g>
+
+          <!-- Member 2: Alignment Padding Hole (4 Bytes, Offset 4..7) -->
+          <g transform="translate(8, 68)">
+            <!-- Dynamic styling for Padding Hole based on mode -->
+            <rect id="paddingHoleRect" x="0" y="0" width="240" height="42" rx="4" fill="url(#gradPaddingZero)" stroke="var(--accent-green)" stroke-width="1.5" />
+            <text id="paddingHoleTitle" x="8" y="16" fill="#ffffff" font-size="10" font-weight="700">⚠️ [ALIGNMENT PADDING HOLE] [4B]</text>
+            <text id="paddingHoleValue" x="8" y="32" fill="#dcfce7" font-size="10" font-family="monospace" font-weight="700">0x00000000 (컴파일러 자동 0 초기화)</text>
+          </g>
+
+          <!-- Member 3: timestamp (8 Bytes, Offset 8..15) -->
+          <g transform="translate(8, 116)">
+            <rect x="0" y="0" width="240" height="34" rx="4" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1" />
+            <text x="8" y="16" fill="#ffffff" font-size="10" font-weight="600">uint64_t timestamp [8B] (명시적 대입)</text>
+            <text x="8" y="28" fill="#93c5fd" font-size="9" font-family="monospace">0x1122334455667788</text>
+          </g>
+
+          <!-- Member 4: msg[16] (16 Bytes, Offset 16..31) -->
+          <g transform="translate(8, 156)">
+            <rect x="0" y="0" width="240" height="48" rx="4" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1" />
+            <text x="8" y="16" fill="#ffffff" font-size="10" font-weight="600">char msg[16] [16B] (명시적 대입)</text>
+            <text x="8" y="30" fill="#93c5fd" font-size="9" font-family="monospace">"STRUCT_PADDING!"</text>
+          </g>
+        </g>
+      </g>
+
+      <!-- ============================================================ -->
+      <!-- Middle: Compiler Defense Prologue vs Threat Flow            -->
+      <!-- ============================================================ -->
+      <!-- Compiler Action Box -->
+      <g transform="translate(345, 135)">
+        <rect id="compilerActionBox" x="0" y="0" width="230" height="150" rx="8" fill="#0f172a" stroke="var(--accent-green)" stroke-width="1.5" />
+        <text id="compilerBoxTitle" x="14" y="24" fill="var(--accent-green)" font-size="12" font-weight="700">🛡️ Compiler Stack Zeroing</text>
+
+        <rect x="12" y="38" width="206" height="60" rx="4" fill="#1e293b" />
+        <text id="asmCode1" x="18" y="56" fill="#38bdf8" font-size="10" font-family="monospace">ARM64: stp xzr, xzr, [sp]</text>
+        <text id="asmCode2" x="18" y="72" fill="#38bdf8" font-size="10" font-family="monospace">x86:   xorps %xmm0, %xmm0</text>
+        <text id="asmCode3" x="18" y="88" fill="#a855f7" font-size="10" font-family="monospace">       movaps %xmm0, (%rsp)</text>
+
+        <text id="compilerBoxDesc" x="12" y="118" fill="var(--text-muted)" font-size="9">
+          함수 진입(Prologue) 시 32바이트 전체를
+        </text>
+        <text id="compilerBoxDesc2" x="12" y="132" fill="var(--text-muted)" font-size="9">
+          0x00으로 소거하여 패딩 누출 차단
+        </text>
+      </g>
+
+      <!-- Dynamic Moving Flow Paths across Boundary -->
+      <!-- 1. Normal members copy path -->
+      <path id="pathNormal" d="M 310 200 C 430 200 520 200 640 200" fill="none" stroke="var(--accent-blue)" stroke-width="2" class="flow-normal" />
+
+      <!-- 2. Padding Hole copy path (Switches between red attack and green shield) -->
+      <path id="pathPadding" d="M 310 225 C 430 225 520 250 640 250" fill="none" stroke="var(--accent-green)" stroke-width="3" class="flow-shield" />
+
+      <!-- Moving Particles -->
+      <circle r="5" fill="#38bdf8" filter="url(#glow-cyan)">
+        <animateMotion dur="1.5s" repeatCount="indefinite" path="M 310 200 C 430 200 520 200 640 200" />
+      </circle>
+      <circle id="paddingParticle" r="6" fill="#22c55e" filter="url(#glow-green)">
+        <animateMotion id="paddingParticleMotion" dur="1.5s" repeatCount="indefinite" path="M 310 225 C 430 225 520 250 640 250" />
+      </circle>
+
+      <!-- ============================================================ -->
+      <!-- Right: User Space Application Buffer                         -->
+      <!-- ============================================================ -->
+      <g transform="translate(640, 70)">
+        <rect x="0" y="0" width="280" height="410" rx="8" fill="#1c1917" stroke="var(--card-border)" stroke-width="1.5" />
+        <text x="14" y="24" fill="var(--perm-user)" font-size="12" font-weight="700">Exploit Process Memory (read() 결과)</text>
+
+        <!-- User struct fields view -->
+        <g transform="translate(14, 42)">
+          <!-- Received Header -->
+          <rect x="0" y="0" width="252" height="40" rx="4" fill="#292524" stroke="#78716c" stroke-width="1" />
+          <text x="10" y="18" fill="#e7e5e4" font-size="10" font-weight="600">user_buf.header [Offset 0..3]</text>
+          <text x="10" y="32" fill="#38bdf8" font-size="10" font-family="monospace">0x44454d4f ("DEMO") - 정상 수신</text>
+        </g>
+
+        <!-- Received Padding Hole Leak/Safe -->
+        <g transform="translate(14, 94)">
+          <rect id="userPaddingBox" x="0" y="0" width="252" height="75" rx="6" fill="#14532d" stroke="var(--accent-green)" stroke-width="2" />
+          <text id="userPaddingTitle" x="10" y="20" fill="#ffffff" font-size="11" font-weight="700">🛡️ user_buf.padding [Offset 4..7]</text>
+          <text id="userPaddingVal" x="10" y="40" fill="#86efac" font-size="12" font-family="monospace" font-weight="700">0x00 0x00 0x00 0x00 (CLEAN)</text>
+          <text id="userPaddingVerdict" x="10" y="62" fill="#dcfce7" font-size="10" font-weight="600">안전: 커널 스택 정보 누출 없음</text>
+        </g>
+
+        <!-- Received Timestamp -->
+        <g transform="translate(14, 180)">
+          <rect x="0" y="0" width="252" height="40" rx="4" fill="#292524" stroke="#78716c" stroke-width="1" />
+          <text x="10" y="18" fill="#e7e5e4" font-size="10" font-weight="600">user_buf.timestamp [Offset 8..15]</text>
+          <text x="10" y="32" fill="#38bdf8" font-size="10" font-family="monospace">0x1122334455667788</text>
+        </g>
+
+        <!-- Received Msg -->
+        <g transform="translate(14, 230)">
+          <rect x="0" y="0" width="252" height="40" rx="4" fill="#292524" stroke="#78716c" stroke-width="1" />
+          <text x="10" y="18" fill="#e7e5e4" font-size="10" font-weight="600">user_buf.msg [Offset 16..31]</text>
+          <text x="10" y="32" fill="#38bdf8" font-size="10" font-family="monospace">"STRUCT_PADDING!"</text>
+        </g>
+
+        <!-- Exploit Verdict Box -->
+        <g transform="translate(14, 285)">
+          <rect id="verdictBanner" x="0" y="0" width="252" height="110" rx="6" fill="#052e16" stroke="var(--accent-green)" stroke-width="1.5" />
+          <text id="verdictTitle" x="12" y="24" fill="var(--accent-green)" font-size="12" font-weight="700">✅ PoC 결과: SECURE</text>
+          <text id="verdictLine1" x="12" y="46" fill="#bbf7d0" font-size="10">패딩 홀 0x00 유지 확인</text>
+          <text id="verdictLine2" x="12" y="64" fill="#bbf7d0" font-size="10">잔여 스택 토큰 추출 실패</text>
+          <text id="verdictLine3" x="12" y="82" fill="#86efac" font-size="9" font-family="monospace">CONFIG_INIT_STACK_ALL_ZERO=y</text>
+          <text id="verdictLine4" x="12" y="98" fill="#86efac" font-size="9">커널 주소/카나리 탈취 원천 차단</text>
+        </g>
+      </g>
+    </svg>
+  </div>
+
+  <!-- Technical Depth Cards -->
+  <div class="info-grid">
+    <div class="info-card">
+      <h3 style="color: var(--accent-blue);">🧩 구조체 정렬 패딩(Alignment Padding)의 맹점</h3>
+      <p>C 언어에서 64비트 아키텍처는 데이터 정렬을 위해 4바이트 멤버 뒤에 4바이트 패딩 홀을 삽입합니다.</p>
+      <div class="code-snippet">
+struct demo { uint32_t a; /* 4B hole */ uint64_t b; };
+demo.a = 1; demo.b = 2; // 패딩 홀은 초기화되지 않음!
+      </div>
+      <p>개발자가 구조체의 모든 멤버를 할당하더라도, 컴파일러가 생성한 패딩 공간에는 이전 스택 프레임의 데이터(카나리, 포인터)가 남아 그대로 유저 공간에 복사됩니다.</p>
+    </div>
+
+    <div class="info-card">
+      <h3 style="color: var(--accent-purple);">🛡️ CONFIG_INIT_STACK_ALL_ZERO 방어 원리</h3>
+      <p>컴파일러(-ftrivial-auto-var-init=zero)가 함수 프롤로그에서 스택 프레임 전체를 0x00으로 소거합니다.</p>
+      <ul>
+        <li><strong>ARM64:</strong> <code>stp xzr, xzr, [sp]</code> 명령어로 16바이트 단위 초고속 0 초기화.</li>
+        <li><strong>x86_64:</strong> SIMD <code>xorps/movaps</code> 또는 <code>rep stosq</code>를 통한 즉각 소거.</li>
+        <li><strong>효과:</strong> 패딩 홀과 미초기화 구조체 필드가 100% 0x00으로 정화되어 정보 누출 원천 봉쇄.</li>
+      </ul>
+    </div>
+
+    <div class="info-card">
+      <h3 style="color: var(--accent-yellow);">🔄 STRUCTLEAK 플러그인과의 역사적 관계</h3>
+      <p>과거 GCC 11 이전에는 GCC 플러그인인 <code>CONFIG_GCC_PLUGIN_STRUCTLEAK</code>이 이 역할을 담당했습니다.</p>
+      <ul>
+        <li><strong>STRUCTLEAK_USER:</strong> <code>__user</code> 속성 구조체만 초기화.</li>
+        <li><strong>STRUCTLEAK_BYREF_ALL:</strong> 참조 전달되는 모든 변수 초기화.</li>
+        <li><strong>현대 리눅스 (6.x LTS):</strong> GCC 12+ 및 Clang 12+의 네이티브 <code>INIT_STACK_ALL_ZERO</code>가 플러그인을 완전히 대체하여 프로덕션 표준으로 안착함.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  let isPlaying = true;
+  let currentMode = 'hardened';
+  let currentSpeed = 1.0;
+
+  function toggleTheme() {
+    const isLight = document.body.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      document.body.removeAttribute('data-theme');
+      document.getElementById('themeBtn').textContent = '☀️ Light Mode';
+    } else {
+      document.body.setAttribute('data-theme', 'light');
+      document.getElementById('themeBtn').textContent = '🌙 Dark Mode';
+    }
+  }
+
+  function togglePlay() {
+    const wrapper = document.getElementById('canvasWrapper');
+    const playBtn = document.getElementById('playBtn');
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      wrapper.classList.remove('paused');
+      playBtn.textContent = '⏸️ 일시정지';
+    } else {
+      wrapper.classList.add('paused');
+      playBtn.textContent = '▶️ 재생';
+    }
+  }
+
+  function resetSim() {
+    const wrapper = document.getElementById('canvasWrapper');
+    wrapper.classList.remove('paused');
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = '⏸️ 일시정지';
+    setMode(currentMode);
+  }
+
+  function setSpeed(spd) {
+    currentSpeed = spd;
+    document.getElementById('spd05').classList.remove('active');
+    document.getElementById('spd10').classList.remove('active');
+    document.getElementById('spd15').classList.remove('active');
+
+    if (spd === 0.5) document.getElementById('spd05').classList.add('active');
+    else if (spd === 1.0) document.getElementById('spd10').classList.add('active');
+    else if (spd === 1.5) document.getElementById('spd15').classList.add('active');
+
+    const duration = (1.5 / spd) + 's';
+    const normalPath = document.getElementById('pathNormal');
+    const paddingPath = document.getElementById('pathPadding');
+    if (normalPath) normalPath.style.animationDuration = (1.2 / spd) + 's';
+    if (paddingPath) paddingPath.style.animationDuration = (1.0 / spd) + 's';
+
+    const motion1 = document.querySelector('circle[fill="#38bdf8"] animateMotion');
+    const motion2 = document.getElementById('paddingParticleMotion');
+    if (motion1) motion1.setAttribute('dur', duration);
+    if (motion2) motion2.setAttribute('dur', duration);
+  }
+
+  function setMode(mode) {
+    currentMode = mode;
+    const vulnBtn = document.getElementById('vulnModeBtn');
+    const hardenedBtn = document.getElementById('hardenedModeBtn');
+    const tickerLed = document.getElementById('tickerLed');
+    const tickerText = document.getElementById('tickerText');
+
+    const paddingHoleRect = document.getElementById('paddingHoleRect');
+    const paddingHoleTitle = document.getElementById('paddingHoleTitle');
+    const paddingHoleValue = document.getElementById('paddingHoleValue');
+
+    const compilerBox = document.getElementById('compilerActionBox');
+    const compilerTitle = document.getElementById('compilerBoxTitle');
+    const asm1 = document.getElementById('asmCode1');
+    const asm2 = document.getElementById('asmCode2');
+    const asm3 = document.getElementById('asmCode3');
+    const compilerDesc = document.getElementById('compilerBoxDesc');
+    const compilerDesc2 = document.getElementById('compilerBoxDesc2');
+
+    const pathPadding = document.getElementById('pathPadding');
+    const paddingParticle = document.getElementById('paddingParticle');
+
+    const userPaddingBox = document.getElementById('userPaddingBox');
+    const userPaddingTitle = document.getElementById('userPaddingTitle');
+    const userPaddingVal = document.getElementById('userPaddingVal');
+    const userPaddingVerdict = document.getElementById('userPaddingVerdict');
+
+    const verdictBanner = document.getElementById('verdictBanner');
+    const verdictTitle = document.getElementById('verdictTitle');
+    const verdictLine1 = document.getElementById('verdictLine1');
+    const verdictLine2 = document.getElementById('verdictLine2');
+    const verdictLine3 = document.getElementById('verdictLine3');
+    const verdictLine4 = document.getElementById('verdictLine4');
+
+    if (mode === 'vuln') {
+      vulnBtn.classList.add('active');
+      hardenedBtn.classList.remove('active');
+      tickerLed.classList.add('vulnerable');
+      tickerText.textContent = "WARNING: CONFIG_INIT_STACK_NONE - Uninitialized Padding Leaked to User Space!";
+
+      // Kernel padding hole: dirty
+      paddingHoleRect.setAttribute('fill', 'url(#gradPaddingLeak)');
+      paddingHoleRect.setAttribute('stroke', 'var(--accent-red)');
+      paddingHoleTitle.textContent = "⚠️ [UNINITIALIZED PADDING HOLE] [4B]";
+      paddingHoleValue.textContent = "0x53544b5f (이전 스택 잔여 데이터 누출)";
+      paddingHoleValue.setAttribute('fill', '#fecaca');
+
+      // Compiler Box: inactive
+      compilerBox.setAttribute('stroke', 'var(--accent-red)');
+      compilerTitle.textContent = "❌ No Zeroing (CONFIG_INIT_STACK_NONE)";
+      compilerTitle.setAttribute('fill', 'var(--accent-red)');
+      asm1.textContent = "Prologue: No zeroing emitted";
+      asm2.textContent = "Stack frame left dirty";
+      asm3.textContent = "Residual data stays intact";
+      compilerDesc.textContent = "컴파일러가 스택을 초기화하지 않아";
+      compilerDesc2.textContent = "이전 함수의 민감 정보가 패딩에 잔존";
+
+      // Path: Attack / leak
+      pathPadding.setAttribute('stroke', 'var(--accent-red)');
+      pathPadding.setAttribute('class', 'flow-attack');
+      paddingParticle.setAttribute('fill', '#ef4444');
+      paddingParticle.setAttribute('filter', 'url(#glow-red)');
+
+      // User Space: Leaked
+      userPaddingBox.setAttribute('fill', '#450a0a');
+      userPaddingBox.setAttribute('stroke', 'var(--accent-red)');
+      userPaddingTitle.textContent = "🚨 user_buf.padding [Offset 4..7] LEAKED!";
+      userPaddingVal.textContent = "0x53 0x54 0x4b 0x5f ('STK_')";
+      userPaddingVal.setAttribute('fill', '#fca5a5');
+      userPaddingVerdict.textContent = "위험: 커널 스택 잔여 데이터 탈취 성공!";
+      userPaddingVerdict.setAttribute('fill', '#fecaca');
+
+      // Verdict Banner: Red
+      verdictBanner.setAttribute('fill', '#450a0a');
+      verdictBanner.setAttribute('stroke', 'var(--accent-red)');
+      verdictTitle.textContent = "❌ PoC 결과: VULNERABLE";
+      verdictTitle.setAttribute('fill', 'var(--accent-red)');
+      verdictLine1.textContent = "패딩 홀에서 잔여 스택 토큰 추출";
+      verdictLine1.setAttribute('fill', '#fecaca');
+      verdictLine2.textContent = "KASLR 기저 주소 및 카나리 누출 가능";
+      verdictLine2.setAttribute('fill', '#fecaca');
+      verdictLine3.textContent = "CONFIG_INIT_STACK_NONE=y (취약)";
+      verdictLine3.setAttribute('fill', '#fca5a5');
+      verdictLine4.textContent = "실무: CVE-2013-2141 계열 정보 누출 취약";
+      verdictLine4.setAttribute('fill', '#f87171');
+
+    } else {
+      // Hardened Mode
+      hardenedBtn.classList.add('active');
+      vulnBtn.classList.remove('active');
+      tickerLed.classList.remove('vulnerable');
+      tickerText.textContent = "INIT_STACK_ALL_ZERO Active: Stack Frame & Padding Holes 100% Zeroed";
+
+      // Kernel padding hole: safe
+      paddingHoleRect.setAttribute('fill', 'url(#gradPaddingZero)');
+      paddingHoleRect.setAttribute('stroke', 'var(--accent-green)');
+      paddingHoleTitle.textContent = "⚠️ [ALIGNMENT PADDING HOLE] [4B]";
+      paddingHoleValue.textContent = "0x00000000 (컴파일러 자동 0 초기화)";
+      paddingHoleValue.setAttribute('fill', '#dcfce7');
+
+      // Compiler Box: active
+      compilerBox.setAttribute('stroke', 'var(--accent-green)');
+      compilerTitle.textContent = "🛡️ Compiler Stack Zeroing";
+      compilerTitle.setAttribute('fill', 'var(--accent-green)');
+      asm1.textContent = "ARM64: stp xzr, xzr, [sp]";
+      asm2.textContent = "x86:   xorps %xmm0, %xmm0";
+      asm3.textContent = "       movaps %xmm0, (%rsp)";
+      compilerDesc.textContent = "함수 진입(Prologue) 시 32바이트 전체를";
+      compilerDesc2.textContent = "0x00으로 소거하여 패딩 누출 차단";
+
+      // Path: Shield
+      pathPadding.setAttribute('stroke', 'var(--accent-green)');
+      pathPadding.setAttribute('class', 'flow-shield');
+      paddingParticle.setAttribute('fill', '#22c55e');
+      paddingParticle.setAttribute('filter', 'url(#glow-green)');
+
+      // User Space: Clean
+      userPaddingBox.setAttribute('fill', '#14532d');
+      userPaddingBox.setAttribute('stroke', 'var(--accent-green)');
+      userPaddingTitle.textContent = "🛡️ user_buf.padding [Offset 4..7]";
+      userPaddingVal.textContent = "0x00 0x00 0x00 0x00 (CLEAN)";
+      userPaddingVal.setAttribute('fill', '#86efac');
+      userPaddingVerdict.textContent = "안전: 커널 스택 정보 누출 없음";
+      userPaddingVerdict.setAttribute('fill', '#dcfce7');
+
+      // Verdict Banner: Green
+      verdictBanner.setAttribute('fill', '#052e16');
+      verdictBanner.setAttribute('stroke', 'var(--accent-green)');
+      verdictTitle.textContent = "✅ PoC 결과: SECURE";
+      verdictTitle.setAttribute('fill', 'var(--accent-green)');
+      verdictLine1.textContent = "패딩 홀 0x00 유지 확인";
+      verdictLine1.setAttribute('fill', '#bbf7d0');
+      verdictLine2.textContent = "잔여 스택 토큰 추출 실패";
+      verdictLine2.setAttribute('fill', '#bbf7d0');
+      verdictLine3.textContent = "CONFIG_INIT_STACK_ALL_ZERO=y";
+      verdictLine3.setAttribute('fill', '#86efac');
+      verdictLine4.textContent = "커널 주소/카나리 탈취 원천 차단";
+      verdictLine4.setAttribute('fill', '#86efac');
+    }
+  }
+</script>
+</body>
+</html>
+
