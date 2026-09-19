@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SLUB Allocator Hardening: Freelist Randomization & Obfuscation</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 9999px;
+      background: var(--accent-purple);
+      color: white;
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 8px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+    }
+
+    .scene-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .scene-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scene-desc {
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+    }
+
+    .canvas-container {
+      width: 100%;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      min-width: 900px;
+    }
+
+    .interactive-panel {
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .ctrl-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .btn-blue {
+      background: #0284c7;
+      color: white;
+    }
+    .btn-blue:hover { background: #0369a1; }
+
+    .btn-green {
+      background: #16a34a;
+      color: white;
+    }
+    .btn-green:hover { background: #15803d; }
+
+    .btn-red {
+      background: #dc2626;
+      color: white;
+    }
+    .btn-red:hover { background: #b91c1c; }
+
+    .btn-secondary {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+    }
+    .btn-secondary:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .log-box {
+      background: #000;
+      color: #38bdf8;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      max-height: 160px;
+      overflow-y: auto;
+      border: 1px solid var(--card-border);
+      white-space: pre-wrap;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th, .comparison-table td {
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--card-bg);
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .comparison-table tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tag-safe {
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+
+    .tag-vuln {
+      color: var(--accent-red);
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>SLUB Allocator Hardening Architecture</span>
+        <span class="badge">Linux Kernel 6.12 LTS</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle">
+        <span id="themeIcon">☀️</span>
+        <span id="themeText">Light Mode</span>
+      </button>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab-btn active" onclick="showScene(1)">시나리오 1: 프리리스트 무작위화 (CONFIG_SLAB_FREELIST_RANDOM)</button>
+      <button class="tab-btn" onclick="showScene(2)">시나리오 2: 프리리스트 포인터 난독화 (CONFIG_SLAB_FREELIST_HARDENED)</button>
+      <button class="tab-btn" onclick="showScene(3)">시나리오 3: 베이스라인 미적용 취약 환경</button>
+      <button class="tab-btn" onclick="showScene(4)">시나리오 4: SLUB 하드닝 비교 매트릭스</button>
+    </nav>
+
+    <!-- SCENARIO 1: FREELIST RANDOMIZATION -->
+    <div id="scene1" class="scene-card">
+      <div class="scene-title">
+        <span>🎲 시나리오 1: 프리리스트 무작위화 (CONFIG_SLAB_FREELIST_RANDOM)</span>
+      </div>
+      <div class="scene-desc">
+        전통적인 슬랩 할당자는 새 페이지 할당 시 <code>[0] -> [1] -> [2] -> [3]</code> 순서로 선형 프리리스트를 구성하여 객체 할당 순서가 100% 예측 가능했습니다.<br>
+        <code>CONFIG_SLAB_FREELIST_RANDOM=y</code> 적용 시, Fisher-Yates 셔플 알고리즘으로 프리리스트 순서를 무작위화하여 <strong>힙 그루밍(Heap Grooming) 및 인접 객체 오버플로우 공격</strong>을 확률적으로 무력화합니다.
+      </div>
+
+      <div class="canvas-container">
+        <svg viewBox="0 0 920 300" xmlns="http://www.w3.org/2000/svg">
+          <!-- Page Boundary -->
+          <rect x="30" y="30" width="860" height="240" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <text x="50" y="58" fill="#38bdf8" font-size="14" font-weight="bold">SLUB Slab Page (4KB Page / 64B Objects)</text>
+
+          <!-- Slab Slot 0 -->
+          <rect id="slot0" x="50" y="80" width="95" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+          <text x="97" y="105" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">Slot 0</text>
+          <text x="97" y="125" fill="#94a3b8" font-size="10" text-anchor="middle">Offset: +0</text>
+          <text id="order0" x="97" y="165" fill="#eab308" font-size="12" font-weight="bold" text-anchor="middle">Order: [3]</text>
+
+          <!-- Slab Slot 1 -->
+          <rect id="slot1" x="155" y="80" width="95" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+          <text x="202" y="105" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">Slot 1</text>
+          <text x="202" y="125" fill="#94a3b8" font-size="10" text-anchor="middle">Offset: +64</text>
+          <text id="order1" x="202" y="165" fill="#eab308" font-size="12" font-weight="bold" text-anchor="middle">Order: [0]</text>
+
+          <!-- Slab Slot 2 -->
+          <rect id="slot2" x="260" y="80" width="95" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+          <text x="307" y="105" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">Slot 2</text>
+          <text x="307" y="125" fill="#94a3b8" font-size="10" text-anchor="middle">Offset: +128</text>
+          <text id="order2" x="307" y="165" fill="#eab308" font-size="12" font-weight="bold" text-anchor="middle">Order: [6]</text>
+
+          <!-- Slab Slot 3 -->
+          <rect id="slot3" x="365" y="80" width="95" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+          <text x="412" y="105" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">Slot 3</text>
+          <text x="412" y="125" fill="#94a3b8" font-size="10" text-anchor="middle">Offset: +192</text>
+          <text id="order3" x="412" y="165" fill="#eab308" font-size="12" font-weight="bold" text-anchor="middle">Order: [1]</text>
+
+          <!-- Slab Slot 4 -->
+          <rect id="slot4" x="470" y="80" width="95" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+          <text x="517" y="105" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">Slot 4</text>
+          <text x="517" y="125" fill="#94a3b8" font-size="10" text-anchor="middle">Offset: +256</text>
+          <text id="order4" x="517" y="165" fill="#eab308" font-size="12" font-weight="bold" text-anchor="middle">Order: [4]</text>
+
+          <!-- Slab Slot 5 -->
+          <rect id="slot5" x="575" y="80" width="95" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+          <text x="622" y="105" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">Slot 5</text>
+          <text x="622" y="125" fill="#94a3b8" font-size="10" text-anchor="middle">Offset: +320</text>
+          <text id="order5" x="622" y="165" fill="#eab308" font-size="12" font-weight="bold" text-anchor="middle">Order: [7]</text>
+
+          <!-- Slab Slot 6 -->
+          <rect id="slot6" x="680" y="80" width="95" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+          <text x="727" y="105" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">Slot 6</text>
+          <text x="727" y="125" fill="#94a3b8" font-size="10" text-anchor="middle">Offset: +384</text>
+          <text id="order6" x="727" y="165" fill="#eab308" font-size="12" font-weight="bold" text-anchor="middle">Order: [2]</text>
+
+          <!-- Slab Slot 7 -->
+          <rect id="slot7" x="785" y="80" width="95" height="110" rx="6" fill="#0f172a" stroke="#334155" stroke-width="2"/>
+          <text x="832" y="105" fill="#f8fafc" font-size="12" font-weight="bold" text-anchor="middle">Slot 7</text>
+          <text x="832" y="125" fill="#94a3b8" font-size="10" text-anchor="middle">Offset: +448</text>
+          <text id="order7" x="832" y="165" fill="#eab308" font-size="12" font-weight="bold" text-anchor="middle">Order: [5]</text>
+
+          <!-- Bottom Banner -->
+          <rect x="50" y="210" width="830" height="40" rx="6" fill="#0f172a" stroke="#22c55e"/>
+          <text id="banner-rand" x="465" y="235" fill="#22c55e" font-size="13" font-weight="bold" text-anchor="middle">
+            Sequential Adjacency Rate: 0% (0/7 matches) - Non-deterministic Allocation Sequence
+          </text>
+        </svg>
+      </div>
+
+      <div class="interactive-panel">
+        <div class="ctrl-row">
+          <button class="action-btn btn-blue" onclick="simAllocRand()">새 슬랩 페이지 할당 시뮬레이션 (Fisher-Yates 셔플)</button>
+          <button class="action-btn btn-secondary" onclick="resetAllocRand()">초기화</button>
+        </div>
+        <div id="log-rand" class="log-box">[System Ready] SLUB Freelist Randomization driver loaded. Click button to allocate objects.</div>
+      </div>
+    </div>
+
+    <!-- SCENARIO 2: FREELIST POINTER OBFUSCATION -->
+    <div id="scene2" class="scene-card" style="display: none;">
+      <div class="scene-title">
+        <span>🔐 시나리오 2: 프리리스트 포인터 난독화 (CONFIG_SLAB_FREELIST_HARDENED)</span>
+      </div>
+      <div class="scene-desc">
+        해제된 객체의 프리 포인터(Free Pointer)는 힙 버퍼 오버플로우의 주요 표적입니다. 공격자는 포인터를 덮어써 원하는 주소에 임의 할당(Arbitrary Write)을 노립니다.<br>
+        <code>CONFIG_SLAB_FREELIST_HARDENED=y</code>는 포인터를 <code>ptr ^ s->random ^ swab(ptr_addr)</code> 공식으로 암호화하여 저장하며, 1비트라도 변조되면 할당 시 즉시 <strong>커널 크래시(Slab Corruption Trap)</strong>를 유발하여 실행 흐름 탈취를 차단합니다.
+      </div>
+
+      <div class="canvas-container">
+        <svg viewBox="0 0 920 320" xmlns="http://www.w3.org/2000/svg">
+          <!-- Object A (Freed) -->
+          <rect id="obja-box" x="50" y="40" width="360" height="230" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <text x="230" y="70" fill="#38bdf8" font-size="14" font-weight="bold" text-anchor="middle">Freed Object A (Address: 0xffff8000_1000)</text>
+          
+          <rect id="obja-ptr-box" x="70" y="90" width="320" height="60" rx="6" fill="#0f172a" stroke="#22c55e" stroke-width="2"/>
+          <text x="230" y="115" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">Stored Next Free Pointer (Offset +0)</text>
+          <text id="obja-val" x="230" y="137" fill="#86efac" font-size="12" font-family="monospace" text-anchor="middle">0x8a2f_c104_9921_b120 (ENCODED)</text>
+
+          <rect x="70" y="165" width="320" height="85" rx="6" fill="#0f172a" stroke="#334155"/>
+          <text x="85" y="190" fill="#94a3b8" font-size="11">Encoding Formula:</text>
+          <text x="85" y="210" fill="#eab308" font-size="11" font-family="monospace">encoded = ptr ^ s->random ^ swab(addr)</text>
+          <text x="85" y="230" fill="#94a3b8" font-size="10">s->random: 64-bit per-cache secret cookie</text>
+
+          <!-- Decoder / Allocator Engine -->
+          <rect x="490" y="40" width="380" height="230" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+          <text x="680" y="70" fill="#a855f7" font-size="14" font-weight="bold" text-anchor="middle">SLUB Allocation Decode Engine</text>
+
+          <rect id="decode-status-box" x="510" y="90" width="340" height="60" rx="6" fill="#0f172a" stroke="#a855f7" stroke-width="2"/>
+          <text id="decode-status-title" x="680" y="115" fill="#a855f7" font-size="12" font-weight="bold" text-anchor="middle">Decode Status: READY</text>
+          <text id="decode-status-val" x="680" y="137" fill="#f8fafc" font-size="12" font-family="monospace" text-anchor="middle">Awaiting Allocation Request...</text>
+
+          <rect x="510" y="165" width="340" height="85" rx="6" fill="#0f172a" stroke="#334155"/>
+          <text x="525" y="190" fill="#94a3b8" font-size="11">Decoding Formula:</text>
+          <text x="525" y="210" fill="#eab308" font-size="11" font-family="monospace">decoded = encoded ^ s->random ^ swab(addr)</text>
+          <text x="525" y="230" fill="#94a3b8" font-size="10">If tampered: decoded address is invalid -> Crash/Trap!</text>
+        </svg>
+      </div>
+
+      <div class="interactive-panel">
+        <div class="ctrl-row">
+          <button class="action-btn btn-blue" onclick="simEncodeNormal()">1단계: 정상 해제 객체 디코딩</button>
+          <button class="action-btn btn-red" onclick="simEncodeTamper()">2단계: 힙 오버플로우 (포인터 1바이트 변조)</button>
+          <button class="action-btn btn-green" onclick="simEncodeAlloc()">3단계: kmem_cache_alloc() 재할당 시도</button>
+          <button class="action-btn btn-secondary" onclick="resetEncode()">초기화</button>
+        </div>
+        <div id="log-encode" class="log-box">[System Ready] Free pointer encryption test ready. Click Step 1 to inspect.</div>
+      </div>
+    </div>
+
+    <!-- SCENARIO 3: BASELINE VULNERABLE -->
+    <div id="scene3" class="scene-card" style="display: none;">
+      <div class="scene-title">
+        <span>⚠️ 시나리오 3: 베이스라인 미적용 취약 환경 (Slab Hardening Disabled)</span>
+      </div>
+      <div class="scene-desc">
+        <code>CONFIG_SLAB_FREELIST_RANDOM</code> 및 <code>CONFIG_SLAB_FREELIST_HARDENED</code>가 비활성화된 기본 커널의 취약점입니다:<br>
+        1. <strong>선형 순차 할당:</strong> 힙 할당이 100% 인접 주소로 연속 배치되어 공격자가 취약 버퍼 바로 뒤에 희생자 객체를 확정 배치 가능.<br>
+        2. <strong>평문 프리리스트 포인터:</strong> 해제된 객체에 커널 가상 주소가 평문 그대로 노출되며, 버퍼 오버플로우로 원하는 타깃 주소를 덮어쓰면 다음 할당 시 해당 위치를 획득(Arbitrary Write) 가능.
+      </div>
+
+      <div class="canvas-container">
+        <svg viewBox="0 0 920 280" xmlns="http://www.w3.org/2000/svg">
+          <!-- Vulnerable Linear Allocation -->
+          <rect x="40" y="30" width="400" height="220" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="240" y="60" fill="#ef4444" font-size="14" font-weight="bold" text-anchor="middle">선형 할당 (Deterministic Heap Grooming)</text>
+          <rect x="60" y="80" width="360" height="35" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="240" y="102" fill="#94a3b8" font-size="12" text-anchor="middle">Alloc[0] = 0xffff_..._1000  (Vulnerable Buffer)</text>
+          <rect x="60" y="125" width="360" height="35" rx="4" fill="#7f1d1d" stroke="#ef4444"/>
+          <text x="240" y="147" fill="#fca5a5" font-size="12" font-weight="bold" text-anchor="middle">Alloc[1] = 0xffff_..._1040  (Victim Struct - 100% Adjacent!)</text>
+          <rect x="60" y="170" width="360" height="60" rx="4" fill="#0f172a" stroke="#ef4444"/>
+          <text x="75" y="195" fill="#f87171" font-size="11" font-weight="bold">공격 결과: 100% 확률로 인접 객체 함수 포인터 오버플로우 성공</text>
+          <text x="75" y="215" fill="#94a3b8" font-size="10">CONFIG_SLAB_FREELIST_RANDOM=n</text>
+
+          <!-- Vulnerable Plaintext Pointer -->
+          <rect x="480" y="30" width="400" height="220" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="680" y="60" fill="#ef4444" font-size="14" font-weight="bold" text-anchor="middle">평문 프리리스트 (Freelist Hijacking)</text>
+          <rect x="500" y="80" width="360" height="35" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="680" y="102" fill="#94a3b8" font-size="12" text-anchor="middle">Freed Object Next Ptr: 0xffff8000_1040 (PLAINTEXT)</text>
+          <rect x="500" y="125" width="360" height="35" rx="4" fill="#7f1d1d" stroke="#ef4444"/>
+          <text x="680" y="147" fill="#fca5a5" font-size="12" font-weight="bold" text-anchor="middle">Attacker Overwrite -> 0xffff8000_deadbeef</text>
+          <rect x="500" y="170" width="360" height="60" rx="4" fill="#0f172a" stroke="#ef4444"/>
+          <text x="515" y="195" fill="#f87171" font-size="11" font-weight="bold">공격 결과: kmem_cache_alloc()이 공격자 임의 주소 반환!</text>
+          <text x="515" y="215" fill="#94a3b8" font-size="10">CONFIG_SLAB_FREELIST_HARDENED=n (Double Free 미탐지)</text>
+        </svg>
+      </div>
+
+      <div class="interactive-panel">
+        <div class="log-box">[Baseline Evaluation]
+CONFIG_SLAB_FREELIST_RANDOM: DISABLED (Adjacency rate: 100%)
+CONFIG_SLAB_FREELIST_HARDENED: DISABLED (Plaintext free pointer visible)
+LKDTM SLAB_FREE_DOUBLE: Double free executed WITHOUT error trap! (Corrupt list allowed)</div>
+      </div>
+    </div>
+
+    <!-- SCENARIO 4: COMPARISON MATRIX -->
+    <div id="scene4" class="scene-card" style="display: none;">
+      <div class="scene-title">
+        <span>📊 시나리오 4: SLUB 하드닝 비교 매트릭스</span>
+      </div>
+      <div class="scene-desc">
+        리눅스 커널 6.12 슬랩 할당자 하드닝 기능의 기술적 세부사항 및 보안 방어 효과 비교입니다.
+      </div>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>항목 (Metric)</th>
+            <th>Hardened (`slab-freelist`)</th>
+            <th>Baseline (`slab-freelist-disabled`)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>프리리스트 순서</strong></td>
+            <td><span class="tag-safe">Fisher-Yates 기반 무작위 셔플</span></td>
+            <td><span class="tag-vuln">선형 순차 (0, 1, 2, 3...)</span></td>
+          </tr>
+          <tr>
+            <td><strong>인접 객체 예측률</strong></td>
+            <td><span class="tag-safe">0% ~ 20% (비결정론적)</span></td>
+            <td><span class="tag-vuln">100% (완전 결정론적)</span></td>
+          </tr>
+          <tr>
+            <td><strong>프리리스트 포인터 저장 방식</strong></td>
+            <td><span class="tag-safe">ptr ^ s->random ^ swab(addr) 암호화</span></td>
+            <td><span class="tag-vuln">평문 커널 가상 주소 (Plaintext)</span></td>
+          </tr>
+          <tr>
+            <td><strong>포인터 변조 시 동작</strong></td>
+            <td><span class="tag-safe">슬랩 손상 감지 및 즉시 안전한 커널 패닉/트랩</span></td>
+            <td><span class="tag-vuln">임의 주소 할당 (Arbitrary Write 성공)</span></td>
+          </tr>
+          <tr>
+            <td><strong>더블 프리 감지</strong></td>
+            <td><span class="tag-safe">BUG_ON(object == fp) 즉각 감지</span></td>
+            <td><span class="tag-vuln">미감지 (순환 프리리스트 발생)</span></td>
+          </tr>
+          <tr>
+            <td><strong>성능 오버헤드</strong></td>
+            <td>< 0.5% (새 슬랩 페이지 할당 시 1회 셔플, 가벼운 XOR)</td>
+            <td>0% (기본값)</td>
+          </tr>
+          <tr>
+            <td><strong>아키텍처 지원</strong></td>
+            <td>x86_64, arm64 전 아키텍처 지원</td>
+            <td>모든 아키텍처 공통</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Tab Navigation
+    function showScene(n) {
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById('scene' + i).style.display = (i === n) ? 'block' : 'none';
+      }
+      const btns = document.querySelectorAll('.tab-btn');
+      btns.forEach((btn, idx) => {
+        if (idx === n - 1) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+    }
+
+    // Theme Toggle
+    const themeBtn = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    const themeText = document.getElementById('themeText');
+    let isLight = false;
+
+    themeBtn.addEventListener('click', () => {
+      isLight = !isLight;
+      document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+      themeIcon.textContent = isLight ? '🌙' : '☀️';
+      themeText.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+    });
+
+    // Scenario 1: Random allocation simulation
+    const randSequences = [
+      [3, 0, 6, 1, 4, 7, 2, 5],
+      [5, 2, 0, 7, 3, 1, 6, 4],
+      [7, 4, 1, 6, 0, 3, 5, 2]
+    ];
+    let randIdx = 0;
+
+    function simAllocRand() {
+      const seq = randSequences[randIdx % randSequences.length];
+      randIdx++;
+      for (let i = 0; i < 8; i++) {
+        const orderEl = document.getElementById('order' + i);
+        orderEl.textContent = `Order: [${seq[i]}]`;
+        const slotEl = document.getElementById('slot' + i);
+        slotEl.setAttribute('stroke', '#38bdf8');
+      }
+      document.getElementById('log-rand').textContent = `[+] Fresh Slab Page Initialized via Fisher-Yates shuffle!
+Randomized Freelist Order: [${seq.join(', ')}]
+Consecutive kmem_cache_alloc() requests will receive slots non-contiguously.
+Adjacent overwrite attacks fail because target object is placed elsewhere in the slab!`;
+    }
+
+    function resetAllocRand() {
+      const defaultSeq = [3, 0, 6, 1, 4, 7, 2, 5];
+      for (let i = 0; i < 8; i++) {
+        document.getElementById('order' + i).textContent = `Order: [${defaultSeq[i]}]`;
+        document.getElementById('slot' + i).setAttribute('stroke', '#334155');
+      }
+      document.getElementById('log-rand').textContent = '[System Ready] SLUB Freelist Randomization driver loaded. Click button to allocate objects.';
+    }
+
+    // Scenario 2: Freelist pointer obfuscation
+    let encodeState = 'normal';
+
+    function simEncodeNormal() {
+      encodeState = 'normal';
+      document.getElementById('obja-ptr-box').setAttribute('stroke', '#22c55e');
+      document.getElementById('obja-val').setAttribute('fill', '#86efac');
+      document.getElementById('obja-val').textContent = '0x8a2f_c104_9921_b120 (ENCODED)';
+      document.getElementById('decode-status-box').setAttribute('stroke', '#22c55e');
+      document.getElementById('decode-status-title').textContent = 'Decode Status: VERIFIED';
+      document.getElementById('decode-status-title').setAttribute('fill', '#22c55e');
+      document.getElementById('decode-status-val').textContent = 'Decodes cleanly to Object B (0xffff8000_1040)';
+      document.getElementById('decode-status-val').setAttribute('fill', '#86efac');
+      document.getElementById('log-encode').textContent = `[Step 1: Normal Free Pointer Encode & Decode]
+Original Target Pointer: 0xffff8000_1040 (Object B)
+Stored Free Pointer:     0x8a2f_c104_9921_b120 (XORed with s->random ^ swab(addr))
+Decoder recalculates:    0x8a2f_c104_9921_b120 ^ s->random ^ swab(addr) == 0xffff8000_1040
+[+] Verification Success: Plaintext address is never stored in memory!`;
+    }
+
+    function simEncodeTamper() {
+      encodeState = 'tampered';
+      document.getElementById('obja-ptr-box').setAttribute('stroke', '#ef4444');
+      document.getElementById('obja-val').setAttribute('fill', '#fca5a5');
+      document.getElementById('obja-val').textContent = '0xffff8000_deadbeef (ATTACKER OVERWRITE)';
+      document.getElementById('decode-status-box').setAttribute('stroke', '#eab308');
+      document.getElementById('decode-status-title').textContent = 'Decode Status: Awaiting Allocation';
+      document.getElementById('decode-status-title').setAttribute('fill', '#eab308');
+      document.getElementById('decode-status-val').textContent = 'Pointer tampered. Click Step 3 to allocate.';
+      document.getElementById('decode-status-val').setAttribute('fill', '#eab308');
+      document.getElementById('log-encode').textContent = `[Step 2: Attacker Overwrites Free Pointer]
+Attacker exploits heap overflow from adjacent buffer and writes:
+Target Address: 0xffff8000_deadbeef
+Attacker goal: Trick SLUB into returning 0xffff8000_deadbeef on next allocation.
+However, attacker does not know the secret 64-bit cookie s->random!`;
+    }
+
+    function simEncodeAlloc() {
+      if (encodeState === 'tampered') {
+        document.getElementById('decode-status-box').setAttribute('stroke', '#ef4444');
+        document.getElementById('decode-status-title').textContent = 'TRAP: Free pointer corrupt!';
+        document.getElementById('decode-status-title').setAttribute('fill', '#ef4444');
+        document.getElementById('decode-status-val').textContent = 'Decoded: 0x7b11_33a0_8241_cc19 (INVALID)';
+        document.getElementById('decode-status-val').setAttribute('fill', '#fca5a5');
+        document.getElementById('log-encode').textContent = `[Step 3: kmem_cache_alloc() Execution]
+CPU attempts to decode tampered value:
+0xffff8000_deadbeef ^ s->random ^ swab(addr) -> 0x7b11_33a0_8241_cc19
+[!] KERNEL CORRUPTION TRAP: Decoded address is non-canonical / unmapped!
+[!] kmem_cache: Free pointer corrupt in vuln_slab_cache!
+[+] ATTACK BLOCKED: Kernel halts before attacker gains arbitrary write!`;
+      } else {
+        simEncodeNormal();
+      }
+    }
+
+    function resetEncode() {
+      encodeState = 'normal';
+      document.getElementById('obja-ptr-box').setAttribute('stroke', '#22c55e');
+      document.getElementById('obja-val').setAttribute('fill', '#86efac');
+      document.getElementById('obja-val').textContent = '0x8a2f_c104_9921_b120 (ENCODED)';
+      document.getElementById('decode-status-box').setAttribute('stroke', '#a855f7');
+      document.getElementById('decode-status-title').textContent = 'Decode Status: READY';
+      document.getElementById('decode-status-title').setAttribute('fill', '#a855f7');
+      document.getElementById('decode-status-val').textContent = 'Awaiting Allocation Request...';
+      document.getElementById('decode-status-val').setAttribute('fill', '#f8fafc');
+      document.getElementById('log-encode').textContent = '[System Ready] Free pointer encryption test ready. Click Step 1 to inspect.';
+    }
+  </script>
+</body>
+</html>

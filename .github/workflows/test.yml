@@ -220,6 +220,15 @@ jobs:
             feature: bti-pac
             test: test_bti_pac
 
+          # Task 7-1: SLAB Freelist Hardening & Randomization (Dual-Arch)
+          - arch: arm64
+            feature: slab-freelist
+            test: test_slab_freelist
+          - arch: x86_64
+            feature: slab-freelist
+            test: test_slab_freelist
+
+
 
     steps:
       - name: Checkout repository

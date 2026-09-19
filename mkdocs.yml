@@ -122,3 +122,6 @@ nav:
           - Clang kCFI: features/13-kcfi.md
           - x86 IBT & Shadow Stack: features/14-ibt-shstk.md
           - ARM64 BTI & PAC: features/15-bti-pac.md
+      - 05. Heap & Slab Allocator Hardening:
+          - SLAB Freelist Hardening: features/16-slab-freelist.md
+

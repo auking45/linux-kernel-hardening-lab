@@ -217,3 +217,4 @@ ARM64 BTI와 PAC는 소프트웨어 계층의 한계를 뛰어넘어 하드웨�
    - pKVM(Protected KVM) 기반으로 격리된 마이크로 안드로이드 게스트 VM(pVM) 환경에서의 신뢰 실행 환경 검증.
 3. **Arm CCA (Confidential Compute Architecture)**:
    - RMM(Realm Management Monitor) 및 하이퍼바이저로부터도 메모리가 암호학적으로 은닉되는 기밀 컴퓨팅(Realm) 데모 환경 확장 지원 예정.
+
