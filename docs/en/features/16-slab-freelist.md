@@ -161,3 +161,4 @@ The feature was tested across both x86_64 and arm64 architectures:
 ## 8. Conclusion
 
 `CONFIG_SLAB_FREELIST_RANDOM` and `CONFIG_SLAB_FREELIST_HARDENED` deliver essential baseline protection against modern heap exploitation with minimal runtime overhead and zero memory footprint increase.
+

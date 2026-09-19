@@ -164,3 +164,4 @@ CONFIG_LKDTM=y
 ## 8. 결론
 
 `CONFIG_SLAB_FREELIST_RANDOM`과 `CONFIG_SLAB_FREELIST_HARDENED`는 별도의 추가 메모리 오버헤드 없이도 리눅스 커널 슬랩 할당자의 예측 가능성을 제거하고 힙 기반 공격 체인을 효과적으로 무력화하는 필수 기초 방어선임.
+

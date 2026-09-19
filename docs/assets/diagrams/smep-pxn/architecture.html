@@ -3,38 +3,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SMEP (x86) & PXN (ARM64) Architecture</title>
+  <title>SMEP (x86) & PXN (ARM64) Dynamic Architecture Simulator</title>
   <style>
     :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --card-border: #334155;
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --accent-blue: #38bdf8;
       --accent-green: #22c55e;
       --accent-red: #ef4444;
       --accent-purple: #a855f7;
-      --accent-yellow: #eab308;
-      --perm-user: #f97316;
+      --accent-yellow: #f59e0b;
+      --perm-user: #fb923c;
       --perm-kernel: #38bdf8;
-      --perm-block: #ef4444;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
     }
 
     [data-theme="light"] {
-      --bg-color: #f8fafc;
+      --bg-color: #f1f5f9;
       --card-bg: #ffffff;
-      --card-border: #e2e8f0;
+      --card-border: #cbd5e1;
       --text-main: #0f172a;
       --text-muted: #64748b;
       --accent-blue: #0284c7;
       --accent-green: #16a34a;
       --accent-red: #dc2626;
       --accent-purple: #9333ea;
-      --accent-yellow: #ca8a04;
+      --accent-yellow: #d97706;
       --perm-user: #ea580c;
       --perm-kernel: #0284c7;
-      --perm-block: #dc2626;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
     }
 
     * {
@@ -52,7 +58,7 @@
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1240px;
       margin: 0 auto;
     }
 
@@ -60,25 +66,25 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       padding-bottom: 16px;
       border-bottom: 1px solid var(--card-border);
     }
 
     h1 {
-      font-size: 1.5rem;
+      font-size: 1.45rem;
       font-weight: 700;
       color: var(--accent-blue);
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
 
     .badge {
       font-size: 0.75rem;
       padding: 4px 8px;
       border-radius: 4px;
-      background-color: rgba(56, 189, 248, 0.2);
+      background-color: rgba(56, 189, 248, 0.15);
       color: var(--accent-blue);
       border: 1px solid var(--accent-blue);
     }
@@ -101,7 +107,7 @@
     .scenario-tabs {
       display: flex;
       gap: 8px;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
       flex-wrap: wrap;
     }
 
@@ -109,11 +115,11 @@
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       color: var(--text-muted);
-      padding: 10px 18px;
+      padding: 10px 16px;
       border-radius: 8px;
       cursor: pointer;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: 0.88rem;
       transition: all 0.2s;
     }
 
@@ -128,13 +134,115 @@
       border-color: var(--accent-blue);
     }
 
+    /* Simulation Control Toolbar */
+    .sim-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      margin-bottom: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sim-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sim-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .sim-btn.primary {
+      color: #ffffff;
+    }
+
+    .speed-selector {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .speed-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+
+    .speed-btn.active {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .speed-btn.active {
+      color: #ffffff;
+    }
+
+    .sim-status {
+      font-size: 0.85rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* Main View Grid */
     .view-container {
       display: grid;
-      grid-template-columns: 2fr 1fr;
+      grid-template-columns: 2.1fr 1fr;
       gap: 20px;
     }
 
-    @media (max-width: 900px) {
+    @media (max-width: 960px) {
       .view-container {
         grid-template-columns: 1fr;
       }
@@ -144,8 +252,8 @@
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: 12px;
-      padding: 24px;
-      min-height: 480px;
+      padding: 16px;
+      min-height: 540px;
       position: relative;
       overflow: hidden;
       display: flex;
@@ -179,10 +287,14 @@
     }
 
     .metric-box {
-      background: rgba(15, 23, 42, 0.6);
+      background: rgba(11, 19, 43, 0.6);
       border: 1px solid var(--card-border);
       border-radius: 8px;
       padding: 12px 16px;
+    }
+
+    [data-theme="light"] .metric-box {
+      background: rgba(241, 245, 249, 0.8);
     }
 
     .metric-label {
@@ -197,153 +309,83 @@
       font-size: 1rem;
       font-weight: 700;
       color: var(--text-main);
-      font-family: monospace;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     }
 
-    /* Diagram Elements */
-    .mem-layout {
+    /* SVG Canvas Styles & Animations */
+    .svg-canvas {
       width: 100%;
-      max-width: 650px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
+      height: 520px;
+      display: block;
     }
 
-    .ring-box {
-      border: 2px dashed var(--card-border);
-      border-radius: 10px;
-      padding: 16px;
-      position: relative;
-      transition: all 0.3s;
+    /* Dynamic Flow Lines */
+    @keyframes flowDash {
+      to {
+        stroke-dashoffset: -48;
+      }
     }
 
-    .ring-box.kernel {
-      border-color: var(--accent-blue);
-      background: rgba(56, 189, 248, 0.05);
+    @keyframes pulseGlow {
+      0%, 100% { filter: drop-shadow(0 0 4px currentColor); }
+      50% { filter: drop-shadow(0 0 12px currentColor); }
     }
 
-    .ring-box.user {
-      border-color: var(--perm-user);
-      background: rgba(249, 115, 22, 0.05);
+    .flow-path {
+      stroke-dasharray: 8 6;
+      animation: flowDash 1.2s linear infinite;
     }
 
-    .ring-label {
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .ring-box.kernel .ring-label {
+    .flow-path.normal {
+      stroke: var(--accent-blue);
       color: var(--accent-blue);
     }
 
-    .ring-box.user .ring-label {
-      color: var(--perm-user);
+    .flow-path.return {
+      stroke: var(--accent-green);
+      color: var(--accent-green);
     }
 
-    .component-row {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
+    .flow-path.attack {
+      stroke: var(--accent-red);
+      color: var(--accent-red);
+      animation: flowDash 0.8s linear infinite;
+      filter: drop-shadow(0 0 6px var(--accent-red));
     }
 
-    .mem-node {
-      flex: 1;
-      min-width: 120px;
-      padding: 12px;
-      border-radius: 6px;
-      border: 1px solid var(--card-border);
-      text-align: center;
-      transition: all 0.3s;
-      cursor: pointer;
+    .flow-path.blocked {
+      stroke: var(--accent-yellow);
+      color: var(--accent-yellow);
+      stroke-dasharray: 6 4;
+      animation: flowDash 1.5s linear infinite;
     }
 
-    .mem-node:hover {
-      transform: translateY(-2px);
+    .flow-particle {
+      animation: pulseGlow 1.2s ease-in-out infinite;
     }
 
-    .mem-node.kernel-code {
-      background: rgba(56, 189, 248, 0.15);
-      border-color: var(--accent-blue);
+    /* Hardware Gate Barrier Shield */
+    @keyframes shieldGlow {
+      0%, 100% { stroke-opacity: 0.6; stroke-width: 2; }
+      50% { stroke-opacity: 1; stroke-width: 4; }
     }
 
-    .mem-node.kernel-vuln {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: var(--accent-red);
+    .shield-line {
+      stroke-dasharray: 10 5;
+      animation: shieldGlow 2s ease-in-out infinite;
     }
 
-    .mem-node.user-shellcode {
-      background: rgba(249, 115, 22, 0.15);
-      border-color: var(--perm-user);
+    /* Detonation Trap Ripple */
+    @keyframes rippleExpand {
+      0% { r: 6; opacity: 1; }
+      100% { r: 38; opacity: 0; }
     }
 
-    .mem-node.mmu-trap {
-      background: rgba(234, 179, 8, 0.15);
-      border-color: var(--accent-yellow);
+    .trap-ripple {
+      animation: rippleExpand 1.5s cubic-bezier(0, 0.2, 0.8, 1) infinite;
     }
 
-    .node-title {
-      font-size: 0.85rem;
-      font-weight: 700;
-      margin-bottom: 4px;
-    }
-
-    .node-sub {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-family: monospace;
-    }
-
-    .arrow-container {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 8px 0;
-    }
-
-    .flow-arrow {
-      width: 4px;
-      height: 40px;
-      background: var(--card-border);
-      position: relative;
-      transition: all 0.3s;
-    }
-
-    .flow-arrow::after {
-      content: '';
-      position: absolute;
-      bottom: -6px;
-      left: -6px;
-      width: 0;
-      height: 0;
-      border-left: 8px solid transparent;
-      border-right: 8px solid transparent;
-      border-top: 8px solid var(--card-border);
-      transition: all 0.3s;
-    }
-
-    .flow-arrow.active-attack {
-      background: var(--accent-red);
-      box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
-    }
-
-    .flow-arrow.active-attack::after {
-      border-top-color: var(--accent-red);
-    }
-
-    .flow-arrow.active-blocked {
-      background: var(--accent-yellow);
-    }
-
-    .flow-arrow.active-blocked::after {
-      border-top-color: var(--accent-yellow);
-    }
-
+    /* Badges */
     .shield-badge {
       display: inline-flex;
       align-items: center;
@@ -351,9 +393,9 @@
       background: rgba(34, 197, 94, 0.15);
       color: var(--accent-green);
       border: 1px solid var(--accent-green);
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 0.75rem;
       font-weight: 700;
     }
 
@@ -364,9 +406,9 @@
       background: rgba(239, 68, 68, 0.15);
       color: var(--accent-red);
       border: 1px solid var(--accent-red);
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 0.8rem;
+      padding: 4px 10px;
+      border-radius: 16px;
+      font-size: 0.75rem;
       font-weight: 700;
     }
   </style>
@@ -375,197 +417,389 @@
   <div class="container">
     <header>
       <h1>
-        SMEP & PXN Execution Prevention Architecture
-        <span class="badge">Hardware Protection</span>
+        <span>SMEP & PXN Dynamic Architecture Simulator</span>
+        <span class="badge">Hardware Instruction Fetch Prevention</span>
       </h1>
       <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀️ 테마 전환</button>
     </header>
 
     <div class="scenario-tabs">
-      <button class="tab-btn active" onclick="switchScenario(1)">1. 권한 분리 모델 (Privilege Model)</button>
-      <button class="tab-btn" onclick="switchScenario(2)">2. ret2usr 공격 흐름 (Attack Vector)</button>
-      <button class="tab-btn" onclick="switchScenario(3)">3. 하드웨어 MMU 차단 (SMEP/PXN Defense)</button>
-      <button class="tab-btn" onclick="switchScenario(4)">4. ROP로의 전이 및 비교 매트릭스</button>
+      <button class="tab-btn active" onclick="switchScenario(1)">1. 권한 분리 정상 모델 (Syscall Flow)</button>
+      <button class="tab-btn" onclick="switchScenario(2)">2. ret2usr 공격 침투 (Without SMEP/PXN)</button>
+      <button class="tab-btn" onclick="switchScenario(3)">3. 하드웨어 MMU 차단 (With SMEP/PXN Active)</button>
+      <button class="tab-btn" onclick="switchScenario(4)">4. ROP 전이 및 방어 매트릭스 (Comparison)</button>
+    </div>
+
+    <!-- Simulator Interactive Controls -->
+    <div class="sim-toolbar">
+      <div class="sim-controls">
+        <button class="sim-btn primary" id="playBtn" onclick="togglePlay()">⏸ 일시정지</button>
+        <button class="sim-btn" onclick="resetAnimation()">⏮ 초기화</button>
+        <div class="speed-selector">
+          <span>속도:</span>
+          <button class="speed-btn" onclick="setSpeed(0.5)">0.5x</button>
+          <button class="speed-btn active" onclick="setSpeed(1.0)">1.0x</button>
+          <button class="speed-btn" onclick="setSpeed(1.5)">1.5x</button>
+        </div>
+      </div>
+      <div class="sim-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Simulation Active: Real-time Signal Stream</span>
+      </div>
     </div>
 
     <div class="view-container">
       <div class="diagram-panel" id="diagramPanel">
-        <!-- Injected via JavaScript -->
+        <!-- SVG Canvas rendered dynamically -->
       </div>
 
       <div class="info-panel" id="infoPanel">
-        <!-- Injected via JavaScript -->
+        <!-- Technical explanations and telemetry -->
       </div>
     </div>
   </div>
 
   <script>
     let currentScenario = 1;
+    let isPlaying = true;
+    let currentSpeed = 1.0;
 
     const scenarios = {
       1: {
-        title: "1. 권한 분리 기본 모델 (Privilege Separation Model)",
-        desc: "CPU는 링(Ring 0 / EL1)과 유저(Ring 3 / EL0)의 권한 레벨을 구분하여 가상 주소 공간을 관리합니다. 상위 주소는 커널 전용이며, 하위 주소는 프로세스 유저 공간입니다. 전통적인 커널에서는 슈퍼바이저 모드(Ring 0)가 유저 공간 메모리의 코드를 페치하여 실행하는 것이 하드웨어적으로 허용되었습니다.",
+        title: "1. 권한 분리 정상 모델 (Privilege Separation & Syscall Flow)",
+        desc: "CPU는 링(Ring 0 / EL1)과 유저(Ring 3 / EL0)의 권한 레벨을 물리적으로 분리합니다. 유저 프로세스는 시스템 콜(syscall / svc)을 통해 합법적인 인터페이스로 커널에 진입하며, 작업 완료 후 sysret / eret을 통해 유저 공간으로 안전하게 복귀합니다. 이 정상 흐름에서는 유저 공간 코드가 커널 모드에서 실행되지 않습니다.",
         metric1Label: "x86 제어 플래그",
-        metric1Val: "CR4.SMEP (Bit 20)",
+        metric1Val: "CR4.SMEP (Bit 20 = 1)",
         metric2Label: "ARM64 디스크립터",
-        metric2Val: "PTE_PXN (Bit 53)",
-        render: () => `
-          <div class="mem-layout">
-            <div class="ring-box kernel">
-              <div class="ring-label">
-                <span>Kernel Space (Supervisor: Ring 0 / EL1)</span>
-                <span class="shield-badge">CPL = 0</span>
-              </div>
-              <div class="component-row">
-                <div class="mem-node kernel-code">
-                  <div class="node-title">Kernel Core Code</div>
-                  <div class="node-sub">.text (R-X)</div>
-                </div>
-                <div class="mem-node kernel-code">
-                  <div class="node-title">System Call Handlers</div>
-                  <div class="node-sub">entry_SYSCALL_64</div>
-                </div>
-              </div>
-            </div>
+        metric2Val: "PTE_PXN (Bit 53 = 1)",
+        status: "Normal: Syscall Entry (EL0 -> EL1) & Return (EL1 -> EL0)",
+        statusColor: "var(--accent-green)",
+        renderSvg: (speed) => {
+          const dur1 = (2.2 / speed).toFixed(2);
+          const dur2 = (2.2 / speed).toFixed(2);
+          return `
+          <svg class="svg-canvas" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <linearGradient id="kernelGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#0284c7" stop-opacity="0.15" />
+                <stop offset="100%" stop-color="#38bdf8" stop-opacity="0.05" />
+              </linearGradient>
+              <linearGradient id="userGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#ea580c" stop-opacity="0.15" />
+                <stop offset="100%" stop-color="#fb923c" stop-opacity="0.05" />
+              </linearGradient>
+            </defs>
 
-            <div class="arrow-container">
-              <div class="flow-arrow"></div>
-            </div>
+            <!-- KERNEL ZONE (Ring 0 / EL1) -->
+            <rect x="30" y="30" width="700" height="180" rx="12" fill="url(#kernelGrad)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="4 2" />
+            <text x="50" y="60" fill="#38bdf8" font-size="14" font-weight="bold" letter-spacing="1">KERNEL SPACE (SUPERVISOR: RING 0 / EL1)</text>
+            <rect x="580" y="44" width="130" height="24" rx="12" fill="rgba(56,189,248,0.2)" stroke="#38bdf8" />
+            <text x="645" y="60" fill="#38bdf8" font-size="11" font-weight="bold" text-anchor="middle">CPL = 0 (Privileged)</text>
 
-            <div class="ring-box user">
-              <div class="ring-label">
-                <span>User Space (Unprivileged: Ring 3 / EL0)</span>
-                <span class="badge">CPL = 3</span>
-              </div>
-              <div class="component-row">
-                <div class="mem-node user-shellcode">
-                  <div class="node-title">User Application</div>
-                  <div class="node-sub">libc / app code</div>
-                </div>
-                <div class="mem-node user-shellcode">
-                  <div class="node-title">User Memory Heap/Stack</div>
-                  <div class="node-sub">&lt; TASK_SIZE</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `
+            <!-- Kernel Components -->
+            <g transform="translate(60, 80)">
+              <rect width="260" height="100" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.2" />
+              <text x="20" y="32" fill="#f8fafc" font-size="13" font-weight="bold">Syscall Dispatcher</text>
+              <text x="20" y="52" fill="#94a3b8" font-size="11" font-family="monospace">entry_SYSCALL_64 / el0_svc</text>
+              <text x="20" y="76" fill="#38bdf8" font-size="11">Valid Kernel Entry Point</text>
+            </g>
+
+            <g transform="translate(440, 80)">
+              <rect width="260" height="100" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.2" />
+              <text x="20" y="32" fill="#f8fafc" font-size="13" font-weight="bold">Kernel Service Routines</text>
+              <text x="20" y="52" fill="#94a3b8" font-size="11" font-family="monospace">sys_read(), sys_write(), ...</text>
+              <text x="20" y="76" fill="#22c55e" font-size="11">Execution in Ring 0 (.text)</text>
+            </g>
+
+            <!-- HARDWARE MMU BOUNDARY PLANE -->
+            <g transform="translate(30, 235)">
+              <line x1="0" y1="20" x2="700" y2="20" stroke="#f59e0b" stroke-width="2" class="shield-line" />
+              <rect x="250" y="6" width="260" height="28" rx="14" fill="#1c2541" stroke="#f59e0b" stroke-width="1.5" />
+              <text x="380" y="24" fill="#f59e0b" font-size="11" font-weight="bold" text-anchor="middle">⚡ HARDWARE MMU PRIVILEGE BOUNDARY</text>
+            </g>
+
+            <!-- USER ZONE (Ring 3 / EL0) -->
+            <rect x="30" y="295" width="700" height="180" rx="12" fill="url(#userGrad)" stroke="#fb923c" stroke-width="1.5" stroke-dasharray="4 2" />
+            <text x="50" y="325" fill="#fb923c" font-size="14" font-weight="bold" letter-spacing="1">USER SPACE (UNPRIVILEGED: RING 3 / EL0)</text>
+            <rect x="580" y="309" width="130" height="24" rx="12" fill="rgba(251,146,60,0.2)" stroke="#fb923c" />
+            <text x="645" y="325" fill="#fb923c" font-size="11" font-weight="bold" text-anchor="middle">CPL = 3 (Unprivileged)</text>
+
+            <!-- User Components -->
+            <g transform="translate(60, 345)">
+              <rect width="260" height="100" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.2" />
+              <text x="20" y="32" fill="#f8fafc" font-size="13" font-weight="bold">User Application Process</text>
+              <text x="20" y="52" fill="#94a3b8" font-size="11" font-family="monospace">/bin/exploit (UID 1000)</text>
+              <text x="20" y="76" fill="#fb923c" font-size="11">Invokes syscall instruction</text>
+            </g>
+
+            <g transform="translate(440, 345)">
+              <rect width="260" height="100" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.2" />
+              <text x="20" y="32" fill="#f8fafc" font-size="13" font-weight="bold">User Return Destination</text>
+              <text x="20" y="52" fill="#94a3b8" font-size="11" font-family="monospace">libc resume / RIP restore</text>
+              <text x="20" y="76" fill="#22c55e" font-size="11">Resumes unprivileged task</text>
+            </g>
+
+            <!-- DYNAMIC CONNECTING PATHS -->
+            <!-- 1. Syscall Path (User -> Kernel) -->
+            <path id="pathSyscall" d="M 190 345 C 190 280 190 240 190 180" fill="none" stroke="#38bdf8" stroke-width="3" class="flow-path normal" />
+            <circle r="6" fill="#38bdf8" filter="url(#glow-blue)" class="flow-particle">
+              <animateMotion dur="${dur1}s" repeatCount="indefinite" path="M 190 345 C 190 280 190 240 190 180" />
+            </circle>
+
+            <!-- 2. Kernel Internal Dispatch Path -->
+            <path id="pathInternal" d="M 320 130 L 440 130" fill="none" stroke="#38bdf8" stroke-width="2.5" class="flow-path normal" />
+
+            <!-- 3. Sysret Path (Kernel -> User) -->
+            <path id="pathSysret" d="M 570 180 C 570 240 570 280 570 345" fill="none" stroke="#22c55e" stroke-width="3" class="flow-path return" />
+            <circle r="6" fill="#22c55e" filter="url(#glow-green)" class="flow-particle">
+              <animateMotion dur="${dur2}s" repeatCount="indefinite" path="M 570 180 C 570 240 570 280 570 345" />
+            </circle>
+
+            <rect x="120" y="240" width="140" height="20" rx="4" fill="#0b132b" stroke="#38bdf8" />
+            <text x="190" y="254" fill="#38bdf8" font-size="10" font-weight="bold" text-anchor="middle">▲ 1. SYSCALL (Safe)</text>
+
+            <rect x="500" y="240" width="140" height="20" rx="4" fill="#0b132b" stroke="#22c55e" />
+            <text x="570" y="254" fill="#22c55e" font-size="10" font-weight="bold" text-anchor="middle">▼ 2. SYSRET (Safe)</text>
+          </svg>
+          `;
+        }
       },
       2: {
-        title: "2. ret2usr 공격 메커니즘 (Without SMEP/PXN)",
-        desc: "하드닝이 비활성화된 환경(clearcpuid=smep, pxn=off)에서는 공격자가 유저 공간에 권한 상승 쉘코드(예: commit_creds(prepare_kernel_cred(0)))를 배치하고, 커널 함수 포인터나 스택 반환 주소를 유저 공간 주소로 변조합니다. 커널은 Ring 0 상태에서 유저 주소로 분기하여 악성 코드를 그대로 실행(ret2usr)합니다.",
+        title: "2. ret2usr 공격 침투 (Without SMEP/PXN Baseline)",
+        desc: "SMEP/PXN이 비활성화된 커널(clearcpuid=smep, pxn=off)에서는 슈퍼바이저 모드(Ring 0)가 유저 가상 주소 공간의 명령어를 페치하는 것이 하드웨어적으로 차단되지 않습니다. 공격자가 커널 취약 드라이버의 함수 포인터를 유저 공간 쉘코드(0x00401234)로 덮어쓰면, CPU는 슈퍼바이저 권한(CPL=0)을 유지한 채 유저 쉘코드로 뛰어들어 commit_creds(0)를 실행하고 루트 권한을 즉각 탈취합니다.",
         metric1Label: "공격 기법",
         metric1Val: "ret2usr (Return-to-User)",
         metric2Label: "공격 결과",
-        metric2Val: "루트 권한 즉각 탈취 (VULNERABLE)",
-        render: () => `
-          <div class="mem-layout">
-            <div class="ring-box kernel">
-              <div class="ring-label">
-                <span>Kernel Space (Ring 0 / EL1)</span>
-                <span class="danger-badge">Hijacked Control Flow</span>
-              </div>
-              <div class="component-row">
-                <div class="mem-node kernel-vuln">
-                  <div class="node-title">Vulnerable Driver Callback</div>
-                  <div class="node-sub">Function Pointer = 0x00401234</div>
-                </div>
-              </div>
-            </div>
+        metric2Val: "루트 권한 완전 탈취 (VULNERABLE)",
+        status: "CRITICAL BREACH: Ring 0 CPU executed User Shellcode directly!",
+        statusColor: "var(--accent-red)",
+        renderSvg: (speed) => {
+          const dur = (1.5 / speed).toFixed(2);
+          return `
+          <svg class="svg-canvas" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="5" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <linearGradient id="breachGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2" />
+                <stop offset="100%" stop-color="#ef4444" stop-opacity="0.05" />
+              </linearGradient>
+            </defs>
 
-            <div class="arrow-container">
-              <div class="flow-arrow active-attack"></div>
-            </div>
+            <!-- KERNEL ZONE -->
+            <rect x="30" y="30" width="700" height="180" rx="12" fill="#1c2541" stroke="#ef4444" stroke-width="2" />
+            <text x="50" y="60" fill="#ef4444" font-size="14" font-weight="bold">KERNEL SPACE (SUPERVISOR: RING 0 / EL1) - HIJACKED</text>
+            <rect x="540" y="44" width="170" height="24" rx="12" fill="rgba(239,68,68,0.25)" stroke="#ef4444" />
+            <text x="625" y="60" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">❌ Control Flow Hijacked</text>
 
-            <div class="ring-box user">
-              <div class="ring-label">
-                <span>User Space Memory (&lt; TASK_SIZE)</span>
-                <span class="danger-badge">Arbitrary Shellcode Executed</span>
-              </div>
-              <div class="component-row">
-                <div class="mem-node user-shellcode" style="border-color: var(--accent-red); background: rgba(239, 68, 68, 0.25);">
-                  <div class="node-title">Exploit User Payload</div>
-                  <div class="node-sub">0x00401234: commit_creds(0)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `
+            <g transform="translate(60, 80)">
+              <rect width="280" height="100" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" />
+              <text x="20" y="32" fill="#ef4444" font-size="13" font-weight="bold">Vulnerable Driver (/proc/vuln)</text>
+              <text x="20" y="52" fill="#f8fafc" font-size="11" font-family="monospace">fn_ptr = 0x00401234 (USER ADDR)</text>
+              <text x="20" y="76" fill="#fb923c" font-size="11">Invokes indirect call (*fn_ptr)()</text>
+            </g>
+
+            <g transform="translate(420, 80)">
+              <rect width="280" height="100" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.2" />
+              <text x="20" y="32" fill="#f8fafc" font-size="13" font-weight="bold">CPU Execution State</text>
+              <text x="20" y="52" fill="#ef4444" font-size="11" font-family="monospace">CPL=0 (Supervisor / Ring 0)</text>
+              <text x="20" y="76" fill="#94a3b8" font-size="11">No MMU instruction fetch check</text>
+            </g>
+
+            <!-- DISABLED MMU BARRIER -->
+            <g transform="translate(30, 235)">
+              <line x1="0" y1="20" x2="700" y2="20" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 3" opacity="0.4" />
+              <rect x="220" y="6" width="320" height="28" rx="14" fill="#1c2541" stroke="#ef4444" stroke-width="1.2" />
+              <text x="380" y="24" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">⚠️ MMU SMEP / PXN DISABLED (NO DEFENSE)</text>
+            </g>
+
+            <!-- USER ZONE -->
+            <rect x="30" y="295" width="700" height="180" rx="12" fill="url(#breachGrad)" stroke="#ef4444" stroke-width="2" />
+            <text x="50" y="325" fill="#ef4444" font-size="14" font-weight="bold">USER SPACE MEMORY (&lt; TASK_SIZE) - EXPLOITED</text>
+            <rect x="540" y="309" width="170" height="24" rx="12" fill="#ef4444" stroke="#ef4444" />
+            <text x="625" y="325" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">💀 Arbitrary Code Executed</text>
+
+            <g transform="translate(240, 345)">
+              <rect width="320" height="100" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2" filter="url(#glow-red)" />
+              <text x="20" y="32" fill="#ef4444" font-size="13" font-weight="bold">Exploit Shellcode Payload (0x00401234)</text>
+              <text x="20" y="52" fill="#f8fafc" font-size="11" font-family="monospace">commit_creds(prepare_kernel_cred(0))</text>
+              <text x="20" y="76" fill="#22c55e" font-size="11" font-weight="bold">Target Reached: Process Promoted to Root (UID 0)</text>
+            </g>
+
+            <!-- DYNAMIC ATTACK STREAM -->
+            <path id="pathAttack" d="M 200 180 C 200 240 400 250 400 345" fill="none" stroke="#ef4444" stroke-width="4" class="flow-path attack" />
+            
+            <!-- Moving High-Speed Attack Particle -->
+            <circle r="7" fill="#ef4444" filter="url(#glow-red)" class="flow-particle">
+              <animateMotion dur="${dur}s" repeatCount="indefinite" path="M 200 180 C 200 240 400 250 400 345" />
+            </circle>
+
+            <!-- Exploit Pulse Indicator -->
+            <circle cx="400" cy="345" r="14" fill="none" stroke="#ef4444" stroke-width="2" class="trap-ripple" />
+
+            <rect x="230" y="240" width="180" height="22" rx="4" fill="#ef4444" />
+            <text x="320" y="255" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle">⚡ DIRECT JUMP TO USER CODE</text>
+          </svg>
+          `;
+        }
       },
       3: {
         title: "3. 하드웨어 MMU 차단 (With SMEP/PXN Enforced)",
-        desc: "SMEP (CR4 Bit 20 = 1) 또는 PXN (PTE Bit 53 = 1)이 활성화되면, CPU가 슈퍼바이저 모드(Ring 0 / EL1)에서 유저 공간 페이지(U/S=1)의 명령어를 페치하려는 즉시 하드웨어 MMU가 명령 실행 전에 Page Fault (#PF, Error: Supervisor Instruction Fetch Violation)를 발생시켜 분기를 원천 차단합니다.",
+        desc: "하드닝이 적용된 커널에서는 x86 CR4 레지스터의 Bit 20(SMEP) 또는 ARM64 PTE의 Bit 53(PXN)이 활성화됩니다. 커널 슈퍼바이저 모드(Ring 0 / EL1)에서 유저 공간 페이지(U/S=1)의 명령어를 페치(Instruction Fetch)하려는 순간, CPU 하드웨어 MMU가 페치를 물리적으로 거부하고 Page Fault (#PF, Supervisor Instruction Fetch Violation)를 발생시켜 커널 Oops로 즉각 트랩합니다.",
         metric1Label: "하드웨어 검증",
         metric1Val: "CR4.SMEP=1 / PTE_PXN=1",
         metric2Label: "방어 결과",
-        metric2Val: "MMU #PF Trap (DEFENSE ACTIVE)",
-        render: () => `
-          <div class="mem-layout">
-            <div class="ring-box kernel">
-              <div class="ring-label">
-                <span>Kernel Space (Supervisor: Ring 0 / EL1)</span>
-                <span class="shield-badge">Protected by MMU</span>
-              </div>
-              <div class="component-row">
-                <div class="mem-node kernel-code">
-                  <div class="node-title">Kernel Execution Context</div>
-                  <div class="node-sub">Attempting branch to user space</div>
-                </div>
-              </div>
-            </div>
+        metric2Val: "MMU #PF Trap Detonation (DEFENDED)",
+        status: "BLOCKED: MMU Hardware Trap prevented execution of User Shellcode!",
+        statusColor: "var(--accent-yellow)",
+        renderSvg: (speed) => {
+          const dur = (1.8 / speed).toFixed(2);
+          return `
+          <svg class="svg-canvas" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <filter id="glow-gold" x="-30%" y="-30%" width="160%" height="160%">
+                <feGaussianBlur stdDeviation="6" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+              <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.8" />
+                <stop offset="50%" stop-color="#ef4444" stop-opacity="1" />
+                <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.8" />
+              </linearGradient>
+            </defs>
 
-            <div class="arrow-container" style="position: relative;">
-              <div class="flow-arrow active-blocked"></div>
-              <div style="position: absolute; background: var(--accent-red); color: white; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: bold;">
-                ⛔ MMU TRAP (#PF)
-              </div>
-            </div>
+            <!-- KERNEL ZONE -->
+            <rect x="30" y="30" width="700" height="180" rx="12" fill="#1c2541" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="50" y="60" fill="#38bdf8" font-size="14" font-weight="bold">KERNEL SPACE (SUPERVISOR: RING 0 / EL1) - DEFENDED</text>
+            <rect x="530" y="44" width="180" height="24" rx="12" fill="rgba(34,197,94,0.2)" stroke="#22c55e" />
+            <text x="620" y="60" fill="#22c55e" font-size="11" font-weight="bold" text-anchor="middle">🛡️ Hardware Protection Active</text>
 
-            <div class="ring-box user">
-              <div class="ring-label">
-                <span>User Space (PTE: User=1, PXN=1)</span>
-                <span class="shield-badge">Instruction Fetch Blocked</span>
-              </div>
-              <div class="component-row">
-                <div class="mem-node mmu-trap">
-                  <div class="node-title">User Memory Address</div>
-                  <div class="node-sub">Execution Denied by Hardware</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        `
+            <g transform="translate(60, 80)">
+              <rect width="270" height="100" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.2" />
+              <text x="20" y="32" fill="#ef4444" font-size="13" font-weight="bold">Hijacked Function Pointer</text>
+              <text x="20" y="52" fill="#f8fafc" font-size="11" font-family="monospace">Target = 0x00401234 (&lt; TASK_SIZE)</text>
+              <text x="20" y="76" fill="#94a3b8" font-size="11">Attempting instruction fetch...</text>
+            </g>
+
+            <g transform="translate(430, 80)">
+              <rect width="270" height="100" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" />
+              <text x="20" y="32" fill="#f59e0b" font-size="13" font-weight="bold">Page Fault Handler</text>
+              <text x="20" y="52" fill="#f8fafc" font-size="11" font-family="monospace">do_user_addr_fault() -> Oops</text>
+              <text x="20" y="76" fill="#22c55e" font-size="11" font-weight="bold">Process Terminated (SIGSEGV)</text>
+            </g>
+
+            <!-- ACTIVE MMU HARDWARE SHIELD -->
+            <g transform="translate(30, 235)">
+              <line x1="0" y1="20" x2="700" y2="20" stroke="url(#shieldGrad)" stroke-width="4" filter="url(#glow-gold)" />
+              <rect x="180" y="4" width="400" height="32" rx="16" fill="#0b132b" stroke="#f59e0b" stroke-width="2" filter="url(#glow-gold)" />
+              <text x="380" y="24" fill="#f59e0b" font-size="12" font-weight="bold" text-anchor="middle">🛡️ MMU HARDWARE BARRIER: CR4.SMEP=1 / PTE_PXN=1</text>
+            </g>
+
+            <!-- USER ZONE (ISOLATED & UNREACHED) -->
+            <rect x="30" y="295" width="700" height="180" rx="12" fill="#0b132b" stroke="#334155" stroke-width="1.5" opacity="0.6" />
+            <text x="50" y="325" fill="#64748b" font-size="14" font-weight="bold">USER SPACE MEMORY (UNPRIVILEGED: RING 3 / EL0) - UNREACHED</text>
+            <rect x="530" y="309" width="180" height="24" rx="12" fill="rgba(100,116,139,0.2)" stroke="#64748b" />
+            <text x="620" y="325" fill="#94a3b8" font-size="11" font-weight="bold" text-anchor="middle">🔒 Zero Execution in User</text>
+
+            <g transform="translate(240, 345)" opacity="0.4">
+              <rect width="320" height="100" rx="8" fill="#1e293b" stroke="#64748b" stroke-width="1.2" stroke-dasharray="4 2" />
+              <text x="20" y="32" fill="#94a3b8" font-size="13" font-weight="bold">Exploit Shellcode (0x00401234)</text>
+              <text x="20" y="52" fill="#64748b" font-size="11" font-family="monospace">commit_creds()</text>
+              <text x="20" y="76" fill="#64748b" font-size="11">Fetch Blocked: Never Executed</text>
+            </g>
+
+            <!-- DYNAMIC INTERCEPT FLOW -->
+            <!-- 1. Attack branch from Kernel towards MMU -->
+            <path id="pathIntercept" d="M 195 180 L 195 245" fill="none" stroke="#ef4444" stroke-width="3.5" class="flow-path attack" />
+
+            <!-- 2. Deflection to Fault Handler -->
+            <path id="pathDeflect" d="M 195 245 C 230 245 400 240 565 180" fill="none" stroke="#f59e0b" stroke-width="3.5" class="flow-path blocked" />
+
+            <!-- Moving Particle from Branch to Detonation Point -->
+            <circle r="7" fill="#ef4444" class="flow-particle">
+              <animateMotion dur="${dur}s" repeatCount="indefinite" path="M 195 180 L 195 245 C 230 245 400 240 565 180" />
+            </circle>
+
+            <!-- DETONATION TRAP BLAST EFFECT -->
+            <g transform="translate(195, 245)">
+              <circle r="12" fill="#ef4444" opacity="0.7" />
+              <circle r="6" fill="#f59e0b" />
+              <circle class="trap-ripple" stroke="#ef4444" fill="none" stroke-width="3" />
+              <circle class="trap-ripple" stroke="#f59e0b" fill="none" stroke-width="2" style="animation-delay: 0.5s;" />
+              <rect x="-70" y="-36" width="140" height="24" rx="6" fill="#dc2626" stroke="#ffffff" stroke-width="1.5" />
+              <text x="0" y="-20" fill="#ffffff" font-size="10" font-weight="bold" text-anchor="middle">⛔ #PF TRAP FIRED!</text>
+            </g>
+          </svg>
+          `;
+        }
       },
       4: {
-        title: "4. 보안 비교 매트릭스 및 ROP로의 전이",
-        desc: "SMEP/PXN의 도입으로 유저 공간에 직접 쉘코드를 올리고 점프하는 ret2usr 공격은 영구 무력화되었습니다. 이에 따라 공격자들은 커널 내부의 기존 코드 조각들을 엮는 커널 ROP(Return-Oriented Programming) 및 JOP로 공격 기법을 전환해야만 했습니다.",
-        metric1Label: "ret2usr 공격",
-        metric1Val: "완전 차단 (0% 성공률)",
+        title: "4. ROP 전이 및 방어 매트릭스 (Comparison & Evolution)",
+        desc: "SMEP/PXN의 도입으로 유저 공간에 쉘코드를 올려두고 점프하는 단순 ret2usr 공격은 100% 무력화되었습니다. 이에 따라 공격자들은 커널 내부의 기존 실행 가능한 코드 조각들을 조합하는 커널 ROP(Return-Oriented Programming) 및 JOP(Jump-Oriented Programming)로 기법을 전환해야 했습니다. 하드웨어 내장 MMU 검사이므로 성능 오버헤드는 0%입니다.",
+        metric1Label: "ret2usr 공격 차단율",
+        metric1Val: "100% 차단 (0% 성공률)",
         metric2Label: "런타임 오버헤드",
         metric2Val: "0% (하드웨어 MMU 내장)",
-        render: () => `
-          <div class="mem-layout">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; width: 100%;">
-              <div class="ring-box" style="border-color: var(--accent-red);">
-                <div class="ring-label" style="color: var(--accent-red);">Without SMEP (Base)</div>
-                <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted);">
-                  ❌ 유저 공간 쉘코드 실행 허용<br>
-                  ❌ 단순 함수 포인터 변조로 루트 탈취<br>
-                  ❌ ROP 불필요 (간단한 익스플로잇)
-                </div>
-              </div>
-              <div class="ring-box" style="border-color: var(--accent-green);">
-                <div class="ring-label" style="color: var(--accent-green);">With SMEP/PXN (Hardened)</div>
-                <div style="font-size: 0.85rem; line-height: 1.5; color: var(--text-muted);">
-                  ✅ 유저 공간 인스트럭션 페치 하드웨어 차단<br>
-                  ✅ ret2usr 공격 원천 방어<br>
-                  ✅ 공격 난이도 극대화 (커널 ROP 강제)
-                </div>
-              </div>
-            </div>
-          </div>
-        `
+        status: "Comparison: ret2usr Completely Neutralized -> Kernel ROP Required",
+        statusColor: "var(--accent-blue)",
+        renderSvg: (speed) => {
+          return `
+          <svg class="svg-canvas" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+            <!-- Side-by-side comparative architecture -->
+            <!-- Left: Baseline -->
+            <rect x="40" y="40" width="320" height="440" rx="12" fill="#1c2541" stroke="#ef4444" stroke-width="1.5" />
+            <text x="60" y="75" fill="#ef4444" font-size="15" font-weight="bold">Without SMEP / PXN (Base)</text>
+            <text x="60" y="100" fill="#94a3b8" font-size="12">ret2usr Attack Vector Enabled</text>
+
+            <rect x="60" y="130" width="280" height="80" rx="8" fill="#1e293b" stroke="#334155" />
+            <text x="80" y="160" fill="#f8fafc" font-size="12" font-weight="bold">Kernel Ring 0</text>
+            <text x="80" y="185" fill="#ef4444" font-size="11">Indirect Call to User Addr</text>
+
+            <path d="M 200 210 L 200 290" stroke="#ef4444" stroke-width="3" stroke-dasharray="6 4" class="flow-path attack" />
+            <text x="215" y="255" fill="#ef4444" font-size="11" font-weight="bold">Direct Jump</text>
+
+            <rect x="60" y="290" width="280" height="80" rx="8" fill="#1e293b" stroke="#ef4444" />
+            <text x="80" y="320" fill="#ef4444" font-size="12" font-weight="bold">User Shellcode (Ring 3 Memory)</text>
+            <text x="80" y="345" fill="#22c55e" font-size="11">Executes with Ring 0 Power!</text>
+
+            <rect x="60" y="390" width="280" height="70" rx="8" fill="rgba(239,68,68,0.15)" stroke="#ef4444" />
+            <text x="80" y="418" fill="#ef4444" font-size="12" font-weight="bold">결과: 취약 (VULNERABLE)</text>
+            <text x="80" y="440" fill="#94a3b8" font-size="11">루트 권한 즉시 탈취 가능</text>
+
+            <!-- Right: Hardened -->
+            <rect x="400" y="40" width="320" height="440" rx="12" fill="#1c2541" stroke="#22c55e" stroke-width="1.5" />
+            <text x="420" y="75" fill="#22c55e" font-size="15" font-weight="bold">With SMEP / PXN (Hardened)</text>
+            <text x="420" y="100" fill="#94a3b8" font-size="12">Hardware Enforced Protection</text>
+
+            <rect x="420" y="130" width="280" height="80" rx="8" fill="#1e293b" stroke="#334155" />
+            <text x="440" y="160" fill="#f8fafc" font-size="12" font-weight="bold">Kernel Ring 0</text>
+            <text x="440" y="185" fill="#38bdf8" font-size="11">Fetch attempt to User Addr</text>
+
+            <!-- MMU Intercept Wall -->
+            <line x1="420" y1="250" x2="700" y2="250" stroke="#f59e0b" stroke-width="4" stroke-dasharray="8 4" />
+            <rect x="490" y="235" width="140" height="30" rx="6" fill="#dc2626" stroke="#ffffff" />
+            <text x="560" y="255" fill="#ffffff" font-size="11" font-weight="bold" text-anchor="middle">⛔ MMU #PF TRAP</text>
+
+            <rect x="420" y="290" width="280" height="80" rx="8" fill="#1e293b" stroke="#334155" opacity="0.5" />
+            <text x="440" y="320" fill="#64748b" font-size="12" font-weight="bold">User Shellcode</text>
+            <text x="440" y="345" fill="#64748b" font-size="11">Execution Denied by MMU</text>
+
+            <rect x="420" y="390" width="280" height="70" rx="8" fill="rgba(34,197,94,0.15)" stroke="#22c55e" />
+            <text x="440" y="418" fill="#22c55e" font-size="12" font-weight="bold">결과: 방어 성공 (DEFENDED)</text>
+            <text x="440" y="440" fill="#94a3b8" font-size="11">공격자는 커널 ROP 구성 강제됨</text>
+          </svg>
+          `;
+        }
       }
     };
 
@@ -576,7 +810,8 @@
       });
 
       const s = scenarios[num];
-      document.getElementById('diagramPanel').innerHTML = s.render();
+      renderCurrentScenario();
+
       document.getElementById('infoPanel').innerHTML = `
         <div class="info-title">${s.title}</div>
         <div class="info-desc">${s.desc}</div>
@@ -589,6 +824,49 @@
           <div class="metric-val">${s.metric2Val}</div>
         </div>
       `;
+
+      updateStatus(s.status, s.statusColor);
+    }
+
+    function renderCurrentScenario() {
+      const s = scenarios[currentScenario];
+      const panel = document.getElementById('diagramPanel');
+      panel.innerHTML = s.renderSvg(isPlaying ? currentSpeed : 0.0001);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      const dot = document.getElementById('statusDot');
+
+      if (isPlaying) {
+        btn.innerHTML = '⏸ 일시정지';
+        dot.style.animationPlayState = 'running';
+      } else {
+        btn.innerHTML = '▶ 재생';
+        dot.style.animationPlayState = 'paused';
+      }
+      renderCurrentScenario();
+    }
+
+    function resetAnimation() {
+      renderCurrentScenario();
+    }
+
+    function setSpeed(speed) {
+      currentSpeed = speed;
+      document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.includes(speed + 'x'));
+      });
+      renderCurrentScenario();
+    }
+
+    function updateStatus(text, color) {
+      const statusText = document.getElementById('statusText');
+      const statusDot = document.getElementById('statusDot');
+      statusText.textContent = text;
+      statusDot.style.background = color || 'var(--accent-green)';
+      statusDot.style.boxShadow = `0 0 8px ${color || 'var(--accent-green)'}`;
     }
 
     function toggleTheme() {
@@ -597,8 +875,8 @@
       document.getElementById('themeToggle').textContent = isLight ? '☀️ 테마 전환' : '🌙 테마 전환';
     }
 
+    // Initialize first scenario
     switchScenario(1);
   </script>
 </body>
 </html>
-
