@@ -228,6 +228,15 @@ jobs:
             feature: slab-freelist
             test: test_slab_freelist
 
+          # Task 7-2: Heap Initialization & Zeroing (Dual-Arch)
+          - arch: arm64
+            feature: heap-init
+            test: test_heap_init
+          - arch: x86_64
+            feature: heap-init
+            test: test_heap_init
+
+
 
 
     steps:

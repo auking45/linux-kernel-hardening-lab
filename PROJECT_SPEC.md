@@ -92,7 +92,7 @@
 ### [Phase 7] Category 5: Heap & Slab Allocator Hardening
 
 - [x] **Task 7-1:** `CONFIG_SLAB_FREELIST_RANDOM` & `CONFIG_SLAB_FREELIST_HARDENED` (프리리스트 무작위화 및 메타데이터 포인터 난독화).
-- [ ] **Task 7-2:** `CONFIG_INIT_ON_ALLOC_DEFAULT_ON` & `CONFIG_INIT_ON_FREE_DEFAULT_ON` (할당/해제 시 자동 0 초기화로 UAF 완화).
+- [x] **Task 7-2:** `CONFIG_INIT_ON_ALLOC_DEFAULT_ON` & `CONFIG_INIT_ON_FREE_DEFAULT_ON` (할당/해제 시 자동 0 초기화로 UAF 완화).
 - [ ] **Task 7-3:** `CONFIG_HARDENED_USERCOPY` (유저 공간 복사 시 슬랩 버퍼 경계 엄격 검증).
 - [ ] **Task 7-4:** KFENCE (Kernel Electric Fence - 낮은 오버헤드의 프로덕션 힙 결함 샘플링 탐지).
 

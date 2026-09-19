@@ -111,3 +111,4 @@ SVG `<animateMotion>`을 활용하여 베지어 곡선 경로를 따라 고속 �
 2. **Tab 2 (Exploit Attack Vector)**: 방어가 해제된 베이스라인 환경에서의 침투 및 권한 탈취 흐름.
 3. **Tab 3 (Hardware / Kernel Defense)**: 하드닝 활성화 시 하드웨어/메커니즘 차단 및 커널 트랩 동작.
 4. **Tab 4 (Comparison & Matrix)**: 공격 성공률, 런타임 오버헤드, 공격자의 우회 기법 전이 비교.
+

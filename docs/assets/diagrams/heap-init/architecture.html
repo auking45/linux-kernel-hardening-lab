@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Heap Memory Zeroing (Alloc & Free) Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --perm-user: #fb923c;
+      --perm-kernel: #38bdf8;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .scenario-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.88rem;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .tab-btn.active {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border-color: var(--accent-blue);
+    }
+
+    /* Simulation Control Toolbar */
+    .sim-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 8px 16px;
+      margin-bottom: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sim-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sim-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .sim-btn.primary {
+      color: #ffffff;
+    }
+
+    .speed-selector {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .speed-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+
+    .speed-btn.active {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .speed-btn.active {
+      color: #ffffff;
+    }
+
+    .sim-status {
+      font-size: 0.85rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .view-container {
+      display: grid;
+      grid-template-columns: 2.1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 960px) {
+      .view-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .diagram-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      min-height: 540px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .info-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 8px;
+    }
+
+    .info-desc {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+    }
+
+    .metric-box {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+    }
+
+    [data-theme="light"] .metric-box {
+      background: rgba(241, 245, 249, 0.8);
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+    }
+
+    .metric-val {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .svg-canvas {
+      width: 100%;
+      height: 520px;
+      display: block;
+    }
+
+    @keyframes flowDash {
+      to {
+        stroke-dashoffset: -48;
+      }
+    }
+
+    .flow-path {
+      stroke-dasharray: 8 6;
+      animation: flowDash 1.2s linear infinite;
+    }
+
+    .flow-path.alloc {
+      stroke: var(--accent-green);
+      animation: flowDash 1.0s linear infinite;
+      filter: drop-shadow(0 0 6px var(--accent-green));
+    }
+
+    .flow-path.free {
+      stroke: var(--accent-purple);
+      animation: flowDash 1.2s linear infinite;
+      filter: drop-shadow(0 0 6px var(--accent-purple));
+    }
+
+    .flow-path.attack {
+      stroke: var(--accent-red);
+      animation: flowDash 0.8s linear infinite;
+      filter: drop-shadow(0 0 6px var(--accent-red));
+    }
+
+    /* Wipe Wave Animation */
+    @keyframes wipeSweep {
+      0% { transform: translateX(-100%); opacity: 0; }
+      30% { opacity: 0.8; }
+      70% { opacity: 0.8; }
+      100% { transform: translateX(100%); opacity: 0; }
+    }
+
+    .wipe-wave {
+      animation: wipeSweep 2.5s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>Heap Memory Zeroing Architecture Simulator</span>
+        <span class="badge">CONFIG_INIT_ON_ALLOC & CONFIG_INIT_ON_FREE</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀️ 테마 전환</button>
+    </header>
+
+    <div class="scenario-tabs">
+      <button class="tab-btn active" onclick="switchScenario(1)">1. 할당 시 자동 0 초기화 (init_on_alloc)</button>
+      <button class="tab-btn" onclick="switchScenario(2)">2. 해제 시 즉시 0 소거 (init_on_free)</button>
+      <button class="tab-btn" onclick="switchScenario(3)">3. 베이스라인 잔류 데이터 누출 (Without Zeroing)</button>
+      <button class="tab-btn" onclick="switchScenario(4)">4. 성능 및 보안 트레이드오프 비교 매트릭스</button>
+    </div>
+
+    <!-- Simulator Interactive Controls -->
+    <div class="sim-toolbar">
+      <div class="sim-controls">
+        <button class="sim-btn primary" id="playBtn" onclick="togglePlay()">⏸ 일시정지</button>
+        <button class="sim-btn" onclick="resetAnimation()">⏮ 초기화</button>
+        <div class="speed-selector">
+          <span>속도:</span>
+          <button class="speed-btn" onclick="setSpeed(0.5)">0.5x</button>
+          <button class="speed-btn active" onclick="setSpeed(1.0)">1.0x</button>
+          <button class="speed-btn" onclick="setSpeed(1.5)">1.5x</button>
+        </div>
+      </div>
+      <div class="sim-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Simulation Active: Kernel Heap Sanitization Pipeline</span>
+      </div>
+    </div>
+
+    <div class="view-container">
+      <div class="diagram-panel" id="diagramPanel">
+        <!-- Rendered via JavaScript -->
+      </div>
+
+      <div class="info-panel" id="infoPanel">
+        <!-- Rendered via JavaScript -->
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentScenario = 1;
+    let isPlaying = true;
+    let currentSpeed = 1.0;
+
+    const scenarios = {
+      1: {
+        title: "1. 할당 시 자동 0 초기화 (CONFIG_INIT_ON_ALLOC_DEFAULT_ON)",
+        desc: "kmalloc(), kmem_cache_alloc(), 또는 버디 할당기를 통해 새로운 메모리를 할당받을 때, slab_post_alloc_hook()에서 memset(p, 0, size)를 수행하여 전체 슬랩 객체를 0x00으로 깨끗이 초기화합니다. 이전 사용자가 남긴 암호화 키, 구조체 패딩 바이트, 커널 포인터 잔류 데이터가 새 객체로 전달되는 것을 원천 방어합니다.",
+        metric1Label: "초기화 시점",
+        metric1Val: "slab_post_alloc_hook()",
+        metric2Label: "런타임 오버헤드",
+        metric2Val: "< 1.0% (핫 캐시 메모리 초기화)",
+        status: "Active: slab_post_alloc_hook() clearing newly allocated memory to 0x00",
+        statusColor: "var(--accent-green)",
+        renderSvg: (speed) => {
+          const dur = (2.0 / speed).toFixed(2);
+          return `
+          <svg class="svg-canvas" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="wipeGradGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#22c55e" stop-opacity="0" />
+                <stop offset="50%" stop-color="#22c55e" stop-opacity="0.6" />
+                <stop offset="100%" stop-color="#22c55e" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+
+            <!-- KERNEL ALLOC PIPELINE -->
+            <rect x="30" y="30" width="700" height="150" rx="12" fill="#1c2541" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="50" y="58" fill="#38bdf8" font-size="14" font-weight="bold">SLUB ALLOCATION PIPELINE (kmalloc / kmem_cache_alloc)</text>
+
+            <g transform="translate(60, 75)">
+              <rect width="180" height="85" rx="6" fill="#1e293b" stroke="#334155" />
+              <text x="20" y="30" fill="#f8fafc" font-size="12" font-weight="bold">1. kmalloc(256)</text>
+              <text x="20" y="50" fill="#94a3b8" font-size="10">Without __GFP_ZERO</text>
+              <text x="20" y="70" fill="#38bdf8" font-size="10">Raw heap request</text>
+            </g>
+
+            <g transform="translate(280, 75)">
+              <rect width="190" height="85" rx="6" fill="#1e293b" stroke="#334155" />
+              <text x="20" y="30" fill="#f8fafc" font-size="12" font-weight="bold">2. __slab_alloc()</text>
+              <text x="20" y="50" fill="#94a3b8" font-size="10">Pops object from freelist</text>
+              <text x="20" y="70" fill="#eab308" font-size="10">Stale dirty bytes present</text>
+            </g>
+
+            <g transform="translate(500, 75)">
+              <rect width="200" height="85" rx="6" fill="#1e293b" stroke="#22c55e" stroke-width="2" />
+              <text x="20" y="30" fill="#22c55e" font-size="12" font-weight="bold">3. slab_post_alloc_hook()</text>
+              <text x="20" y="50" fill="#86efac" font-size="10" font-family="monospace">memset(p, 0, 256)</text>
+              <text x="20" y="70" fill="#22c55e" font-size="10" font-weight="bold">Enforced by init_on_alloc</text>
+            </g>
+
+            <!-- DYNAMIC CONNECTING ALLOC STREAM -->
+            <path d="M 240 115 L 280 115 M 470 115 L 500 115" stroke="#38bdf8" stroke-width="3" class="flow-path" />
+
+            <!-- MEMORY BUFFER VISUALIZATION -->
+            <g transform="translate(30, 220)">
+              <rect width="700" height="260" rx="12" fill="#1c2541" stroke="#22c55e" stroke-width="1.5" />
+              <text x="20" y="30" fill="#22c55e" font-size="14" font-weight="bold">MEMORY BUFFER STATE: 100% SANITIZED ALLOCATION</text>
+              
+              <!-- Memory Chunk -->
+              <g transform="translate(40, 55)">
+                <rect width="620" height="110" rx="8" fill="#0f172a" stroke="#22c55e" stroke-width="2" />
+                
+                <!-- Zeroed Bytes Representation -->
+                <text x="30" y="35" fill="#86efac" font-size="13" font-family="monospace">Offset +0x00:  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00</text>
+                <text x="30" y="60" fill="#86efac" font-size="13" font-family="monospace">Offset +0x10:  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00</text>
+                <text x="30" y="85" fill="#86efac" font-size="13" font-family="monospace">Offset +0x20:  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  ... [ALL ZEROES]</text>
+
+                <!-- Animated Wipe Wave -->
+                <rect width="200" height="110" fill="url(#wipeGradGreen)" class="wipe-wave" />
+              </g>
+
+              <g transform="translate(40, 185)">
+                <rect width="620" height="50" rx="6" fill="#0b132b" stroke="#334155" />
+                <text x="20" y="30" fill="#f8fafc" font-size="12">🛡️ Security Impact: Uninitialized stack/heap infoleaks (CWE-457) eradicated completely.</text>
+              </g>
+            </g>
+          </svg>
+          `;
+        }
+      },
+      2: {
+        title: "2. 해제 시 즉시 0 소거 (CONFIG_INIT_ON_FREE_DEFAULT_ON)",
+        desc: "kfree() 또는 kmem_cache_free() 호출 즉시 slab_free_hook()에서 메모리를 0x00으로 덮어씁니다. 민감한 데이터(암호화 키, 세션 토큰, 함수 포인터)의 잔존 수명(Lifetime)을 0으로 단축시키며, Use-After-Free(UAF, CWE-416) 취약점이 발생하더라도 댕글링 포인터가 오직 0만을 읽게 만들어 정보 유출 및 가짜 객체 조작을 무력화합니다.",
+        metric1Label: "소거 시점",
+        metric1Val: "slab_free_hook() 즉시 실행",
+        metric2Label: "런타임 오버헤드",
+        metric2Val: "약 3~5% (콜드 캐시 메모리 터치)",
+        status: "Active: slab_free_hook() wiping object on kfree() immediately",
+        statusColor: "var(--accent-purple)",
+        renderSvg: (speed) => {
+          const dur = (2.0 / speed).toFixed(2);
+          return `
+          <svg class="svg-canvas" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="wipeGradPurple" x1="0%" y1="0%" x2="100%" y2="0%">
+                <stop offset="0%" stop-color="#a855f7" stop-opacity="0" />
+                <stop offset="50%" stop-color="#a855f7" stop-opacity="0.6" />
+                <stop offset="100%" stop-color="#a855f7" stop-opacity="0" />
+              </linearGradient>
+            </defs>
+
+            <!-- KERNEL FREE PIPELINE -->
+            <rect x="30" y="30" width="700" height="150" rx="12" fill="#1c2541" stroke="#a855f7" stroke-width="1.5" />
+            <text x="50" y="58" fill="#a855f7" font-size="14" font-weight="bold">SLUB DEALLOCATION PIPELINE (kfree / kmem_cache_free)</text>
+
+            <g transform="translate(60, 75)">
+              <rect width="180" height="85" rx="6" fill="#1e293b" stroke="#334155" />
+              <text x="20" y="30" fill="#f8fafc" font-size="12" font-weight="bold">1. kfree(object)</text>
+              <text x="20" y="50" fill="#94a3b8" font-size="10">Object contains secrets</text>
+              <text x="20" y="70" fill="#38bdf8" font-size="10">Free request dispatched</text>
+            </g>
+
+            <g transform="translate(280, 75)">
+              <rect width="200" height="85" rx="6" fill="#1e293b" stroke="#a855f7" stroke-width="2" />
+              <text x="20" y="30" fill="#a855f7" font-size="12" font-weight="bold">2. slab_free_hook()</text>
+              <text x="20" y="50" fill="#d8b4fe" font-size="10" font-family="monospace">memset(x, 0, orig_size)</text>
+              <text x="20" y="70" fill="#a855f7" font-size="10" font-weight="bold">Immediate Zero Wipe Wave</text>
+            </g>
+
+            <g transform="translate(510, 75)">
+              <rect width="190" height="85" rx="6" fill="#1e293b" stroke="#334155" />
+              <text x="20" y="30" fill="#f8fafc" font-size="12" font-weight="bold">3. set_freepointer()</text>
+              <text x="20" y="50" fill="#94a3b8" font-size="10">Object added to freelist</text>
+              <text x="20" y="70" fill="#22c55e" font-size="10">Zeroed memory in queue</text>
+            </g>
+
+            <path d="M 240 115 L 280 115 M 480 115 L 510 115" stroke="#a855f7" stroke-width="3" class="flow-path free" />
+
+            <!-- UAF SAFEGUARD VISUALIZATION -->
+            <g transform="translate(30, 220)">
+              <rect width="700" height="260" rx="12" fill="#1c2541" stroke="#a855f7" stroke-width="1.5" />
+              <text x="20" y="30" fill="#a855f7" font-size="14" font-weight="bold">USE-AFTER-FREE DEFENSE: DANGLING POINTER INSPECTION</text>
+
+              <g transform="translate(40, 55)">
+                <rect width="620" height="110" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="2" />
+                <text x="30" y="35" fill="#d8b4fe" font-size="13" font-family="monospace">token:     0x0000000000000000  (Secret Token Wiped Clean)</text>
+                <text x="30" y="60" fill="#d8b4fe" font-size="13" font-family="monospace">magic:     0x0000000000000000  (Canary Zeroed)</text>
+                <text x="30" y="85" fill="#d8b4fe" font-size="13" font-family="monospace">func_ptr:  0x0000000000000000  (Callback Pointer Cleared)</text>
+
+                <rect width="200" height="110" fill="url(#wipeGradPurple)" class="wipe-wave" />
+              </g>
+
+              <g transform="translate(40, 185)">
+                <rect width="620" height="50" rx="6" fill="#0b132b" stroke="#334155" />
+                <text x="20" y="30" fill="#f8fafc" font-size="12">🔒 Security Impact: UAF reads yield only zeroes. Live memory forensics & cold-boot attacks fail.</text>
+              </g>
+            </g>
+          </svg>
+          `;
+        }
+      },
+      3: {
+        title: "3. 베이스라인 잔류 데이터 누출 (Without Heap Zeroing)",
+        desc: "하드닝이 비활성화된 기본 커널에서는 kmalloc()이나 kfree() 시 메모리를 0으로 밀지 않습니다. 이전 객체가 사용하던 민감 정보(비밀 키, 토큰)가 메모리에 고스란히 남아있으며, 다음 할당자가 버퍼를 채우지 않고 유저 공간으로 복사(copy_to_user)하면 커널 내부 비밀 데이터가 비특권 프로세스로 여과 없이 유출됩니다.",
+        metric1Label: "메모리 잔류 상태",
+        metric1Val: "STALE DIRTY DATA (노출)",
+        metric2Label: "보안 판정",
+        metric2Val: "취약 (VULNERABLE: Info Leak & UAF)",
+        status: "Warning: Residual secret bytes retained in heap memory across alloc/free!",
+        statusColor: "var(--accent-red)",
+        renderSvg: (speed) => {
+          const dur = (1.5 / speed).toFixed(2);
+          return `
+          <svg class="svg-canvas" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+            <!-- BASELINE DIRTY HEAP -->
+            <rect x="30" y="30" width="700" height="200" rx="12" fill="#1c2541" stroke="#ef4444" stroke-width="2" />
+            <text x="50" y="60" fill="#ef4444" font-size="14" font-weight="bold">UNPROTECTED KERNEL HEAP (WITHOUT ZEROING)</text>
+
+            <g transform="translate(60, 80)">
+              <rect width="300" height="120" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" />
+              <text x="20" y="30" fill="#ef4444" font-size="13" font-weight="bold">Reallocated Slab Object</text>
+              <text x="20" y="55" fill="#fca5a5" font-size="11" font-family="monospace">"CONFIDENTIAL_KEY_7777"</text>
+              <text x="20" y="80" fill="#fca5a5" font-size="11" font-family="monospace">0x5A 0x5A 0x5A 0x5A ... [DIRTY]</text>
+              <text x="20" y="105" fill="#ef4444" font-size="11" font-weight="bold">Stale bytes NOT cleared!</text>
+            </g>
+
+            <g transform="translate(390, 80)">
+              <rect width="310" height="120" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.2" />
+              <text x="20" y="30" fill="#f8fafc" font-size="13" font-weight="bold">copy_to_user() Leak Vector</text>
+              <text x="20" y="55" fill="#94a3b8" font-size="11">Partial struct copy leaks padding</text>
+              <text x="20" y="80" fill="#94a3b8" font-size="11">Uninitialized bytes copied to ubuf</text>
+              <text x="20" y="105" fill="#f59e0b" font-size="11">CWE-457 Information Exposure</text>
+            </g>
+
+            <!-- DYNAMIC ATTACK LEAK STREAM -->
+            <path id="pathLeak" d="M 210 200 C 210 270 380 270 380 340" fill="none" stroke="#ef4444" stroke-width="4" class="flow-path attack" />
+            <circle r="7" fill="#ef4444" class="flow-particle">
+              <animateMotion dur="${dur}s" repeatCount="indefinite" path="M 210 200 C 210 270 380 270 380 340" />
+            </circle>
+
+            <!-- USER SPACE RECEPTION -->
+            <g transform="translate(30, 320)">
+              <rect width="700" height="160" rx="12" fill="#0b132b" stroke="#ef4444" stroke-width="2" />
+              <text x="30" y="40" fill="#ef4444" font-size="14" font-weight="bold">UNPRIVILEGED USER SPACE (EXPLOIT PROCESS)</text>
+
+              <g transform="translate(40, 60)">
+                <rect width="620" height="75" rx="6" fill="#1e293b" stroke="#ef4444" />
+                <text x="20" y="30" fill="#fca5a5" font-size="12" font-family="monospace">User Buffer: Recovers "CONFIDENTIAL_KEY_7777" (0x5A bytes)</text>
+                <text x="20" y="55" fill="#ef4444" font-size="12" font-weight="bold">💀 EXPLOIT SUCCEEDED: Sensitive kernel secrets exposed to user!</text>
+              </g>
+            </g>
+          </svg>
+          `;
+        }
+      },
+      4: {
+        title: "4. 성능 및 보안 트레이드오프 비교 매트릭스",
+        desc: "초기화 옵션별 성능 영향도 및 방어 스펙트럼 비교 분석입니다. init_on_alloc은 핫 캐시 메모리를 초기화하므로 오버헤드가 1% 미만이며, init_on_free는 콜드 캐시 메모리를 터치하여 3~5% 오버헤드가 발생하지만 UAF 방어와 데이터 수명 최소화에 탁월합니다.",
+        metric1Label: "init_on_alloc 오버헤드",
+        metric1Val: "< 1% (대부분의 워크로드)",
+        metric2Label: "init_on_free 오버헤드",
+        metric2Val: "3 ~ 5% (콜드 메모리 캐시 영향)",
+        status: "Comparison: Alloc Zeroing vs Free Wiping vs Sanitizers (KASAN)",
+        statusColor: "var(--accent-blue)",
+        renderSvg: (speed) => {
+          return `
+          <svg class="svg-canvas" viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+            <rect x="30" y="30" width="700" height="460" rx="12" fill="#1c2541" stroke="#38bdf8" stroke-width="1.5" />
+            <text x="50" y="65" fill="#38bdf8" font-size="16" font-weight="bold">Heap Sanitization & Security Comparison</text>
+
+            <g transform="translate(50, 95)">
+              <!-- Row 1: init_on_alloc -->
+              <rect width="660" height="80" rx="8" fill="#1e293b" stroke="#22c55e" />
+              <text x="20" y="30" fill="#22c55e" font-size="14" font-weight="bold">1. CONFIG_INIT_ON_ALLOC_DEFAULT_ON</text>
+              <text x="20" y="55" fill="#f8fafc" font-size="12">방어: 미초기화 힙 누출 차단 | 오버헤드: &lt; 1% | 프로덕션 권장 (기본 하드닝)</text>
+
+              <!-- Row 2: init_on_free -->
+              <rect y="100" width="660" height="80" rx="8" fill="#1e293b" stroke="#a855f7" />
+              <text x="20" y="130" fill="#a855f7" font-size="14" font-weight="bold">2. CONFIG_INIT_ON_FREE_DEFAULT_ON</text>
+              <text x="20" y="155" fill="#f8fafc" font-size="12">방어: UAF 잔류 노출 &amp; 콜드부트 포렌식 방어 | 오버헤드: 3~5% | 고보안 환경 권장</text>
+
+              <!-- Row 3: Baseline -->
+              <rect y="200" width="660" height="80" rx="8" fill="#1e293b" stroke="#ef4444" />
+              <text x="20" y="230" fill="#ef4444" font-size="14" font-weight="bold">3. Baseline (Both Disabled)</text>
+              <text x="20" y="255" fill="#fca5a5" font-size="12">방어: 없음 (잔류 비밀 데이터 및 UAF 구조체 노출) | 오버헤드: 0% | 취약</text>
+
+              <!-- Row 4: KASAN Comparison -->
+              <rect y="300" width="660" height="80" rx="8" fill="#1e293b" stroke="#eab308" />
+              <text x="20" y="330" fill="#eab308" font-size="14" font-weight="bold">4. KASAN (Kernel Address Sanitizer)과의 차이</text>
+              <text x="20" y="355" fill="#94a3b8" font-size="12">KASAN은 섀도 메모리 디버깅 도구(오버헤드 ~200%), Zeroing은 프로덕션용 완화책</text>
+            </g>
+          </svg>
+          `;
+        }
+      }
+    };
+
+    function switchScenario(num) {
+      currentScenario = num;
+      document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
+        btn.classList.toggle('active', idx + 1 === num);
+      });
+
+      const s = scenarios[num];
+      renderCurrentScenario();
+
+      document.getElementById('infoPanel').innerHTML = `
+        <div class="info-title">${s.title}</div>
+        <div class="info-desc">${s.desc}</div>
+        <div class="metric-box">
+          <div class="metric-label">${s.metric1Label}</div>
+          <div class="metric-val">${s.metric1Val}</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">${s.metric2Label}</div>
+          <div class="metric-val">${s.metric2Val}</div>
+        </div>
+      `;
+
+      updateStatus(s.status, s.statusColor);
+    }
+
+    function renderCurrentScenario() {
+      const s = scenarios[currentScenario];
+      const panel = document.getElementById('diagramPanel');
+      panel.innerHTML = s.renderSvg(isPlaying ? currentSpeed : 0.0001);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      const dot = document.getElementById('statusDot');
+
+      if (isPlaying) {
+        btn.innerHTML = '⏸ 일시정지';
+        dot.style.animationPlayState = 'running';
+      } else {
+        btn.innerHTML = '▶ 재생';
+        dot.style.animationPlayState = 'paused';
+      }
+      renderCurrentScenario();
+    }
+
+    function resetAnimation() {
+      renderCurrentScenario();
+    }
+
+    function setSpeed(speed) {
+      currentSpeed = speed;
+      document.querySelectorAll('.speed-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.textContent.includes(speed + 'x'));
+      });
+      renderCurrentScenario();
+    }
+
+    function updateStatus(text, color) {
+      const statusText = document.getElementById('statusText');
+      const statusDot = document.getElementById('statusDot');
+      statusText.textContent = text;
+      statusDot.style.background = color || 'var(--accent-green)';
+      statusDot.style.boxShadow = `0 0 8px ${color || 'var(--accent-green)'}`;
+    }
+
+    function toggleTheme() {
+      const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      document.documentElement.setAttribute('data-theme', isLight ? 'dark' : 'light');
+      document.getElementById('themeToggle').textContent = isLight ? '☀️ 테마 전환' : '🌙 테마 전환';
+    }
+
+    switchScenario(1);
+  </script>
+</body>
+</html>
+
