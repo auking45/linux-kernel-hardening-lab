@@ -125,5 +125,7 @@ nav:
       - 05. Heap & Slab Allocator Hardening:
           - SLAB Freelist Hardening: features/16-slab-freelist.md
           - Heap Zeroing (Alloc & Free): features/17-heap-init.md
+          - Hardened Usercopy: features/18-hardened-usercopy.md
+
 
 
