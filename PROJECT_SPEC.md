@@ -95,7 +95,6 @@
 - [ ] **Task 7-2:** `CONFIG_INIT_ON_ALLOC_DEFAULT_ON` & `CONFIG_INIT_ON_FREE_DEFAULT_ON` (할당/해제 시 자동 0 초기화로 UAF 완화).
 - [ ] **Task 7-3:** `CONFIG_HARDENED_USERCOPY` (유저 공간 복사 시 슬랩 버퍼 경계 엄격 검증).
 - [ ] **Task 7-4:** KFENCE (Kernel Electric Fence - 낮은 오버헤드의 프로덕션 힙 결함 샘플링 탐지).
-- [ ] **Task 7-5:** ARM64 MTE (Memory Tagging Extension - 하드웨어 기반 4비트 컬러 태깅 힙 메모리 안전성 검증).
 
 ### [Phase 8] Category 6: Structure & Compiler Level Protections
 
@@ -133,7 +132,9 @@
 - [ ] **Task 12-5:** Ptrace Restrictions (`CONFIG_SECURITY_YAMA`).
 - [ ] **Task 12-6:** Kexec Restrictions (`kexec_load_disabled`).
 
-### [Phase 13 (Roadmap)] Category 11: Advanced Architecture & Confidential Compute (ARMv9, AVF, CCA)
+### [Phase 13 (Roadmap)] Category 11: Modern ARMv8/ARMv9 & Mobile Security (MTE, AVF, CCA)
 
-- [ ] **Task 13-1:** AVF (Android Virtualization Framework - pKVM 기반 마이크로 pVM 격리 및 통신 실습).
-- [ ] **Task 13-2:** Arm CCA (Confidential Compute Architecture - RMM 기반 Realm 기밀 가상머신 메모리 보호 데모).
+- [ ] **Task 13-1:** ARM64 MTE (Memory Tagging Extension - ARMv8.5/v9 하드웨어 4비트 컬러 태깅, 동기/비동기 트랩, 힙 UAF/OOB 탐지 데모).
+- [ ] **Task 13-2:** ARMv9 POE / S1POE (Permission Overlay Extension - ARMv8.9/v9.4 하드웨어 메모리 권한 오버레이 키 실습).
+- [ ] **Task 13-3:** AVF (Android Virtualization Framework - pKVM 기반 마이크로 pVM 게스트 격리 및 통신 실습).
+- [ ] **Task 13-4:** Arm CCA (Confidential Compute Architecture - RMM 기반 Realm 기밀 가상머신 메모리 암호화 및 무결성 데모).
