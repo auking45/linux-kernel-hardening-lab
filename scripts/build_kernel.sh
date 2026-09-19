@@ -113,6 +113,8 @@ get_llvm_flags() {
     local feature_config="${CONFIGS_DIR}/features/${FEATURE_NAME}.config"
     if [[ "${USE_LLVM}" -eq 1 || "${FEATURE_NAME}" =~ ^kcfi ]] || [[ -f "${feature_config}" && $(grep -c "CONFIG_CFI_CLANG" "${feature_config}") -gt 0 ]]; then
         echo "LLVM=1"
+    elif [[ "${TARGET_ARCH}" == "arm64" ]] && { [[ "${FEATURE_NAME}" =~ ^bti-pac ]] || [[ -f "${feature_config}" && $(grep -c "CONFIG_ARM64_BTI" "${feature_config}") -gt 0 ]]; }; then
+        echo "LLVM=1"
     fi
 }
 

@@ -121,3 +121,4 @@ nav:
       - 04. Control Flow Integrity (CFI):
           - Clang kCFI: features/13-kcfi.md
           - x86 IBT & Shadow Stack: features/14-ibt-shstk.md
+          - ARM64 BTI & PAC: features/15-bti-pac.md

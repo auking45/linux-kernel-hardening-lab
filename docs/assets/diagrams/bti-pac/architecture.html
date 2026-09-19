@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ARM64 Control Flow Integrity: BTI & PAC Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #eab308;
+      --perm-user: #f97316;
+      --perm-kernel: #38bdf8;
+      --perm-block: #ef4444;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #ca8a04;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --perm-block: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 9999px;
+      background: var(--accent-purple);
+      color: white;
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 8px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      border-color: var(--accent-blue);
+    }
+
+    .tab-btn.active {
+      background: var(--accent-blue);
+      color: #0f172a;
+      border-color: var(--accent-blue);
+    }
+
+    .scene-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .scene-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scene-desc {
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 20px;
+      font-size: 0.95rem;
+    }
+
+    .canvas-container {
+      width: 100%;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      overflow-x: auto;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      min-width: 900px;
+    }
+
+    .interactive-panel {
+      margin-top: 20px;
+      padding: 16px;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .ctrl-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .btn-blue {
+      background: #0284c7;
+      color: white;
+    }
+    .btn-blue:hover { background: #0369a1; }
+
+    .btn-green {
+      background: #16a34a;
+      color: white;
+    }
+    .btn-green:hover { background: #15803d; }
+
+    .btn-red {
+      background: #dc2626;
+      color: white;
+    }
+    .btn-red:hover { background: #b91c1c; }
+
+    .btn-purple {
+      background: #9333ea;
+      color: white;
+    }
+    .btn-purple:hover { background: #7e22ce; }
+
+    .btn-secondary {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+    }
+    .btn-secondary:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .log-box {
+      background: #000;
+      color: #38bdf8;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      max-height: 160px;
+      overflow-y: auto;
+      border: 1px solid var(--card-border);
+      white-space: pre-wrap;
+    }
+
+    .comparison-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+      font-size: 0.9rem;
+    }
+
+    .comparison-table th, .comparison-table td {
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      text-align: left;
+    }
+
+    .comparison-table th {
+      background: var(--card-bg);
+      color: var(--accent-blue);
+      font-weight: 600;
+    }
+
+    .comparison-table tr:nth-child(even) {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .tag-safe {
+      color: var(--accent-green);
+      font-weight: bold;
+    }
+
+    .tag-vuln {
+      color: var(--accent-red);
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>ARM64 Control Flow Integrity (BTI & PAC)</span>
+        <span class="badge">ARMv8.3 / ARMv8.5 Hardware Defense</span>
+      </h1>
+      <button class="theme-toggle" id="themeToggle">
+        <span id="themeIcon">☀️</span>
+        <span id="themeText">Light Mode</span>
+      </button>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab-btn active" onclick="showScene(1)">시나리오 1: ARM64 BTI 전방향 제어 흐름 검증</button>
+      <button class="tab-btn" onclick="showScene(2)">시나리오 2: ARM64 PAC 후방향 반환 주소 보호</button>
+      <button class="tab-btn" onclick="showScene(3)">시나리오 3: 베이스라인 미적용 취약 환경</button>
+      <button class="tab-btn" onclick="showScene(4)">시나리오 4: ARM64 vs x86 CET 아키텍처 비교</button>
+    </nav>
+
+    <!-- SCENARIO 1: ARM64 BTI -->
+    <div id="scene1" class="scene-card">
+      <div class="scene-title">
+        <span>🛡️ 시나리오 1: ARM64 BTI (Branch Target Identification) 전방향 무결성</span>
+      </div>
+      <div class="scene-desc">
+        간접 분기(<code>BLR x20</code>) 발생 시 CPU는 <code>PSTATE.BTYPE</code>을 <code>0b10</code>으로 설정하고, 타깃 메모리가 Guarded Page(<code>PTE_GP</code>)인지 확인합니다.<br>
+        타깃의 첫 명령어가 유효한 Landing Pad(<code>bti c</code> 또는 <code>paciasp</code>)이면 정상이지만, 가젯 중간이나 비인가 위치로 점프하면 즉각 <strong>Branch Target Exception (<code>ESR_EL1.EC=0x0D</code> / Oops - BTI)</strong>을 발생시킵니다.
+      </div>
+
+      <div class="canvas-container">
+        <svg viewBox="0 0 920 320" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8" />
+            </marker>
+            <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#22c55e" />
+            </marker>
+            <marker id="arrow-red" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+              <path d="M 0 1 L 10 5 L 0 9 z" fill="#ef4444" />
+            </marker>
+          </defs>
+
+          <!-- Indirect Branch Caller -->
+          <rect x="30" y="40" width="220" height="230" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <text x="140" y="68" fill="#38bdf8" font-size="14" font-weight="bold" text-anchor="middle">Dispatcher (BLR x20)</text>
+          <rect x="50" y="90" width="180" height="35" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="140" y="112" fill="#94a3b8" font-size="12" text-anchor="middle">mov x20, target_addr</text>
+          <rect id="node-blr" x="50" y="140" width="180" height="40" rx="4" fill="#0369a1" stroke="#38bdf8"/>
+          <text x="140" y="165" fill="#ffffff" font-size="13" font-weight="bold" text-anchor="middle">blr x20 (Indirect Call)</text>
+          
+          <rect x="50" y="200" width="180" height="50" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="60" y="220" fill="#eab308" font-size="11">PSTATE.BTYPE = 0b10</text>
+          <text x="60" y="238" fill="#94a3b8" font-size="10">(Awaiting BTI Landing Pad)</text>
+
+          <!-- Hardware BTI Validator -->
+          <rect x="320" y="70" width="220" height="170" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+          <text x="430" y="98" fill="#a855f7" font-size="14" font-weight="bold" text-anchor="middle">ARM64 Hardware BTI Logic</text>
+          <text x="430" y="125" fill="#f8fafc" font-size="12" text-anchor="middle">1. Page Table PTE_GP Check</text>
+          <text x="430" y="150" fill="#f8fafc" font-size="12" text-anchor="middle">2. Target Insn == BTI / PACIASP?</text>
+          <rect id="bti-status-box" x="345" y="175" width="170" height="40" rx="4" fill="#0f172a" stroke="#a855f7"/>
+          <text id="bti-status-text" x="430" y="200" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">Status: Ready</text>
+
+          <!-- Target 1: Legitimate with paciasp / bti c -->
+          <rect id="box-legit" x="610" y="30" width="280" height="110" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="750" y="55" fill="#22c55e" font-size="13" font-weight="bold" text-anchor="middle">bti_legit_target (0xffff8000...)</text>
+          <rect x="630" y="68" width="240" height="30" rx="4" fill="#14532d" stroke="#22c55e"/>
+          <text x="750" y="88" fill="#86efac" font-size="12" font-weight="bold" text-anchor="middle">0xd503233f : paciasp / bti c</text>
+          <text x="750" y="122" fill="#94a3b8" font-size="11" text-anchor="middle">Valid Landing Pad -> BTYPE = 0b00 (OK)</text>
+
+          <!-- Target 2: Deliberately missing BTI -->
+          <rect id="box-nobti" x="610" y="170" width="280" height="120" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="750" y="195" fill="#ef4444" font-size="13" font-weight="bold" text-anchor="middle">bti_nobti_target (No Landing Pad)</text>
+          <rect x="630" y="208" width="240" height="30" rx="4" fill="#7f1d1d" stroke="#ef4444"/>
+          <text x="750" y="228" fill="#fca5a5" font-size="12" font-weight="bold" text-anchor="middle">0xa9be7bfd : stp x29, x30, [sp, #-32]!</text>
+          <text id="nobti-trap-label" x="750" y="265" fill="#ef4444" font-size="11" font-weight="bold" text-anchor="middle">TRAP: Oops - BTI (ESR=0x36000002)</text>
+
+          <!-- Dynamic Path Arrows -->
+          <path id="path-legit" d="M 230 160 Q 275 80 610 80" fill="none" stroke="#22c55e" stroke-width="3" marker-end="url(#arrow-green)" stroke-dasharray="6,6" style="opacity: 0.3;"/>
+          <path id="path-nobti" d="M 230 160 Q 275 220 610 220" fill="none" stroke="#ef4444" stroke-width="3" marker-end="url(#arrow-red)" stroke-dasharray="6,6" style="opacity: 0.3;"/>
+        </svg>
+      </div>
+
+      <div class="interactive-panel">
+        <div class="ctrl-row">
+          <button class="action-btn btn-green" onclick="simBti('legit')">정상 간접 호출 시뮬레이션 (with BTI/PAC)</button>
+          <button class="action-btn btn-red" onclick="simBti('nobti')">JOP 공격 시뮬레이션 (BTI 누락 타깃 점프)</button>
+          <button class="action-btn btn-secondary" onclick="resetBti()">초기화</button>
+        </div>
+        <div id="log-bti" class="log-box">[System Ready] ARM64 BTI & PAC Telemetry Driver Loaded. Click a button to simulate control flow.</div>
+      </div>
+    </div>
+
+    <!-- SCENARIO 2: ARM64 PAC -->
+    <div id="scene2" class="scene-card" style="display: none;">
+      <div class="scene-title">
+        <span>🔐 시나리오 2: ARM64 PAC (Pointer Authentication Code) 후방향 반환 주소 보호</span>
+      </div>
+      <div class="scene-desc">
+        함수 진입 시 <code>paciasp</code> 명령어가 비밀 키(Key A)와 스택 포인터(SP)를 결합하여 반환 주소(LR / x30)의 상위 미사용 비트(54:48)에 암호화 서명(PAC)을 삽입합니다.<br>
+        스택 버퍼 오버플로우로 LR이 1비트라도 변조되면, 에필로그의 <code>autiasp</code> 검증 시 <strong>FPAC 예외(<code>ESR_EL1.EC=0x1C</code> / Oops - FPAC)</strong> 또는 변조 주소 오류를 발생시켜 ROP 공격을 원천 차단합니다.
+      </div>
+
+      <div class="canvas-container">
+        <svg viewBox="0 0 920 340" xmlns="http://www.w3.org/2000/svg">
+          <!-- Step 1: Function Prologue -->
+          <rect x="30" y="30" width="260" height="280" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+          <text x="160" y="60" fill="#38bdf8" font-size="14" font-weight="bold" text-anchor="middle">[1] Function Prologue</text>
+          <rect x="50" y="80" width="220" height="40" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="160" y="105" fill="#f8fafc" font-size="12" text-anchor="middle">LR = 0x0000_0000_1234_5678</text>
+          <rect id="pac-sign-box" x="50" y="135" width="220" height="45" rx="4" fill="#0369a1" stroke="#38bdf8"/>
+          <text x="160" y="162" fill="#ffffff" font-size="13" font-weight="bold" text-anchor="middle">paciasp (Sign LR with Key A)</text>
+          <rect x="50" y="195" width="220" height="50" rx="4" fill="#0f172a" stroke="#22c55e"/>
+          <text x="60" y="218" fill="#22c55e" font-size="11" font-weight="bold">PAC-Signed LR:</text>
+          <text id="signed-lr-text" x="60" y="235" fill="#86efac" font-size="11">0x0077_0000_1234_5678</text>
+          <rect x="50" y="255" width="220" height="35" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="160" y="277" fill="#94a3b8" font-size="11" text-anchor="middle">Save LR to Stack [sp, #-16]!</text>
+
+          <!-- Step 2: Stack / Attacker Intervention -->
+          <rect x="330" y="30" width="260" height="280" rx="8" fill="#1e293b" stroke="#eab308" stroke-width="2"/>
+          <text x="460" y="60" fill="#eab308" font-size="14" font-weight="bold" text-anchor="middle">[2] Stack Memory State</text>
+          <rect x="350" y="80" width="220" height="90" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="460" y="105" fill="#f8fafc" font-size="12" text-anchor="middle">Stack Frame Payload</text>
+          <text x="460" y="125" fill="#94a3b8" font-size="11" text-anchor="middle">Local buffer[64] ...</text>
+          <text x="460" y="145" fill="#94a3b8" font-size="11" text-anchor="middle">Saved x29 (FP)</text>
+          <rect id="stack-lr-box" x="350" y="180" width="220" height="60" rx="4" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+          <text x="460" y="202" fill="#22c55e" font-size="11" font-weight="bold" text-anchor="middle">Saved Return Address (LR)</text>
+          <text id="stack-lr-val" x="460" y="224" fill="#86efac" font-size="11" text-anchor="middle">0x0077_0000_1234_5678</text>
+          <text id="attack-status-lbl" x="460" y="275" fill="#94a3b8" font-size="11" text-anchor="middle">Stack Integrity: Intact</text>
+
+          <!-- Step 3: Function Epilogue & autiasp -->
+          <rect x="630" y="30" width="260" height="280" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+          <text x="760" y="60" fill="#a855f7" font-size="14" font-weight="bold" text-anchor="middle">[3] Epilogue & Verification</text>
+          <rect x="650" y="80" width="220" height="40" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="760" y="105" fill="#f8fafc" font-size="12" text-anchor="middle">Restore LR from Stack</text>
+          <rect id="pac-aut-box" x="650" y="135" width="220" height="45" rx="4" fill="#581c87" stroke="#a855f7"/>
+          <text x="760" y="162" fill="#ffffff" font-size="13" font-weight="bold" text-anchor="middle">autiasp (Auth LR via Key A)</text>
+          <rect id="aut-res-box" x="650" y="195" width="220" height="50" rx="4" fill="#0f172a" stroke="#22c55e"/>
+          <text id="aut-res-title" x="660" y="218" fill="#22c55e" font-size="11" font-weight="bold">Verification Result:</text>
+          <text id="aut-res-val" x="660" y="235" fill="#86efac" font-size="11">0x0000_0000_1234_5678 (Match)</text>
+          <rect id="ret-box" x="650" y="255" width="220" height="35" rx="4" fill="#0f172a" stroke="#22c55e"/>
+          <text id="ret-text" x="760" y="277" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">ret (Safe Return)</text>
+        </svg>
+      </div>
+
+      <div class="interactive-panel">
+        <div class="ctrl-row">
+          <button class="action-btn btn-blue" onclick="simPac('sign')">1단계: paciasp 서명 생성</button>
+          <button class="action-btn btn-red" onclick="simPac('tamper')">2단계: ROP 공격 (스택 반환 주소 변조)</button>
+          <button class="action-btn btn-purple" onclick="simPac('auth')">3단계: autiasp 인증 및 복귀</button>
+          <button class="action-btn btn-secondary" onclick="resetPac()">초기화</button>
+        </div>
+        <div id="log-pac" class="log-box">[System Ready] PAC APIAKey initialized via PR_PAC_SET_ENABLED_KEYS. Click step 1 to begin.</div>
+      </div>
+    </div>
+
+    <!-- SCENARIO 3: BASELINE VULNERABLE -->
+    <div id="scene3" class="scene-card" style="display: none;">
+      <div class="scene-title">
+        <span>⚠️ 시나리오 3: 베이스라인 미적용 취약 환경 (BTI & PAC Disabled)</span>
+      </div>
+      <div class="scene-desc">
+        <code>CONFIG_ARM64_BTI</code> 및 <code>CONFIG_ARM64_PTR_AUTH</code>가 비활성화된 커널에서는 다음과 같은 보안 취약점이 그대로 노출됩니다:<br>
+        1. <strong>전방향 무방비:</strong> 랜딩 패드가 없는 <code>bti_nobti_target</code>으로 간접 분기해도 CPU가 예외를 발생시키지 않고 임의 코드를 실행(JOP 허용).<br>
+        2. <strong>후방향 무방비:</strong> LKDTM <code>CFI_BACKWARD</code> 트리거 시 스택 반환 주소가 변조되어도 하드웨어 서명 검증 없이 리디렉션 성공(<code>FAIL: stack return address was redirected!</code>).
+      </div>
+
+      <div class="canvas-container">
+        <svg viewBox="0 0 920 280" xmlns="http://www.w3.org/2000/svg">
+          <!-- Vulnerable Forward Branch -->
+          <rect x="40" y="30" width="400" height="220" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="240" y="60" fill="#ef4444" font-size="14" font-weight="bold" text-anchor="middle">[Forward-Edge] BTI 미적용 (JOP 취약)</text>
+          <rect x="60" y="80" width="360" height="35" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="240" y="102" fill="#94a3b8" font-size="12" text-anchor="middle">blr x20 -> bti_nobti_target (No Landing Pad)</text>
+          <rect x="60" y="130" width="360" height="45" rx="4" fill="#7f1d1d" stroke="#ef4444"/>
+          <text x="240" y="152" fill="#fca5a5" font-size="12" font-weight="bold" text-anchor="middle">CPU BTYPE Check Skipped (Hardware Feature Inactive)</text>
+          <text x="240" y="168" fill="#fca5a5" font-size="11" text-anchor="middle">Kernel: CONFIG_ARM64_BTI=n</text>
+          <rect x="60" y="190" width="360" height="40" rx="4" fill="#0f172a" stroke="#ef4444"/>
+          <text x="240" y="215" fill="#f87171" font-size="12" font-weight="bold" text-anchor="middle">Result: NOBTI_EXECUTED (Control Flow Hijacked!)</text>
+
+          <!-- Vulnerable Backward Branch -->
+          <rect x="480" y="30" width="400" height="220" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="2"/>
+          <text x="680" y="60" fill="#ef4444" font-size="14" font-weight="bold" text-anchor="middle">[Backward-Edge] PAC 미적용 (ROP 취약)</text>
+          <rect x="500" y="80" width="360" height="35" rx="4" fill="#0f172a" stroke="#334155"/>
+          <text x="680" y="102" fill="#94a3b8" font-size="12" text-anchor="middle">Stack Return Address Tampered (ROP Chain)</text>
+          <rect x="500" y="130" width="360" height="45" rx="4" fill="#7f1d1d" stroke="#ef4444"/>
+          <text x="680" y="152" fill="#fca5a5" font-size="12" font-weight="bold" text-anchor="middle">autiasp absent (Plain 'ret' executes)</text>
+          <text x="680" y="168" fill="#fca5a5" font-size="11" text-anchor="middle">Kernel: CONFIG_ARM64_PTR_AUTH=n</text>
+          <rect x="500" y="190" width="360" height="40" rx="4" fill="#0f172a" stroke="#ef4444"/>
+          <text x="680" y="215" fill="#f87171" font-size="12" font-weight="bold" text-anchor="middle">LKDTM: FAIL: stack return address was redirected!</text>
+        </svg>
+      </div>
+
+      <div class="interactive-panel">
+        <div class="log-box">[Baseline Telemetry]
+TARGET_ARCH: arm64
+CONFIG_ARM64_PTR_AUTH: DISABLED
+CONFIG_ARM64_BTI: DISABLED
+HW_BTI_USER_SUPPORT: NO
+HW_PAC_ADDR_SUPPORT: NO
+Triggering 'nobti': Result: NOBTI_EXECUTED (val=0xdeadbeef)
+Triggering LKDTM CFI_BACKWARD: lkdtm: FAIL: stack return address was redirected! (No protection active)</div>
+      </div>
+    </div>
+
+    <!-- SCENARIO 4: DUAL-ARCH ARCHITECTURE CONTRAST -->
+    <div id="scene4" class="scene-card" style="display: none;">
+      <div class="scene-title">
+        <span>⚖️ 시나리오 4: ARM64 BTI & PAC vs x86 Intel CET 아키텍처 비교 분석</span>
+      </div>
+      <div class="scene-desc">
+        리눅스 커널 6.12에서 제공하는 두 메이저 하드웨어 제어 흐름 보호 기술(ARM64 vs x86_64)의 메커니즘과 설계 트레이드오프를 비교합니다.
+      </div>
+
+      <table class="comparison-table">
+        <thead>
+          <tr>
+            <th>구분 (Category)</th>
+            <th>ARM64 (Lab 15: BTI & PAC)</th>
+            <th>x86_64 (Lab 14: Intel CET)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>전방향 방어 (Forward-Edge)</strong></td>
+            <td><strong>BTI (Branch Target Identification)</strong><br>ARMv8.5-A 하드웨어 인스트럭션</td>
+            <td><strong>IBT (Indirect Branch Tracking)</strong><br>Intel CET 하드웨어 인스트럭션</td>
+          </tr>
+          <tr>
+            <td><strong>랜딩 패드 명령어</strong></td>
+            <td><code>bti c</code> (0xd503245f) 또는 <code>paciasp</code> (0xd503233f)</td>
+            <td><code>endbr64</code> (0xfa1e0ff3)</td>
+          </tr>
+          <tr>
+            <td><strong>후방향 방어 (Backward-Edge)</strong></td>
+            <td><strong>PAC (Pointer Authentication Code)</strong><br>ARMv8.3-A 암호학적 서명 (QARMA/PAC-GA)</td>
+            <td><strong>Shadow Stack (SHSTK)</strong><br>하드웨어 보조 격리 스택 페이지 (SSP MSR)</td>
+          </tr>
+          <tr>
+            <td><strong>메모리 오버헤드</strong></td>
+            <td><span class="tag-safe">0% (Zero Extra Memory)</span><br>가상 주소 상위 미사용 비트(54:48) 활용</td>
+            <td>스택 크기와 동일한 별도 섀도 스택 페이지 필요</td>
+          </tr>
+          <tr>
+            <td><strong>버스 트래픽 / 캐시 영향</strong></td>
+            <td>추가 메모리 읽기/쓰기 없이 CPU 내부 연산으로 수행</td>
+            <td>CALL/RET마다 섀도 스택 쓰기/읽기 메모리 버스 트래픽 발생</td>
+          </tr>
+          <tr>
+            <td><strong>커널 Kconfig 심볼</strong></td>
+            <td><code>CONFIG_ARM64_BTI_KERNEL=y</code><br><code>CONFIG_ARM64_PTR_AUTH_KERNEL=y</code></td>
+            <td><code>CONFIG_X86_KERNEL_IBT=y</code><br><code>CONFIG_X86_USER_SHADOW_STACK=y</code></td>
+          </tr>
+          <tr>
+            <td><strong>필수 툴체인 제약</strong></td>
+            <td><code>Clang 18+ (LLVM=1)</code> (GCC 버그 106671 방지)</td>
+            <td><code>GCC 11+</code> 또는 <code>Clang 14+</code> (-fcf-protection)</td>
+          </tr>
+          <tr>
+            <td><strong>하드웨어 트랩 예외</strong></td>
+            <td><code>Oops - BTI (ESR 0x0D)</code><br><code>Oops - FPAC (ESR 0x1C)</code></td>
+            <td><code>#CP (Control Protection Exception, Interrupt 21)</code></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // Tab Navigation
+    function showScene(n) {
+      for (let i = 1; i <= 4; i++) {
+        document.getElementById('scene' + i).style.display = (i === n) ? 'block' : 'none';
+      }
+      const btns = document.querySelectorAll('.tab-btn');
+      btns.forEach((btn, idx) => {
+        if (idx === n - 1) btn.classList.add('active');
+        else btn.classList.remove('active');
+      });
+    }
+
+    // Theme Toggle
+    const themeBtn = document.getElementById('themeToggle');
+    const themeIcon = document.getElementById('themeIcon');
+    const themeText = document.getElementById('themeText');
+    let isLight = false;
+
+    themeBtn.addEventListener('click', () => {
+      isLight = !isLight;
+      document.documentElement.setAttribute('data-theme', isLight ? 'light' : 'dark');
+      themeIcon.textContent = isLight ? '🌙' : '☀️';
+      themeText.textContent = isLight ? 'Dark Mode' : 'Light Mode';
+    });
+
+    // Scenario 1: BTI Simulation Logic
+    function simBti(type) {
+      const legitPath = document.getElementById('path-legit');
+      const nobtiPath = document.getElementById('path-nobti');
+      const statusBox = document.getElementById('bti-status-box');
+      const statusText = document.getElementById('bti-status-text');
+      const log = document.getElementById('log-bti');
+
+      if (type === 'legit') {
+        legitPath.style.opacity = '1';
+        nobtiPath.style.opacity = '0.1';
+        statusBox.setAttribute('stroke', '#22c55e');
+        statusBox.setAttribute('fill', '#14532d');
+        statusText.setAttribute('fill', '#86efac');
+        statusText.textContent = 'BTI Match: paciasp OK';
+        log.textContent = `[+] write(fd, "legit", 5) executed
+[vuln_bti_pac] Executing legitimate indirect call with BTI target...
+[vuln_bti_pac] Dispatching indirect call to 0xffff8000803267e4 (Insn: 0xd503233f [PACIASP/BTI])
+[vuln_bti_pac] [+] Legitimate target executed: val=0x1337 (call_count=1)
+[+] PASS: PSTATE.BTYPE cleared to 0b00. Forward-edge CFI intact!`;
+      } else {
+        legitPath.style.opacity = '0.1';
+        nobtiPath.style.opacity = '1';
+        statusBox.setAttribute('stroke', '#ef4444');
+        statusBox.setAttribute('fill', '#7f1d1d');
+        statusText.setAttribute('fill', '#fca5a5');
+        statusText.textContent = 'TRAP: Missing Landing Pad';
+        log.textContent = `[*] write(fd, "nobti", 5) executed
+[vuln_bti_pac] Executing indirect call to target lacking BTI...
+[vuln_bti_pac] Dispatching indirect call to 0xffff800080326828 (Insn: 0xa9be7bfd [NO_BTI])
+[    4.321017] Internal error: Oops - BTI: 0000000036000002 [#1] SMP
+[    4.331037] pstate: 61400805 (BTYPE=-c)
+[    4.341288] pc : bti_nobti_target+0x0/0x54
+[    4.346606] lr : bti_dispatch_call+0x34/0x44
+[+] DEFENSE TRIGGERED: ARM64 CPU halted execution before first instruction executed!`;
+      }
+    }
+
+    function resetBti() {
+      document.getElementById('path-legit').style.opacity = '0.3';
+      document.getElementById('path-nobti').style.opacity = '0.3';
+      const statusBox = document.getElementById('bti-status-box');
+      const statusText = document.getElementById('bti-status-text');
+      statusBox.setAttribute('stroke', '#a855f7');
+      statusBox.setAttribute('fill', '#0f172a');
+      statusText.setAttribute('fill', '#38bdf8');
+      statusText.textContent = 'Status: Ready';
+      document.getElementById('log-bti').textContent = '[System Ready] ARM64 BTI & PAC Telemetry Driver Loaded. Click a button to simulate control flow.';
+    }
+
+    // Scenario 2: PAC Simulation Logic
+    let pacState = 'init'; // init -> signed -> tampered -> authed
+
+    function simPac(step) {
+      const log = document.getElementById('log-pac');
+      const signedLr = document.getElementById('signed-lr-text');
+      const stackLr = document.getElementById('stack-lr-val');
+      const stackBox = document.getElementById('stack-lr-box');
+      const attackLbl = document.getElementById('attack-status-lbl');
+      const autBox = document.getElementById('aut-res-box');
+      const autTitle = document.getElementById('aut-res-title');
+      const autVal = document.getElementById('aut-res-val');
+      const retBox = document.getElementById('ret-box');
+      const retText = document.getElementById('ret-text');
+
+      if (step === 'sign') {
+        pacState = 'signed';
+        signedLr.textContent = '0x0077_0000_1234_5678';
+        stackLr.textContent = '0x0077_0000_1234_5678';
+        stackBox.setAttribute('stroke', '#22c55e');
+        stackLr.setAttribute('fill', '#86efac');
+        attackLbl.textContent = 'Stack Integrity: Intact (Cryptographic PAC Signed)';
+        attackLbl.setAttribute('fill', '#22c55e');
+        autVal.textContent = 'Awaiting Function Return...';
+        log.textContent = `[Step 1: paciasp]
+Input LR:          0x0000_0000_1234_5678
+Secret Key A:      0x5a1f... (Internal CPU Register, inaccessible to EL0)
+Modifier (SP):     0xffff_8000_8085_bc70
+PAC Output LR:     0x0077_0000_1234_5678 (Signature [54:48] = 0x0077)
+[+] Return address safely pushed to stack memory.`;
+      } else if (step === 'tamper') {
+        if (pacState !== 'signed') simPac('sign');
+        pacState = 'tampered';
+        stackLr.textContent = '0x0077_0000_1224_5678'; // Bit 20 inverted
+        stackBox.setAttribute('stroke', '#ef4444');
+        stackLr.setAttribute('fill', '#f87171');
+        attackLbl.textContent = 'ATTACK DETECTED: Stack Buffer Overflow (Bit 20 Inverted)';
+        attackLbl.setAttribute('fill', '#ef4444');
+        log.textContent = `[Step 2: ROP Exploitation Attempt]
+Attacker overwrites stack return address via buffer overflow:
+Original Stored LR: 0x0077_0000_1234_5678
+Tampered Stored LR: 0x0077_0000_1224_5678 (Attacker changes return target to gadget)
+Attacker cannot forge valid PAC signature because Key A is hidden inside CPU!`;
+      } else if (step === 'auth') {
+        if (pacState === 'tampered') {
+          autBox.setAttribute('stroke', '#ef4444');
+          autBox.setAttribute('fill', '#7f1d1d');
+          autTitle.setAttribute('fill', '#fca5a5');
+          autTitle.textContent = 'PAC Verification Failed!';
+          autVal.setAttribute('fill', '#fca5a5');
+          autVal.textContent = 'Oops - FPAC: ESR_EL1.EC=0x1C';
+          retBox.setAttribute('stroke', '#ef4444');
+          retBox.setAttribute('fill', '#7f1d1d');
+          retText.setAttribute('fill', '#fca5a5');
+          retText.textContent = 'CRASH: Execution Aborted (FPAC Trap)';
+          log.textContent = `[Step 3: autiasp Authentication]
+CPU executes autiasp on tampered LR: 0x0077_0000_1224_5678
+Calculated expected PAC != Stored PAC signature (0x0077)!
+[    4.692970] Internal error: Oops - FPAC: 0000000072000000 [#2] SMP
+[    4.700042] pc : set_return_addr+0x28/0x44 (d50323bf autiasp)
+[+] EXPLOIT BLOCKED: Hardware immediately faulted upon detecting signature corruption!`;
+        } else {
+          autBox.setAttribute('stroke', '#22c55e');
+          autBox.setAttribute('fill', '#14532d');
+          autTitle.setAttribute('fill', '#86efac');
+          autTitle.textContent = 'PAC Verification Success:';
+          autVal.setAttribute('fill', '#86efac');
+          autVal.textContent = '0x0000_0000_1234_5678 (Signature Stripped)';
+          retBox.setAttribute('stroke', '#22c55e');
+          retBox.setAttribute('fill', '#14532d');
+          retText.setAttribute('fill', '#86efac');
+          retText.textContent = 'ret (Normal Return to Caller)';
+          log.textContent = `[Step 3: autiasp Authentication]
+CPU authenticates unmodified LR: 0x0077_0000_1234_5678
+Calculated PAC matches signature!
+PAC bits [54:48] cleanly stripped, restoring canonical address 0x0000_0000_1234_5678.
+[+] Legitimate function return allowed to proceed.`;
+        }
+      }
+    }
+
+    function resetPac() {
+      pacState = 'init';
+      document.getElementById('signed-lr-text').textContent = '0x0000_0000_1234_5678';
+      document.getElementById('stack-lr-val').textContent = '0x0000_0000_1234_5678';
+      document.getElementById('stack-lr-box').setAttribute('stroke', '#334155');
+      document.getElementById('stack-lr-val').setAttribute('fill', '#f8fafc');
+      document.getElementById('attack-status-lbl').textContent = 'Stack Integrity: Intact';
+      document.getElementById('attack-status-lbl').setAttribute('fill', '#94a3b8');
+      const autBox = document.getElementById('aut-res-box');
+      autBox.setAttribute('stroke', '#22c55e');
+      autBox.setAttribute('fill', '#0f172a');
+      document.getElementById('aut-res-title').textContent = 'Verification Result:';
+      document.getElementById('aut-res-title').setAttribute('fill', '#22c55e');
+      document.getElementById('aut-res-val').textContent = '0x0000_0000_1234_5678 (Match)';
+      document.getElementById('aut-res-val').setAttribute('fill', '#86efac');
+      const retBox = document.getElementById('ret-box');
+      retBox.setAttribute('stroke', '#22c55e');
+      retBox.setAttribute('fill', '#0f172a');
+      document.getElementById('ret-text').textContent = 'ret (Safe Return)';
+      document.getElementById('ret-text').setAttribute('fill', '#22c55e');
+      document.getElementById('log-pac').textContent = '[System Ready] PAC APIAKey initialized via PR_PAC_SET_ENABLED_KEYS. Click step 1 to begin.';
+    }
+  </script>
+</body>
+</html>

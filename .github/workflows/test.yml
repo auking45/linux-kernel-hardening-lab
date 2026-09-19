@@ -212,6 +212,14 @@ jobs:
             feature: ibt-shstk
             test: test_ibt_shstk
 
+          # Task 6-3: ARM64 BTI & PAC (Dual-Arch)
+          - arch: arm64
+            feature: bti-pac
+            test: test_bti_pac
+          - arch: x86_64
+            feature: bti-pac
+            test: test_bti_pac
+
 
     steps:
       - name: Checkout repository

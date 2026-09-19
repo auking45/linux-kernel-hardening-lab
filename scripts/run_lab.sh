@@ -15,6 +15,7 @@ AUTO_TEST=""
 EXTRA_CMDLINE=""
 USE_KVM=1
 TIMEOUT_SEC=0
+CUSTOM_CPU=""
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -24,6 +25,7 @@ usage() {
     echo "Options:"
     echo "  --arch <x86_64|arm64>      Target architecture (default: x86_64)"
     echo "  --feature <name>           Hardening feature from configs/features/ (default: base)"
+    echo "  --cpu <model>              CPU model (e.g. host, max, cortex-a72)"
     echo "  --build-only               Compile components without launching QEMU"
     echo "  --rebuild                  Force recompilation of the kernel"
     echo "  --test <script_name>       Run automated in-guest test script and poweroff"
@@ -49,6 +51,10 @@ parse_args() {
                 ;;
             --feature)
                 FEATURE_NAME="$2"
+                shift 2
+                ;;
+            --cpu)
+                CUSTOM_CPU="$2"
                 shift 2
                 ;;
             --build-only)
@@ -201,6 +207,11 @@ launch_virtual_machine() {
     local kernel_image="${target_build_dir}/${KERNEL_IMAGE_REL}"
 
     local qemu_args=("--arch" "${TARGET_ARCH}" "--kernel" "${kernel_image}")
+    if [[ -n "${CUSTOM_CPU}" ]]; then
+        qemu_args+=("--cpu" "${CUSTOM_CPU}")
+    elif [[ "${FEATURE_NAME}" =~ ^bti-pac && "${TARGET_ARCH}" == "arm64" ]]; then
+        qemu_args+=("--cpu" "max")
+    fi
     if [[ -n "${AUTO_TEST}" ]]; then
         qemu_args+=("--test" "${AUTO_TEST}")
     fi

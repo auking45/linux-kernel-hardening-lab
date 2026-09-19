@@ -15,6 +15,7 @@ EXTRA_CMDLINE=""
 AUTO_TEST=""
 USE_KVM=1
 TIMEOUT_SEC=0
+CUSTOM_CPU=""
 
 usage() {
     echo "Usage: $0 [OPTIONS]"
@@ -23,6 +24,7 @@ usage() {
     echo "  --arch <x86_64|arm64>      Virtual machine architecture (default: x86_64)"
     echo "  --kernel <path>            Path to kernel binary (bzImage or Image)"
     echo "  --initrd <path>            Path to initramfs archive (default: rootfs/initramfs-<arch>.cpio.gz)"
+    echo "  --cpu <model>              CPU model (e.g. host, max, cortex-a72)"
     echo "  --memory <size>            Memory allocation (default: 1024M)"
     echo "  --smp <N>                  Number of vCPUs (default: 2)"
     echo "  --cmdline <string>         Extra kernel command-line arguments"
@@ -46,6 +48,10 @@ parse_args() {
                 ;;
             --initrd)
                 INITRD_IMAGE="$2"
+                shift 2
+                ;;
+            --cpu)
+                CUSTOM_CPU="$2"
                 shift 2
                 ;;
             --memory)
@@ -133,7 +139,8 @@ build_kvm_flags() {
     if [[ "${USE_KVM}" -eq 1 && -e /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then
         if [[ "${TARGET_ARCH}" == "${host_arch}" ]]; then
             echo "[+] KVM hardware acceleration enabled."
-            KVM_FLAGS=("-enable-kvm" "-cpu" "host")
+            local cpu_opt="${CUSTOM_CPU:-host}"
+            KVM_FLAGS=("-enable-kvm" "-cpu" "${cpu_opt}")
             return
         else
             echo "[*] Cross-architecture mode: TCG software emulation enabled."
@@ -142,7 +149,7 @@ build_kvm_flags() {
         echo "[*] TCG software emulation mode enabled (KVM unavailable or disabled)."
     fi
 
-    local tcg_cpu="${QEMU_CPU}"
+    local tcg_cpu="${CUSTOM_CPU:-${QEMU_CPU}}"
     if [[ "${tcg_cpu}" == host* ]]; then
         tcg_cpu="max"
     fi
