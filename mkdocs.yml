@@ -129,6 +129,7 @@ nav:
           - KFENCE (Memory Safety Detector): features/19-kfence.md
       - 06. Structure & Compiler Level Protections:
           - Structleak (Stack Auto-Initialization): features/20-structleak.md
+          - Randstruct (Structure Layout Randomization): features/21-randstruct.md
 
 
 

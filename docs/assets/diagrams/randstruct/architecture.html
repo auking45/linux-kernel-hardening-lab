@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CONFIG_RANDSTRUCT Dynamic Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --perm-user: #fb923c;
+      --perm-kernel: #38bdf8;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    /* Simulation Toolbar (STYLE_GUIDE.md Standard) */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      gap: 12px;
+    }
+
+    .toolbar-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--accent-blue);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn:hover {
+      background: var(--accent-blue);
+      color: #0b132b;
+    }
+
+    .btn.active {
+      background: var(--accent-blue);
+      color: #0b132b;
+    }
+
+    .btn-danger {
+      border-color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .btn-danger:hover, .btn-danger.active {
+      background: var(--accent-red);
+      color: #ffffff;
+    }
+
+    .btn-success {
+      border-color: var(--accent-green);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .btn-success:hover, .btn-success.active {
+      background: var(--accent-green);
+      color: #ffffff;
+    }
+
+    .sim-ticker {
+      font-family: monospace;
+      font-size: 0.85rem;
+      padding: 6px 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      border: 1px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .ticker-led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+
+    .ticker-led.vulnerable {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--accent-red);
+    }
+
+    .diagram-wrapper {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      position: relative;
+      margin-bottom: 24px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    @keyframes flowDash {
+      to { stroke-dashoffset: -48; }
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.3; transform: scale(0.98); }
+      50% { opacity: 0.9; transform: scale(1.02); }
+    }
+
+    .flow-normal {
+      stroke-dasharray: 8 6;
+      animation: flowDash 1.2s linear infinite;
+    }
+
+    .flow-attack {
+      stroke-dasharray: 8 6;
+      animation: flowDash 0.8s linear infinite;
+      filter: drop-shadow(0 0 6px var(--accent-red));
+    }
+
+    .flow-shield {
+      stroke-dasharray: 6 4;
+      animation: flowDash 1.0s linear infinite;
+      filter: drop-shadow(0 0 6px var(--accent-green));
+    }
+
+    .paused * {
+      animation-play-state: paused !important;
+    }
+
+    .info-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 16px;
+    }
+
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .info-card h3 {
+      font-size: 1rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-card p, .info-card li {
+      font-size: 0.85rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .info-card ul {
+      margin-left: 18px;
+      margin-top: 6px;
+    }
+
+    .code-snippet {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: #38bdf8;
+      margin: 8px 0;
+      border: 1px solid rgba(56, 189, 248, 0.2);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>
+        <span>CONFIG_RANDSTRUCT Architecture Simulator</span>
+        <span class="badge">Category 6: Structure Hardening</span>
+      </h1>
+      <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 4px;">
+        Compile-time Structure Member Layout Randomization against Fixed-Offset Attacks
+      </p>
+    </div>
+    <div>
+      <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ Light Mode</button>
+    </div>
+  </header>
+
+  <!-- Control Toolbar -->
+  <div class="sim-toolbar">
+    <div class="toolbar-group">
+      <button class="btn" id="playBtn" onclick="togglePlay()">⏸️ 일시정지</button>
+      <button class="btn" id="resetBtn" onclick="resetSim()">🔄 초기화</button>
+      <div style="border-left: 1px solid var(--card-border); height: 24px; margin: 0 4px;"></div>
+      <button class="btn btn-danger" id="vulnModeBtn" onclick="setMode('vuln')">❌ 취약 흐름 (Baseline)</button>
+      <button class="btn btn-success active" id="hardenedModeBtn" onclick="setMode('hardened')">🛡️ 방어 흐름 (RANDSTRUCT)</button>
+    </div>
+
+    <div class="toolbar-group">
+      <span style="font-size: 0.8rem; color: var(--text-muted);">배속:</span>
+      <button class="btn" id="spd05" onclick="setSpeed(0.5)">0.5x</button>
+      <button class="btn active" id="spd10" onclick="setSpeed(1.0)">1.0x</button>
+      <button class="btn" id="spd15" onclick="setSpeed(1.5)">1.5x</button>
+    </div>
+
+    <div class="sim-ticker">
+      <div class="ticker-led" id="tickerLed"></div>
+      <span id="tickerText">CONFIG_RANDSTRUCT Active: Structure Layouts Shuffled via 256-bit Seed</span>
+    </div>
+  </div>
+
+  <!-- Interactive SVG Canvas -->
+  <div class="diagram-wrapper" id="canvasWrapper">
+    <svg viewBox="0 0 960 520" id="mainSvg">
+      <defs>
+        <!-- Filter Glows -->
+        <filter id="glow-cyan" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        <!-- Linear Gradients -->
+        <linearGradient id="gradKernel" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#1e293b" />
+          <stop offset="100%" stop-color="#0f172a" />
+        </linearGradient>
+        <linearGradient id="gradUser" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#2d1b11" />
+          <stop offset="100%" stop-color="#1c120c" />
+        </linearGradient>
+      </defs>
+
+      <!-- ============================================================ -->
+      <!-- Left: Attacker Process & Payload Assumption (Ring 3)         -->
+      <!-- ============================================================ -->
+      <rect x="20" y="20" width="280" height="480" rx="10" fill="url(#gradUser)" stroke="var(--card-border)" stroke-width="1.5" />
+      <text x="36" y="48" fill="var(--perm-user)" font-size="13" font-weight="700">ATTACKER PROCESS (Ring 3 / EL0)</text>
+
+      <g transform="translate(36, 70)">
+        <rect x="0" y="0" width="248" height="115" rx="6" fill="#292524" stroke="#78716c" stroke-width="1" />
+        <text x="12" y="22" fill="#fb923c" font-size="11" font-weight="700">공격자 고정 오프셋 가정 (헤더 분석)</text>
+        <text x="12" y="42" fill="#d6d3d1" font-size="10" font-family="monospace">Standard C struct cred / victim:</text>
+        <text x="12" y="60" fill="#fca5a5" font-size="10" font-family="monospace">• Offset 16 -> uid (4B, root=0)</text>
+        <text x="12" y="78" fill="#fca5a5" font-size="10" font-family="monospace">• Offset 40 -> callback (8B ptr)</text>
+        <text x="12" y="98" fill="#94a3b8" font-size="9">사전 컴파일된 고정 오프셋 악용</text>
+      </g>
+
+      <!-- Exploit Injected Payload Box -->
+      <g transform="translate(36, 205)">
+        <rect x="0" y="0" width="248" height="135" rx="6" fill="#450a0a" stroke="var(--accent-red)" stroke-width="1.5" />
+        <text x="12" y="22" fill="var(--accent-red)" font-size="11" font-weight="700">임의 쓰기 익스플로잇 페이로드</text>
+
+        <rect x="10" y="34" width="228" height="40" rx="4" fill="#1c1917" stroke="#7f1d1d" />
+        <text x="18" y="50" fill="#fca5a5" font-size="10" font-family="monospace">Write to [Base + 16]:</text>
+        <text x="18" y="66" fill="#ffffff" font-size="10" font-weight="700" font-family="monospace">0x00000000 (uid -> root)</text>
+
+        <rect x="10" y="82" width="228" height="40" rx="4" fill="#1c1917" stroke="#7f1d1d" />
+        <text x="18" y="98" fill="#fca5a5" font-size="10" font-family="monospace">Write to [Base + 40]:</text>
+        <text x="18" y="114" fill="#ffffff" font-size="10" font-weight="700" font-family="monospace">0xffff8000... (shellcode)</text>
+      </g>
+
+      <g transform="translate(36, 360)">
+        <rect x="0" y="0" width="248" height="120" rx="6" fill="#1e293b" stroke="var(--card-border)" />
+        <text x="12" y="22" fill="var(--text-main)" font-size="11" font-weight="700">공격 메커니즘 특성</text>
+        <text x="12" y="44" fill="var(--text-muted)" font-size="9.5">• 표준 리눅스 ABI 고정 레이아웃 가정</text>
+        <text x="12" y="64" fill="var(--text-muted)" font-size="9.5">• 임의 쓰기 원시값(Primitive)으로</text>
+        <text x="12" y="82" fill="var(--text-muted)" font-size="9.5">  특정 오프셋의 uid / 함수 포인터 덮어씀</text>
+        <text x="12" y="102" fill="var(--text-muted)" font-size="9.5">• KASLR과 무관하게 구조체 내부 타깃</text>
+      </g>
+
+      <!-- ============================================================ -->
+      <!-- Center: Kernel Memory Structure Layout (Ring 0)              -->
+      <!-- ============================================================ -->
+      <rect x="330" y="20" width="370" height="480" rx="10" fill="url(#gradKernel)" stroke="var(--card-border)" stroke-width="1.5" />
+      <text id="kernelDomainTitle" x="350" y="48" fill="var(--accent-blue)" font-size="13" font-weight="700">
+        KERNEL STRUCTURE LAYOUT (struct victim_struct, 48B)
+      </text>
+
+      <!-- Member Layout Visualization Column -->
+      <g id="structLayoutGroup" transform="translate(350, 70)">
+        <!-- Slot 0: Offset 0..7 (8B) -->
+        <g id="slot0" transform="translate(0, 0)">
+          <rect id="slot0Rect" x="0" y="0" width="330" height="48" rx="5" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+          <text id="slot0Offset" x="12" y="20" fill="#93c5fd" font-size="10" font-family="monospace">Offset 00..07 [8B]</text>
+          <text id="slot0Name" x="12" y="38" fill="#ffffff" font-size="12" font-weight="700">uint64_t magic</text>
+          <text id="slot0Val" x="200" y="30" fill="#bfdbfe" font-size="10" font-family="monospace">0x56494354494d3031</text>
+        </g>
+
+        <!-- Slot 1: Offset 8..15 (8B) -->
+        <g id="slot1" transform="translate(0, 56)">
+          <rect id="slot1Rect" x="0" y="0" width="330" height="48" rx="5" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+          <text id="slot1Offset" x="12" y="20" fill="#93c5fd" font-size="10" font-family="monospace">Offset 08..15 [8B]</text>
+          <text id="slot1Name" x="12" y="38" fill="#ffffff" font-size="12" font-weight="700">void (*privileged_op)(void)</text>
+          <text id="slot1Val" x="200" y="30" fill="#bfdbfe" font-size="10" font-family="monospace">safe_handler()</text>
+        </g>
+
+        <!-- Slot 2: Offset 16..19 (4B) -> Primary Target -->
+        <g id="slot2" transform="translate(0, 112)">
+          <rect id="slot2Rect" x="0" y="0" width="330" height="48" rx="5" fill="#14532d" stroke="var(--accent-green)" stroke-width="2" />
+          <text id="slot2Offset" x="12" y="20" fill="#86efac" font-size="10" font-family="monospace">Offset 16..19 [4B] 🎯 Attacker Target</text>
+          <text id="slot2Name" x="12" y="38" fill="#ffffff" font-size="12" font-weight="700">char session_token[0..3]</text>
+          <text id="slot2Val" x="200" y="30" fill="#dcfce7" font-size="10" font-family="monospace">"AUTH" (안전)</text>
+        </g>
+
+        <!-- Slot 3: Offset 20..23 (4B) -->
+        <g id="slot3" transform="translate(0, 168)">
+          <rect id="slot3Rect" x="0" y="0" width="330" height="48" rx="5" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+          <text id="slot3Offset" x="12" y="20" fill="#93c5fd" font-size="10" font-family="monospace">Offset 20..23 [4B]</text>
+          <text id="slot3Name" x="12" y="38" fill="#ffffff" font-size="12" font-weight="700">uint32_t gid</text>
+          <text id="slot3Val" x="200" y="30" fill="#bfdbfe" font-size="10" font-family="monospace">gid=1000</text>
+        </g>
+
+        <!-- Slot 4: Offset 24..35 (12B) -->
+        <g id="slot4" transform="translate(0, 224)">
+          <rect id="slot4Rect" x="0" y="0" width="330" height="48" rx="5" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+          <text id="slot4Offset" x="12" y="20" fill="#93c5fd" font-size="10" font-family="monospace">Offset 24..35 [12B]</text>
+          <text id="slot4Name" x="12" y="38" fill="#ffffff" font-size="12" font-weight="700">char session_token[4..15]</text>
+          <text id="slot4Val" x="200" y="30" fill="#bfdbfe" font-size="10" font-family="monospace">"ENTIC_USER!"</text>
+        </g>
+
+        <!-- Slot 5: Offset 36..39 (4B) -> Real UID in Hardened mode -->
+        <g id="slot5" transform="translate(0, 280)">
+          <rect id="slot5Rect" x="0" y="0" width="330" height="48" rx="5" fill="#0f172a" stroke="var(--accent-purple)" stroke-width="1.5" />
+          <text id="slot5Offset" x="12" y="20" fill="#d8b4fe" font-size="10" font-family="monospace">Offset 36..39 [4B] 🛡️ Shuffled UID Slot</text>
+          <text id="slot5Name" x="12" y="38" fill="#ffffff" font-size="12" font-weight="700">uint32_t uid</text>
+          <text id="slot5Val" x="200" y="30" fill="#e9d5ff" font-size="10" font-family="monospace">uid=1000 (보호됨)</text>
+        </g>
+
+        <!-- Slot 6: Offset 40..47 (8B) -->
+        <g id="slot6" transform="translate(0, 336)">
+          <rect id="slot6Rect" x="0" y="0" width="330" height="48" rx="5" fill="#1e3a8a" stroke="#3b82f6" stroke-width="1.5" />
+          <text id="slot6Offset" x="12" y="20" fill="#93c5fd" font-size="10" font-family="monospace">Offset 40..47 [8B] 🎯 Attacker Target 2</text>
+          <text id="slot6Name" x="12" y="38" fill="#ffffff" font-size="12" font-weight="700">void (*callback)(void)</text>
+          <text id="slot6Val" x="200" y="30" fill="#bfdbfe" font-size="10" font-family="monospace">normal_callback()</text>
+        </g>
+      </g>
+
+      <!-- Flow Paths from Attacker to Offset 16 -->
+      <path id="attackPath16" d="M 284 225 C 310 225 320 200 350 200" fill="none" stroke="var(--accent-green)" stroke-width="3" class="flow-shield" />
+      <circle id="particle16" r="6" fill="#22c55e" filter="url(#glow-green)">
+        <animateMotion id="motion16" dur="1.2s" repeatCount="indefinite" path="M 284 225 C 310 225 320 200 350 200" />
+      </circle>
+
+      <!-- ============================================================ -->
+      <!-- Right: Exploit Outcome & Kernel Integrity Banner             -->
+      <!-- ============================================================ -->
+      <rect x="730" y="20" width="210" height="480" rx="10" fill="#0f172a" stroke="var(--card-border)" stroke-width="1.5" />
+      <text x="746" y="48" fill="var(--text-main)" font-size="13" font-weight="700">EXPLOIT OUTCOME</text>
+
+      <!-- Status Card -->
+      <g transform="translate(746, 70)">
+        <rect id="outcomeBox" x="0" y="0" width="178" height="230" rx="8" fill="#052e16" stroke="var(--accent-green)" stroke-width="2" />
+        <text id="outcomeIcon" x="12" y="32" fill="var(--accent-green)" font-size="20">🛡️</text>
+        <text id="outcomeTitle" x="42" y="30" fill="var(--accent-green)" font-size="13" font-weight="700">DEFENSE ACTIVE</text>
+
+        <line x1="12" y1="46" x2="166" y2="46" stroke="rgba(34, 197, 94, 0.3)" stroke-width="1" />
+
+        <text id="outcomeLine1" x="12" y="70" fill="#86efac" font-size="10" font-weight="700">고정 오프셋 공격 실패!</text>
+        <text id="outcomeLine2" x="12" y="90" fill="#bbf7d0" font-size="9">Offset 16은 uid가 아님</text>
+        <text id="outcomeLine3" x="12" y="108" fill="#bbf7d0" font-size="9">session_token 덮어씀</text>
+        <text id="outcomeLine4" x="12" y="126" fill="#86efac" font-size="10" font-weight="700">g_victim.uid = 1000</text>
+        <text id="outcomeLine5" x="12" y="144" fill="#bbf7d0" font-size="9">권한 상승 차단 성공</text>
+
+        <rect x="10" y="160" width="158" height="55" rx="4" fill="#064e3b" />
+        <text x="18" y="178" fill="#a7f3d0" font-size="9" font-family="monospace">CONFIG_RANDSTRUCT=y</text>
+        <text x="18" y="194" fill="#a7f3d0" font-size="8">256-bit Random Seed</text>
+        <text x="18" y="206" fill="#6ee7b7" font-size="8">Per-build Layout Shuffle</text>
+      </g>
+
+      <!-- Real struct cred Offsets Widget -->
+      <g transform="translate(746, 320)">
+        <rect x="0" y="0" width="178" height="160" rx="8" fill="#1e293b" stroke="var(--card-border)" />
+        <text x="12" y="22" fill="var(--accent-blue)" font-size="11" font-weight="700">실제 struct cred 오프셋</text>
+        <line x1="12" y1="32" x2="166" y2="32" stroke="var(--card-border)" stroke-width="1" />
+
+        <text id="credUid" x="12" y="52" fill="#e2e8f0" font-size="9" font-family="monospace">cred->uid  : %zu</text>
+        <text id="credGid" x="12" y="72" fill="#e2e8f0" font-size="9" font-family="monospace">cred->gid  : %zu</text>
+        <text id="credEuid" x="12" y="92" fill="#e2e8f0" font-size="9" font-family="monospace">cred->euid : %zu</text>
+        <text id="credCaps" x="12" y="112" fill="#e2e8f0" font-size="9" font-family="monospace">cred->caps : %zu</text>
+
+        <text id="credDesc" x="12" y="136" fill="#94a3b8" font-size="8">빌드마다 오프셋 재배치됨</text>
+        <text id="credDesc2" x="12" y="148" fill="#38bdf8" font-size="8">하드코딩 root 공격 무력화</text>
+      </g>
+    </svg>
+  </div>
+
+  <!-- Technical Depth Cards -->
+  <div class="info-grid">
+    <div class="info-card">
+      <h3 style="color: var(--accent-red);">🎯 고정 오프셋 공격(Fixed-Offset Attacks)의 원리</h3>
+      <p>전통적인 커널 익스플로잇은 타깃 시스템의 구조체 멤버 배치가 C 언어 소스코드 선언 순서와 정확히 일치한다는 점을 악용합니다.</p>
+      <div class="code-snippet">
+// 공격자의 전형적인 임의 쓰기 페이로드:
+*(uint32_t*)(cred_addr + 16) = 0; // uid = 0 (root 권한 탈취)
+*(uint64_t*)(fops_addr + 40) = shellcode; // 함수 포인터 하이재킹
+      </div>
+      <p>공격자는 공개된 커널 헤더나 vmlinux 바이너리에서 오프셋을 사전에 계산하여 한 번에 권한을 탈취합니다.</p>
+    </div>
+
+    <div class="info-card">
+      <h3 style="color: var(--accent-green);">🛡️ CONFIG_RANDSTRUCT의 무작위화 방어</h3>
+      <p>컴파일 시점(Build-time)에 256비트 암호학적 난수 시드(<code>randstruct.seed</code>)를 생성하여 <code>__randomize_layout</code> 구조체 멤버를 뒤섞습니다.</p>
+      <ul>
+        <li><strong>무작위화 대상:</strong> <code>__randomize_layout</code>이 명시된 구조체(<code>struct cred</code> 등) 및 함수 포인터로만 구성된 구조체(<code>struct file_operations</code> 등).</li>
+        <li><strong>공격 차단:</strong> 공격자가 Offset 16에 0을 덮어쓰더라도 해당 위치는 <code>uid</code>가 아닌 토큰이나 패딩이므로 권한 상승이 완전히 실패함.</li>
+        <li><strong>빌드 고유성:</strong> 배포판 커널 빌드마다 시드가 다르므로 단일 익스플로잇으로 모든 시스템을 공격하는 것이 불가능함.</li>
+      </ul>
+    </div>
+
+    <div class="info-card">
+      <h3 style="color: var(--accent-purple);">⚡ GCC 플러그인 vs Clang 16+ 네이티브 구현</h3>
+      <p>과거 PaX/Grsecurity의 GCC 플러그인에서 시작하여 현대 Clang 컴파일러로 표준화되었습니다.</p>
+      <ul>
+        <li><strong>Clang 16+ (LLVM=1):</strong> <code>-frandomize-layout-seed-file</code> 옵션으로 네이티브 레이아웃 셔플링 지원. 크로스 컴파일(ARM64, x86_64)에 이상적임.</li>
+        <li><strong>GCC 플러그인:</strong> <code>scripts/gcc-plugins/randomize_layout_plugin.c</code>를 통해 지원되나 플러그인 헤더 패키지 필요.</li>
+        <li><strong>성능 영향:</strong> 구조체 멤버 배치에 따른 캐시 미스(Cache Miss) 증가로 약 1% 미만의 미세한 오버헤드만 발생함.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  let isPlaying = true;
+  let currentMode = 'hardened';
+  let currentSpeed = 1.0;
+
+  function toggleTheme() {
+    const isLight = document.body.getAttribute('data-theme') === 'light';
+    if (isLight) {
+      document.body.removeAttribute('data-theme');
+      document.getElementById('themeBtn').textContent = '☀️ Light Mode';
+    } else {
+      document.body.setAttribute('data-theme', 'light');
+      document.getElementById('themeBtn').textContent = '🌙 Dark Mode';
+    }
+  }
+
+  function togglePlay() {
+    const wrapper = document.getElementById('canvasWrapper');
+    const playBtn = document.getElementById('playBtn');
+    isPlaying = !isPlaying;
+    if (isPlaying) {
+      wrapper.classList.remove('paused');
+      playBtn.textContent = '⏸️ 일시정지';
+    } else {
+      wrapper.classList.add('paused');
+      playBtn.textContent = '▶️ 재생';
+    }
+  }
+
+  function resetSim() {
+    const wrapper = document.getElementById('canvasWrapper');
+    wrapper.classList.remove('paused');
+    isPlaying = true;
+    document.getElementById('playBtn').textContent = '⏸️ 일시정지';
+    setMode(currentMode);
+  }
+
+  function setSpeed(spd) {
+    currentSpeed = spd;
+    document.getElementById('spd05').classList.remove('active');
+    document.getElementById('spd10').classList.remove('active');
+    document.getElementById('spd15').classList.remove('active');
+
+    if (spd === 0.5) document.getElementById('spd05').classList.add('active');
+    else if (spd === 1.0) document.getElementById('spd10').classList.add('active');
+    else if (spd === 1.5) document.getElementById('spd15').classList.add('active');
+
+    const duration = (1.2 / spd) + 's';
+    const path = document.getElementById('attackPath16');
+    if (path) path.style.animationDuration = (0.8 / spd) + 's';
+
+    const motion = document.getElementById('motion16');
+    if (motion) motion.setAttribute('dur', duration);
+  }
+
+  function setMode(mode) {
+    currentMode = mode;
+    const vulnBtn = document.getElementById('vulnModeBtn');
+    const hardenedBtn = document.getElementById('hardenedModeBtn');
+    const tickerLed = document.getElementById('tickerLed');
+    const tickerText = document.getElementById('tickerText');
+
+    const attackPath = document.getElementById('attackPath16');
+    const particle = document.getElementById('particle16');
+
+    // Slots in Kernel Layout
+    const s0_name = document.getElementById('slot0Name');
+    const s0_val = document.getElementById('slot0Val');
+    const s1_name = document.getElementById('slot1Name');
+    const s1_val = document.getElementById('slot1Val');
+
+    const s2_rect = document.getElementById('slot2Rect');
+    const s2_name = document.getElementById('slot2Name');
+    const s2_val = document.getElementById('slot2Val');
+
+    const s5_rect = document.getElementById('slot5Rect');
+    const s5_name = document.getElementById('slot5Name');
+    const s5_val = document.getElementById('slot5Val');
+    const s5_offset = document.getElementById('slot5Offset');
+
+    // Outcome Card
+    const outcomeBox = document.getElementById('outcomeBox');
+    const outcomeIcon = document.getElementById('outcomeIcon');
+    const outcomeTitle = document.getElementById('outcomeTitle');
+    const l1 = document.getElementById('outcomeLine1');
+    const l2 = document.getElementById('outcomeLine2');
+    const l3 = document.getElementById('outcomeLine3');
+    const l4 = document.getElementById('outcomeLine4');
+    const l5 = document.getElementById('outcomeLine5');
+
+    // Cred offsets
+    const cUid = document.getElementById('credUid');
+    const cGid = document.getElementById('credGid');
+    const cEuid = document.getElementById('credEuid');
+    const cCaps = document.getElementById('credCaps');
+
+    if (mode === 'vuln') {
+      vulnBtn.classList.add('active');
+      hardenedBtn.classList.remove('active');
+      tickerLed.classList.add('vulnerable');
+      tickerText.textContent = "WARNING: CONFIG_RANDSTRUCT_NONE - Sequential Layout! Fixed-offset Exploit Succeeds!";
+
+      // Flow Path: Attack (Red)
+      attackPath.setAttribute('stroke', 'var(--accent-red)');
+      attackPath.setAttribute('class', 'flow-attack');
+      particle.setAttribute('fill', '#ef4444');
+      particle.setAttribute('filter', 'url(#glow-red)');
+
+      // Layout: Standard Sequential (Baseline)
+      // Slot 2 is UID at Offset 16!
+      s2_rect.setAttribute('fill', '#7f1d1d');
+      s2_rect.setAttribute('stroke', 'var(--accent-red)');
+      s2_name.textContent = "uint32_t uid (4B) 💥 OVERWRITTEN";
+      s2_val.textContent = "uid = 0 (ROOT 탈취!)";
+      s2_val.setAttribute('fill', '#fecaca');
+
+      // Slot 5 is session_token
+      s5_rect.setAttribute('fill', '#1e3a8a');
+      s5_rect.setAttribute('stroke', '#3b82f6');
+      s5_offset.textContent = "Offset 36..39 [4B]";
+      s5_name.textContent = "char session_token[12..15]";
+      s5_val.textContent = "\"ER!\"";
+
+      // Outcome: Vulnerable (Red)
+      outcomeBox.setAttribute('fill', '#450a0a');
+      outcomeBox.setAttribute('stroke', 'var(--accent-red)');
+      outcomeIcon.textContent = "🚨";
+      outcomeTitle.textContent = "EXPLOIT SUCCESS";
+      outcomeTitle.setAttribute('fill', 'var(--accent-red)');
+      l1.textContent = "고정 오프셋 공격 성공!";
+      l1.setAttribute('fill', '#fca5a5');
+      l2.textContent = "Offset 16 = uid 정확히 일치";
+      l2.setAttribute('fill', '#fecaca');
+      l3.textContent = "0x00000000 덮어쓰기 완료";
+      l3.setAttribute('fill', '#fecaca');
+      l4.textContent = "g_victim.uid = 0 (root)";
+      l4.setAttribute('fill', '#f87171');
+      l5.textContent = "비특권 프로세스 root 탈취!";
+      l5.setAttribute('fill', '#fca5a5');
+
+      // Cred: Sequential
+      cUid.textContent  = "cred->uid  :   8 (고정)";
+      cGid.textContent  = "cred->gid  :  12 (고정)";
+      cEuid.textContent = "cred->euid :  24 (고정)";
+      cCaps.textContent = "cred->caps :  40 (고정)";
+
+    } else {
+      // Hardened Mode (RANDSTRUCT)
+      hardenedBtn.classList.add('active');
+      vulnBtn.classList.remove('active');
+      tickerLed.classList.remove('vulnerable');
+      tickerText.textContent = "CONFIG_RANDSTRUCT Active: Structure Layouts Shuffled via 256-bit Seed";
+
+      // Flow Path: Shield (Green)
+      attackPath.setAttribute('stroke', 'var(--accent-green)');
+      attackPath.setAttribute('class', 'flow-shield');
+      particle.setAttribute('fill', '#22c55e');
+      particle.setAttribute('filter', 'url(#glow-green)');
+
+      // Layout: Shuffled
+      // Slot 2 is session_token at Offset 16!
+      s2_rect.setAttribute('fill', '#14532d');
+      s2_rect.setAttribute('stroke', 'var(--accent-green)');
+      s2_name.textContent = "char session_token[0..3]";
+      s2_val.textContent = "\"AUTH\" (안전: 빗나감)";
+      s2_val.setAttribute('fill', '#dcfce7');
+
+      // Slot 5 is UID moved to Offset 36!
+      s5_rect.setAttribute('fill', '#0f172a');
+      s5_rect.setAttribute('stroke', 'var(--accent-purple)');
+      s5_offset.textContent = "Offset 36..39 [4B] 🛡️ Shuffled UID";
+      s5_name.textContent = "uint32_t uid";
+      s5_val.textContent = "uid=1000 (보호됨)";
+
+      // Outcome: Protected (Green)
+      outcomeBox.setAttribute('fill', '#052e16');
+      outcomeBox.setAttribute('stroke', 'var(--accent-green)');
+      outcomeIcon.textContent = "🛡️";
+      outcomeTitle.textContent = "DEFENSE ACTIVE";
+      outcomeTitle.setAttribute('fill', 'var(--accent-green)');
+      l1.textContent = "고정 오프셋 공격 실패!";
+      l1.setAttribute('fill', '#86efac');
+      l2.textContent = "Offset 16은 uid가 아님";
+      l2.setAttribute('fill', '#bbf7d0');
+      l3.textContent = "session_token 덮어씀";
+      l3.setAttribute('fill', '#bbf7d0');
+      l4.textContent = "g_victim.uid = 1000";
+      l4.setAttribute('fill', '#86efac');
+      l5.textContent = "권한 상승 차단 성공";
+      l5.setAttribute('fill', '#bbf7d0');
+
+      // Cred: Randomized
+      cUid.textContent  = "cred->uid  :  48 (랜덤)";
+      cGid.textContent  = "cred->gid  :  96 (랜덤)";
+      cEuid.textContent = "cred->euid :  16 (랜덤)";
+      cCaps.textContent = "cred->caps :  72 (랜덤)";
+    }
+  }
+</script>
+</body>
+</html>
+

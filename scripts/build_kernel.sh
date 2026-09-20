@@ -115,6 +115,8 @@ get_llvm_flags() {
         echo "LLVM=1"
     elif [[ "${TARGET_ARCH}" == "arm64" ]] && { [[ "${FEATURE_NAME}" =~ ^bti-pac ]] || [[ -f "${feature_config}" && $(grep -c "CONFIG_ARM64_BTI" "${feature_config}") -gt 0 ]]; }; then
         echo "LLVM=1"
+    elif [[ "${FEATURE_NAME}" =~ ^randstruct ]] || [[ -f "${feature_config}" && $(grep -c "CONFIG_RANDSTRUCT" "${feature_config}") -gt 0 ]]; then
+        echo "LLVM=1"
     fi
 }
 

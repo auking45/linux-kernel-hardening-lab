@@ -99,7 +99,7 @@
 ### [Phase 8] Category 6: Structure & Compiler Level Protections
 
 - [x] **Task 8-1:** `CONFIG_GCC_PLUGIN_STRUCTLEAK` (초기화되지 않은 커널 구조체 정보 누출 방어).
-- [ ] **Task 8-2:** `CONFIG_GCC_PLUGIN_RANDSTRUCT` (커널 핵심 구조체 멤버 오프셋 랜덤화).
+- [x] **Task 8-2:** `CONFIG_GCC_PLUGIN_RANDSTRUCT` (커널 핵심 구조체 멤버 오프셋 랜덤화).
 
 ### [Phase 9] Category 7: Speculative Execution Defenses
 
