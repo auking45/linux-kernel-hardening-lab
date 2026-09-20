@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spectre v1 & array_index_nospec Dynamic Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --perm-user: #fb923c;
+      --perm-kernel: #38bdf8;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--accent-blue);
+      color: #0b132b;
+      font-weight: 700;
+    }
+
+    /* Standard Simulation Toolbar */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      border-radius: 8px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 4px;
+    }
+
+    button {
+      background: var(--bg-color);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    button.active {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .sim-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    .status-dot.danger {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--accent-red);
+    }
+
+    .status-dot.warning {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--accent-yellow);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+
+    /* Scenario Tabs */
+    .scenario-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .scenario-btn {
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      border-radius: 6px;
+    }
+
+    /* Canvas Panel */
+    .canvas-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    svg {
+      width: 100%;
+      height: 520px;
+      display: block;
+    }
+
+    /* Dynamic SVG Animations */
+    @keyframes flowDash {
+      to { stroke-dashoffset: -48; }
+    }
+
+    .flow-path {
+      stroke-dasharray: 8 6;
+      animation: flowDash 1.2s linear infinite;
+    }
+
+    .flow-path.attack {
+      stroke: var(--accent-red);
+      animation-duration: 0.8s;
+      filter: drop-shadow(0 0 6px var(--accent-red));
+    }
+
+    .flow-path.normal {
+      stroke: var(--accent-blue);
+    }
+
+    .flow-path.blocked {
+      stroke: var(--accent-yellow);
+      stroke-dasharray: 6 4;
+    }
+
+    .flow-path.speculative {
+      stroke: var(--accent-purple);
+      stroke-dasharray: 4 4;
+      animation: flowDash 0.6s linear infinite;
+    }
+
+    @keyframes rippleExpand {
+      0% { r: 6px; opacity: 1; stroke-width: 3; }
+      100% { r: 42px; opacity: 0; stroke-width: 1; }
+    }
+
+    .trap-ripple {
+      animation: rippleExpand 1.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    }
+
+    @keyframes ghostPulse {
+      0%, 100% { opacity: 0.25; }
+      50% { opacity: 0.85; }
+    }
+
+    .ghost-box {
+      animation: ghostPulse 1.8s ease-in-out infinite;
+    }
+
+    /* Explanatory Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .card h3 {
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent-blue);
+    }
+
+    .card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .code-box {
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      margin-top: 8px;
+      overflow-x: auto;
+    }
+
+    /* Comparison Table in Tab 4 */
+    table.compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 10px;
+    }
+
+    table.compare-table th,
+    table.compare-table td {
+      border: 1px solid var(--card-border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    table.compare-table th {
+      background: var(--bg-color);
+      color: var(--accent-blue);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>
+      <span>⚡ Spectre v1 & array_index_nospec</span>
+      <span class="badge">SPECULATIVE EXECUTION DEFENSE</span>
+    </h1>
+    <button id="themeToggleBtn">🌓 테마 전환</button>
+  </header>
+
+  <!-- Simulation Toolbar -->
+  <div class="sim-toolbar">
+    <div class="btn-group">
+      <button id="playBtn" class="active">⏸️ 일시정지</button>
+      <button id="resetBtn">🔄 처음부터</button>
+    </div>
+
+    <div class="btn-group">
+      <button class="speed-btn" data-speed="0.5">0.5x</button>
+      <button class="speed-btn active" data-speed="1.0">1.0x</button>
+      <button class="speed-btn" data-speed="1.5">1.5x</button>
+    </div>
+
+    <div class="sim-status">
+      <div id="statusDot" class="status-dot"></div>
+      <span id="statusText">정상 모델: 합법적 인덱스 경계 내 실행</span>
+    </div>
+  </div>
+
+  <!-- Scenario Navigation Tabs -->
+  <div class="scenario-tabs">
+    <button class="scenario-btn active" data-tab="1">Tab 1: 합법적 정상 실행 (In-Bounds)</button>
+    <button class="scenario-btn" data-tab="2">Tab 2: Spectre v1 공격 벡터 (Bypass & Leak)</button>
+    <button class="scenario-btn" data-tab="3">Tab 3: nospec 방어 메커니즘 (sbb/csdb 마스킹)</button>
+    <button class="scenario-btn" data-tab="4">Tab 4: 보안/성능 비교 매트릭스 (Matrix)</button>
+  </div>
+
+  <!-- Main Canvas Panel -->
+  <div class="canvas-panel">
+    <svg id="simCanvas" viewBox="0 0 1100 500">
+      <defs>
+        <!-- Marker definitions -->
+        <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#38bdf8" />
+        </marker>
+        <marker id="arrow-red" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#ef4444" />
+        </marker>
+        <marker id="arrow-purple" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#a855f7" />
+        </marker>
+        <marker id="arrow-yellow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#f59e0b" />
+        </marker>
+        <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#22c55e" />
+        </marker>
+
+        <!-- Filters -->
+        <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="glow-purple" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      <!-- Background Partition Areas -->
+      <!-- User Space -->
+      <rect x="20" y="30" width="260" height="440" rx="8" fill="#1c2541" stroke="#3a506b" stroke-width="1.5" />
+      <text x="35" y="55" fill="#fb923c" font-weight="bold" font-size="13">USER SPACE (Ring 3 / EL0)</text>
+      <text x="35" y="75" fill="#94a3b8" font-size="11">비특권 프로세스 (공격자 / lab)</text>
+
+      <!-- CPU Execution Engine & Speculation Window -->
+      <rect x="310" y="30" width="460" height="440" rx="8" fill="#151e3f" stroke="#3a506b" stroke-width="1.5" />
+      <text x="325" y="55" fill="#38bdf8" font-weight="bold" font-size="13">CPU PIPELINE & SPECULATIVE ENGINE</text>
+      <text x="325" y="75" fill="#94a3b8" font-size="11">비순차 실행(OoO) / 분기 예측기 / ROB</text>
+
+      <!-- Kernel Memory & Cache Hierarchy -->
+      <rect x="800" y="30" width="280" height="440" rx="8" fill="#1c2541" stroke="#3a506b" stroke-width="1.5" />
+      <text x="815" y="55" fill="#38bdf8" font-weight="bold" font-size="13">KERNEL MEMORY & CPU CACHE</text>
+      <text x="815" y="75" fill="#94a3b8" font-size="11">L1/L2/L3 Cache & Probe Array</text>
+
+      <!-- Dynamic Content Injection Container -->
+      <g id="dynamicContent"></g>
+    </svg>
+  </div>
+
+  <!-- Detailed Explanation Cards Grid -->
+  <div class="cards-grid" id="cardsGrid">
+    <!-- Populated by JS based on active tab -->
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('simCanvas');
+  const dynamicContent = document.getElementById('dynamicContent');
+  const cardsGrid = document.getElementById('cardsGrid');
+  const playBtn = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const speedBtns = document.querySelectorAll('.speed-btn');
+  const scenarioBtns = document.querySelectorAll('.scenario-btn');
+
+  let currentTab = 1;
+  let isPlaying = true;
+  let currentSpeed = 1.0;
+
+  // Theme Toggle
+  themeToggleBtn.addEventListener('click', () => {
+    const isLight = document.body.getAttribute('data-theme') === 'light';
+    document.body.setAttribute('data-theme', isLight ? 'dark' : 'light');
+  });
+
+  // Play / Pause
+  playBtn.addEventListener('click', () => {
+    isPlaying = !isPlaying;
+    playBtn.textContent = isPlaying ? '⏸️ 일시정지' : '▶️ 재생';
+    playBtn.classList.toggle('active', isPlaying);
+    toggleAnimationPlayState(isPlaying);
+  });
+
+  function toggleAnimationPlayState(play) {
+    const animElements = document.querySelectorAll('#dynamicContent *');
+    animElements.forEach(el => {
+      el.style.animationPlayState = play ? 'running' : 'paused';
+    });
+    const animMotion = document.querySelectorAll('#dynamicContent animateMotion');
+    animMotion.forEach(am => {
+      if (play) am.beginElement();
+    });
+  }
+
+  // Speed Control
+  speedBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      speedBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentSpeed = parseFloat(btn.getAttribute('data-speed'));
+      applyAnimationSpeed(currentSpeed);
+    });
+  });
+
+  function applyAnimationSpeed(speed) {
+    const factor = 1.0 / speed;
+    const flowingPaths = document.querySelectorAll('.flow-path');
+    flowingPaths.forEach(p => {
+      p.style.animationDuration = `${1.2 * factor}s`;
+    });
+    const particles = document.querySelectorAll('animateMotion');
+    particles.forEach(am => {
+      am.setAttribute('dur', `${1.5 * factor}s`);
+    });
+  }
+
+  // Reset
+  resetBtn.addEventListener('click', () => {
+    renderTab(currentTab);
+  });
+
+  // Tab Selection
+  scenarioBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      scenarioBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTab = parseInt(btn.getAttribute('data-tab'));
+      renderTab(currentTab);
+    });
+  });
+
+  function renderTab(tab) {
+    dynamicContent.innerHTML = '';
+    cardsGrid.innerHTML = '';
+
+    if (tab === 1) renderTab1();
+    else if (tab === 2) renderTab2();
+    else if (tab === 3) renderTab3();
+    else if (tab === 4) renderTab4();
+
+    applyAnimationSpeed(currentSpeed);
+    toggleAnimationPlayState(isPlaying);
+  }
+
+  /* ----------------------------------------------------
+   * Tab 1: Normal In-Bounds Operation
+   * ---------------------------------------------------- */
+  function renderTab1() {
+    statusDot.className = 'status-dot';
+    statusText.textContent = '정상 모델: 유효 인덱스(0..15) 경계 검사 통과 및 안전한 접근';
+
+    dynamicContent.innerHTML = `
+      <!-- Userland Calling Block -->
+      <g transform="translate(40, 120)">
+        <rect width="220" height="90" rx="6" fill="#151e3f" stroke="#38bdf8" stroke-width="1.5" />
+        <text x="15" y="28" fill="#38bdf8" font-size="12" font-weight="bold">User Application Call</text>
+        <text x="15" y="50" fill="#94a3b8" font-size="11">ioctl / sys_write(fd, idx)</text>
+        <rect x="15" y="60" width="120" height="20" rx="3" fill="#0b132b" />
+        <text x="22" y="74" fill="#22c55e" font-family="monospace" font-size="11">index = 0x05 (< 16)</text>
+      </g>
+
+      <!-- Branch Predictor & Pipeline -->
+      <g transform="translate(340, 110)">
+        <rect width="400" height="130" rx="6" fill="#1c2541" stroke="#3a506b" stroke-width="1.5" />
+        <text x="15" y="28" fill="#38bdf8" font-size="12" font-weight="bold">Branch Predictor Unit (BPU)</text>
+        <text x="15" y="50" fill="#f8fafc" font-family="monospace" font-size="12">if (index < array1_size) [size=16]</text>
+        <rect x="15" y="65" width="260" height="24" rx="4" fill="#0b132b" stroke="#22c55e" />
+        <text x="25" y="81" fill="#22c55e" font-size="11" font-weight="bold">✅ In-Bounds Confirmed (Branch Taken)</text>
+        <text x="15" y="112" fill="#94a3b8" font-size="11">정상 조건 분기: 비순차 투기 없이 파이프라인 커밋</text>
+      </g>
+
+      <!-- Kernel Memory: array1 -->
+      <g transform="translate(820, 110)">
+        <rect width="240" height="100" rx="6" fill="#151e3f" stroke="#38bdf8" stroke-width="1.5" />
+        <text x="15" y="28" fill="#38bdf8" font-size="12" font-weight="bold">array1[16] (Public Array)</text>
+        <rect x="15" y="42" width="210" height="24" rx="3" fill="#0b132b" stroke="#22c55e" />
+        <text x="25" y="58" fill="#22c55e" font-family="monospace" font-size="11">val = array1[5] = 0x06</text>
+        <text x="15" y="85" fill="#94a3b8" font-size="11">합법적 공개 데이터 접근 완료</text>
+      </g>
+
+      <!-- Probe Array & Cache -->
+      <g transform="translate(820, 260)">
+        <rect width="240" height="180" rx="6" fill="#151e3f" stroke="#3a506b" stroke-width="1.5" />
+        <text x="15" y="28" fill="#38bdf8" font-size="12" font-weight="bold">probe_array[256 * 512] (Cache)</text>
+        <text x="15" y="48" fill="#94a3b8" font-size="11">Secondary Cache Array (128 KB)</text>
+
+        <!-- Cache lines grid -->
+        <g transform="translate(15, 60)">
+          ${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => `
+            <rect x="${(i % 3) * 68}" y="${Math.floor(i / 3) * 32}" width="62" height="26" rx="3"
+                  fill="${i === 6 ? '#22c55e' : '#0b132b'}"
+                  stroke="${i === 6 ? '#22c55e' : '#3a506b'}" />
+            <text x="${(i % 3) * 68 + 8}" y="${Math.floor(i / 3) * 32 + 17}"
+                  fill="${i === 6 ? '#0b132b' : '#94a3b8'}" font-size="10" font-family="monospace">
+              Line ${i * 32}
+            </text>
+          `).join('')}
+        </g>
+        <text x="15" y="168" fill="#22c55e" font-size="11">Line 192 (0x06) 정상 캐시 적재</text>
+      </g>
+
+      <!-- Flow Lines -->
+      <path id="flowP1" d="M 260 165 L 340 165" fill="none" class="flow-path normal" marker-end="url(#arrow-blue)" />
+      <path id="flowP2" d="M 740 160 L 820 160" fill="none" class="flow-path normal" marker-end="url(#arrow-blue)" />
+      <path id="flowP3" d="M 940 210 L 940 260" fill="none" class="flow-path normal" marker-end="url(#arrow-blue)" />
+
+      <!-- Pulse Particle -->
+      <circle r="6" fill="#38bdf8" filter="url(#glow-blue)">
+        <animateMotion dur="1.5s" repeatCount="indefinite" path="M 260 165 L 340 165" />
+      </circle>
+      <circle r="6" fill="#38bdf8" filter="url(#glow-blue)">
+        <animateMotion dur="1.5s" repeatCount="indefinite" path="M 740 160 L 820 160" />
+      </circle>
+    `;
+
+    cardsGrid.innerHTML = `
+      <div class="card">
+        <h3>🔹 정상 경계 검사 메커니즘</h3>
+        <p>프로그램이 배열 크기(16) 미만의 합법적 인덱스를 요청할 경우, CPU는 조건 분기문(<code>index < size</code>)을 즉시 참(True)으로 평가하고 해당 메모리를 읽어옵니다.</p>
+        <div class="code-box">if (index < 16) {<br>&nbsp;&nbsp;val = array1[index];<br>&nbsp;&nbsp;probe[val * 512];<br>}</div>
+      </div>
+      <div class="card">
+        <h3>🔹 결정론적 파이프라인 커밋</h3>
+        <p>분기 예측기와 실제 실행 결과가 일치하므로 투기적 실행 롤백이나 마이크로아키텍처 불일치가 발생하지 않으며, 캐시 상태 역시 합법적인 접근 내역만을 반영합니다.</p>
+      </div>
+      <div class="card">
+        <h3>🔹 부채널 누출 없음</h3>
+        <p>공격자가 Flush+Reload를 수행하더라도 자신이 전달한 정상 인덱스의 캐시 라인 외에는 어떠한 커널 비밀 메모리도 캐시에 잔류하지 않습니다.</p>
+      </div>
+    `;
+  }
+
+  /* ----------------------------------------------------
+   * Tab 2: Spectre v1 Bounds Check Bypass Attack Vector
+   * ---------------------------------------------------- */
+  function renderTab2() {
+    statusDot.className = 'status-dot danger';
+    statusText.textContent = '공격 벡터 (Baseline): 분기 오훈련 -> 투기적 OOB 접근 -> Flush+Reload 비밀 유출';
+
+    dynamicContent.innerHTML = `
+      <!-- Userland Attacker Block -->
+      <g transform="translate(40, 100)">
+        <rect width="220" height="150" rx="6" fill="#151e3f" stroke="#ef4444" stroke-width="1.5" />
+        <text x="15" y="25" fill="#ef4444" font-size="12" font-weight="bold">Attacker (Mistraining & Exploit)</text>
+        <text x="15" y="45" fill="#94a3b8" font-size="11">1. Train BPU (idx=0..15 × 5회)</text>
+        <text x="15" y="65" fill="#ef4444" font-size="11" font-weight="bold">2. Trigger OOB: idx = 16 (Secret)</text>
+        <text x="15" y="85" fill="#94a3b8" font-size="11">3. Flush probe_array</text>
+        <rect x="15" y="100" width="190" height="35" rx="4" fill="#0b132b" stroke="#ef4444" />
+        <text x="22" y="116" fill="#ef4444" font-family="monospace" font-size="11">Reload & Measure rdtsc()</text>
+        <text x="22" y="128" fill="#fb923c" font-size="10">Leaked: 'F' (0x46, 52 cycles)</text>
+      </g>
+
+      <!-- CPU Pipeline with Speculation Bubble -->
+      <g transform="translate(330, 90)">
+        <rect width="420" height="360" rx="6" fill="#151e3f" stroke="#ef4444" stroke-width="1.5" />
+        <text x="15" y="25" fill="#ef4444" font-size="12" font-weight="bold">CPU Transient / Speculative Window</text>
+
+        <!-- Delay on array1_size -->
+        <rect x="15" y="40" width="390" height="60" rx="4" fill="#0b132b" stroke="#f59e0b" />
+        <text x="25" y="58" fill="#f59e0b" font-weight="bold" font-size="11">⚠️ Memory Stall on array1_size (L1 Cache Miss)</text>
+        <text x="25" y="78" fill="#94a3b8" font-size="11">CPU는 조건 분기 판정 대기 중(100~200 cycles)</text>
+        <text x="25" y="92" fill="#ef4444" font-size="10">BPU가 과거 이력으로 인해 "Taken(참)"으로 강력 예측!</text>
+
+        <!-- Ghost Speculative Execution Box -->
+        <rect x="15" y="115" width="390" height="150" rx="4" fill="rgba(168, 85, 247, 0.15)" stroke="#a855f7" stroke-width="1.5" class="ghost-box" />
+        <text x="25" y="135" fill="#a855f7" font-weight="bold" font-size="12">👻 Transient Speculative Execution (ROB)</text>
+        <text x="25" y="158" fill="#f8fafc" font-family="monospace" font-size="11">idx = 16 (경계 초과 OOB 주소 계산)</text>
+        <text x="25" y="178" fill="#ef4444" font-family="monospace" font-size="11">secret = array1[16] -> 'F' (0x46) 투기 로드!</text>
+        <text x="25" y="198" fill="#a855f7" font-family="monospace" font-size="11">probe[0x46 * 512] -> L1/L2 캐시 라인 강제 적재!</text>
+
+        <!-- Rollback Notification -->
+        <rect x="15" y="280" width="390" height="55" rx="4" fill="#0b132b" stroke="#ef4444" />
+        <text x="25" y="300" fill="#ef4444" font-weight="bold" font-size="11">❌ Branch Miss Resolved -> Architectural Rollback!</text>
+        <text x="25" y="320" fill="#94a3b8" font-size="10">레지스터 상태는 롤백되나, [L1 캐시 상태는 잔류!]</text>
+      </g>
+
+      <!-- Kernel Memory: array1 + Secret -->
+      <g transform="translate(820, 90)">
+        <rect width="240" height="130" rx="6" fill="#151e3f" stroke="#3a506b" stroke-width="1.5" />
+        <text x="15" y="25" fill="#38bdf8" font-size="12" font-weight="bold">Kernel Memory Layout</text>
+        
+        <rect x="15" y="38" width="210" height="30" rx="3" fill="#0b132b" stroke="#38bdf8" />
+        <text x="22" y="57" fill="#38bdf8" font-family="monospace" font-size="11">array1[0..15] (Public, 16B)</text>
+
+        <rect x="15" y="75" width="210" height="38" rx="3" fill="#0b132b" stroke="#ef4444" stroke-width="1.5" />
+        <text x="22" y="93" fill="#ef4444" font-family="monospace" font-size="11">secret[0..47] @ Offset +16</text>
+        <text x="22" y="106" fill="#fb923c" font-size="10">"FLAG{SPECTRE_V1...}"</text>
+      </g>
+
+      <!-- Probe Array under Cache Attack -->
+      <g transform="translate(820, 240)">
+        <rect width="240" height="210" rx="6" fill="#151e3f" stroke="#ef4444" stroke-width="1.5" />
+        <text x="15" y="25" fill="#ef4444" font-size="12" font-weight="bold">Probe Array (Flush+Reload)</text>
+        <text x="15" y="45" fill="#94a3b8" font-size="10">Cache Line 0x46 ('F' * 512) HOT!</text>
+
+        <g transform="translate(15, 55)">
+          ${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => `
+            <rect x="${(i % 3) * 68}" y="${Math.floor(i / 3) * 36}" width="62" height="30" rx="3"
+                  fill="${i === 4 ? '#ef4444' : '#0b132b'}"
+                  stroke="${i === 4 ? '#ef4444' : '#3a506b'}"
+                  filter="${i === 4 ? 'url(#glow-red)' : 'none'}" />
+            <text x="${(i % 3) * 68 + 6}" y="${Math.floor(i / 3) * 36 + 18}"
+                  fill="${i === 4 ? '#ffffff' : '#94a3b8'}" font-size="10" font-family="monospace">
+              ${i === 4 ? "0x46 'F'" : `Line ${i * 32}`}
+            </text>
+          `).join('')}
+        </g>
+        <text x="15" y="185" fill="#ef4444" font-size="11" font-weight="bold">🔥 Cache Hit Latency: 52 cycles</text>
+        <text x="15" y="200" fill="#94a3b8" font-size="10">(기타 미스 라인: ~210 cycles)</text>
+      </g>
+
+      <!-- Flow Streams -->
+      <path id="atkStream1" d="M 260 170 L 330 170" fill="none" class="flow-path attack" marker-end="url(#arrow-red)" />
+      <path id="specStream2" d="M 750 200 L 820 140" fill="none" class="flow-path speculative" marker-end="url(#arrow-purple)" />
+      <path id="specStream3" d="M 820 140 C 780 260 760 300 820 320" fill="none" class="flow-path attack" marker-end="url(#arrow-red)" />
+      <path id="reloadStream" d="M 820 380 C 500 480 200 450 150 250" fill="none" class="flow-path attack" marker-end="url(#arrow-red)" />
+
+      <!-- Attack Particle -->
+      <circle r="6" fill="#ef4444" filter="url(#glow-red)">
+        <animateMotion dur="1.2s" repeatCount="indefinite" path="M 260 170 L 330 170" />
+      </circle>
+      <circle r="6" fill="#a855f7" filter="url(#glow-purple)">
+        <animateMotion dur="1.0s" repeatCount="indefinite" path="M 750 200 L 820 140" />
+      </circle>
+      <circle r="6" fill="#ef4444" filter="url(#glow-red)">
+        <animateMotion dur="1.4s" repeatCount="indefinite" path="M 820 380 C 500 480 200 450 150 250" />
+      </circle>
+    `;
+
+    cardsGrid.innerHTML = `
+      <div class="card">
+        <h3>⚠️ 1단계: 분기 예측기 오훈련 (Mistraining)</h3>
+        <p>공격자는 루프를 돌며 유효한 인덱스(0..15)를 5회 이상 전달하여, CPU의 패턴 히스토리 테이블(PHT)이 해당 분기를 무조건 "Taken"으로 예측하도록 학습시킵니다.</p>
+      </div>
+      <div class="card">
+        <h3>⚠️ 2단계: 경계 검사 지연 & 투기적 OOB 로드</h3>
+        <p><code>array1_size</code>를 캐시에서 플러시하여 메모리 스톨(100~200 사이클)을 유발합니다. CPU는 대기 시간 동안 경계 검사를 우회하여 비밀 데이터(<code>offset +16</code>)를 투기적으로 로드합니다.</p>
+        <div class="code-box">val = secret['F'];<br>probe_array['F' * 512]; // 캐시 적재!</div>
+      </div>
+      <div class="card">
+        <h3>⚠️ 3단계: Flush+Reload 부채널 데이터 복원</h3>
+        <p>분기 결과가 거짓으로 판명되어 레지스터는 롤백되지만, 캐시 라인 <code>'F' * 512</code>는 여전히 캐시에 남아 있습니다. 유저스페이스에서 재접근 시 52사이클만에 로드되어 비밀 바이트가 완벽히 탈취됩니다.</p>
+      </div>
+    `;
+  }
+
+  /* ----------------------------------------------------
+   * Tab 3: nospec Defense Mechanism (sbb / sbc + csdb)
+   * ---------------------------------------------------- */
+  function renderTab3() {
+    statusDot.className = 'status-dot warning';
+    statusText.textContent = '하드닝 모델: array_index_nospec() 산술 마스킹 및 제어 투기 배리어(csdb) 차단';
+
+    dynamicContent.innerHTML = `
+      <!-- Userland Attacker Block -->
+      <g transform="translate(40, 100)">
+        <rect width="220" height="150" rx="6" fill="#151e3f" stroke="#3a506b" stroke-width="1.5" />
+        <text x="15" y="25" fill="#38bdf8" font-size="12" font-weight="bold">Attacker (Same Exploit)</text>
+        <text x="15" y="45" fill="#94a3b8" font-size="11">동일한 OOB 인덱스 주입</text>
+        <rect x="15" y="60" width="190" height="24" rx="3" fill="#0b132b" />
+        <text x="22" y="76" fill="#ef4444" font-family="monospace" font-size="11">index = 16 (Target: Secret)</text>
+        <text x="15" y="105" fill="#94a3b8" font-size="11">Flush+Reload 타이밍 측정 결과:</text>
+        <rect x="15" y="115" width="190" height="24" rx="3" fill="#0b132b" stroke="#22c55e" />
+        <text x="22" y="131" fill="#22c55e" font-family="monospace" font-size="11">모든 라인 Cache Miss (~210c)</text>
+      </g>
+
+      <!-- CPU Pipeline with nospec Barrier Shield -->
+      <g transform="translate(330, 90)">
+        <rect width="420" height="360" rx="6" fill="#151e3f" stroke="#22c55e" stroke-width="1.5" />
+        <text x="15" y="25" fill="#22c55e" font-size="12" font-weight="bold">HARDENED SPECULATION ENGINE</text>
+
+        <!-- array_index_nospec Arithmetic Mask Box -->
+        <g transform="translate(15, 45)">
+          <rect width="390" height="110" rx="5" fill="#0b132b" stroke="#38bdf8" stroke-width="1.5" />
+          <text x="15" y="22" fill="#38bdf8" font-weight="bold" font-size="11">🛡️ array_index_nospec(idx, size) [<linux/nospec.h>]</text>
+          
+          <rect x="15" y="32" width="170" height="32" rx="3" fill="#1c2541" stroke="#a855f7" />
+          <text x="22" y="46" fill="#a855f7" font-size="10" font-weight="bold">x86_64: cmp; sbb</text>
+          <text x="22" y="58" fill="#f8fafc" font-family="monospace" font-size="10">mask = 0x00000000</text>
+
+          <rect x="200" y="32" width="175" height="32" rx="3" fill="#1c2541" stroke="#a855f7" />
+          <text x="207" y="46" fill="#a855f7" font-size="10" font-weight="bold">ARM64: cmp; sbc + csdb</text>
+          <text x="207" y="58" fill="#f8fafc" font-family="monospace" font-size="10">hint #20 (Spec Barrier)</text>
+
+          <text x="15" y="85" fill="#f59e0b" font-family="monospace" font-size="11">safe_idx = (idx & mask) -> 16 & 0 = [0]</text>
+          <text x="15" y="100" fill="#22c55e" font-size="10">투기적 창 내부에서도 인덱스가 [0]으로 강제 고정됨!</text>
+        </g>
+
+        <!-- Barrier Impact Detonation Point -->
+        <g transform="translate(210, 230)">
+          <circle cx="0" cy="0" r="18" fill="#f59e0b" opacity="0.3" />
+          <circle cx="0" cy="0" r="10" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
+          <circle cx="0" cy="0" r="28" fill="none" stroke="#f59e0b" class="trap-ripple" />
+          <text x="-48" y="-22" fill="#f59e0b" font-weight="bold" font-size="11">⛔ OOB ACCESS CLAMPED</text>
+          <text x="-65" y="38" fill="#22c55e" font-weight="bold" font-size="11">safe_idx = 0 로만 투기 로드</text>
+        </g>
+
+        <!-- Neutralized Speculation -->
+        <rect x="15" y="295" width="390" height="50" rx="4" fill="#0b132b" stroke="#22c55e" />
+        <text x="20" y="315" fill="#22c55e" font-weight="bold" font-size="11">✅ Secret Memory Boundary Fully Preserved</text>
+        <text x="20" y="333" fill="#94a3b8" font-size="10">비밀 주소(+16)는 투기 창에서도 결코 메모리 버스로 전송되지 않음</text>
+      </g>
+
+      <!-- Kernel Memory: array1 + Safe Clamped Access -->
+      <g transform="translate(820, 90)">
+        <rect width="240" height="130" rx="6" fill="#151e3f" stroke="#22c55e" stroke-width="1.5" />
+        <text x="15" y="25" fill="#22c55e" font-size="12" font-weight="bold">Protected Kernel Memory</text>
+        
+        <rect x="15" y="38" width="210" height="30" rx="3" fill="#0b132b" stroke="#22c55e" stroke-width="1.5" />
+        <text x="22" y="57" fill="#22c55e" font-family="monospace" font-size="11">array1[0] accessed safely</text>
+
+        <rect x="15" y="75" width="210" height="38" rx="3" fill="#0b132b" stroke="#3a506b" />
+        <text x="22" y="93" fill="#94a3b8" font-family="monospace" font-size="11">secret[0..47] @ Offset +16</text>
+        <text x="22" y="106" fill="#22c55e" font-size="10">🔒 100% BLOCKED & UNTOUCHED</text>
+      </g>
+
+      <!-- Probe Array in Protected State -->
+      <g transform="translate(820, 240)">
+        <rect width="240" height="210" rx="6" fill="#151e3f" stroke="#22c55e" stroke-width="1.5" />
+        <text x="15" y="25" fill="#22c55e" font-size="12" font-weight="bold">Probe Array (Zero Leakage)</text>
+        <text x="15" y="45" fill="#94a3b8" font-size="10">Line 0x46 is COLD (Miss)</text>
+
+        <g transform="translate(15, 55)">
+          ${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => `
+            <rect x="${(i % 3) * 68}" y="${Math.floor(i / 3) * 36}" width="62" height="30" rx="3"
+                  fill="${i === 0 ? '#38bdf8' : '#0b132b'}"
+                  stroke="${i === 0 ? '#38bdf8' : '#3a506b'}" />
+            <text x="${(i % 3) * 68 + 6}" y="${Math.floor(i / 3) * 36 + 18}"
+                  fill="${i === 0 ? '#0b132b' : '#94a3b8'}" font-size="10" font-family="monospace">
+              ${i === 0 ? "safe[0]" : `Line ${i * 32}`}
+            </text>
+          `).join('')}
+        </g>
+        <text x="15" y="185" fill="#22c55e" font-size="11" font-weight="bold">🛡️ Secret Cache Line 0x46: COLD</text>
+        <text x="15" y="200" fill="#94a3b8" font-size="10">공격자 타이밍 측정: 전 라인 Cache Miss</text>
+      </g>
+
+      <!-- Flow Lines -->
+      <path id="hFlow1" d="M 260 170 L 330 170" fill="none" class="flow-path blocked" marker-end="url(#arrow-yellow)" />
+      <path id="hFlow2" d="M 420 230 L 820 120" fill="none" class="flow-path normal" marker-end="url(#arrow-blue)" />
+
+      <!-- Particles -->
+      <circle r="6" fill="#f59e0b" filter="url(#glow-blue)">
+        <animateMotion dur="1.4s" repeatCount="indefinite" path="M 260 170 L 330 170" />
+      </circle>
+      <circle r="6" fill="#22c55e" filter="url(#glow-blue)">
+        <animateMotion dur="1.2s" repeatCount="indefinite" path="M 420 230 L 820 120" />
+      </circle>
+    `;
+
+    cardsGrid.innerHTML = `
+      <div class="card">
+        <h3>🛡️ 산술 비트마스킹 (Arithmetic Data Dependency)</h3>
+        <p><code>array_index_nospec</code>은 분기문 대신 하드웨어 산술 명령어(x86 <code>sbb</code>, ARM64 <code>sbc</code>)를 사용합니다. <code>idx >= size</code>인 경우 <code>0x00000000</code> 마스크가 생성되어 <code>idx & mask = 0</code>으로 즉각 클램핑됩니다.</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ ARM64 CSDB (Control Speculation Barrier)</h3>
+        <p>ARMv8-A의 <code>csdb</code>(<code>hint #20</code>) 명령어는 앞선 조건 플래그와 데이터 의존성이 완전히 해결되기 전에 투기적 데이터 로드가 선행 실행되는 것을 하드웨어적으로 동기화 차단합니다.</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ 제로 오버헤드 완화 (Zero Pipeline Stall)</h3>
+        <p>파이프라인을 완전히 비우는 <code>lfence</code>나 <code>isb</code> 메모리 배리어와 달리, 1사이클 산술 마스킹만을 수행하므로 정상 인덱스 실행 시 CPU 성능 저하가 0%에 수렴합니다.</p>
+      </div>
+    `;
+  }
+
+  /* ----------------------------------------------------
+   * Tab 4: Comparison & Security Matrix
+   * ---------------------------------------------------- */
+  function renderTab4() {
+    statusDot.className = 'status-dot';
+    statusText.textContent = '비교 매트릭스: Spectre v1 공격 기법별 방어 강도 및 성능 오버헤드 분석';
+
+    dynamicContent.innerHTML = `
+      <foreignObject x="30" y="40" width="1040" height="420">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="color: var(--text-main);">
+          <h2 style="font-size: 1.15rem; color: var(--accent-blue); margin-bottom: 8px;">📊 Spectre v1 Mitigation Strategies & Comparative Analysis</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+            경계 검사 우회(Bounds Check Bypass - CVE-2017-5753)에 대응하기 위한 방어 전략별 특성 비교:
+          </p>
+
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>완화 기법 (Mitigation)</th>
+                <th>적용 방식 (Mechanism)</th>
+                <th>방어 강도 (Security)</th>
+                <th>CPU 오버헤드</th>
+                <th>주요 대상 및 특징</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="background: rgba(239, 68, 68, 0.1);">
+                <td style="font-weight: bold; color: var(--accent-red);">Baseline (미방어)</td>
+                <td>표준 조건 분기문 (<code>if (idx < sz)</code>)</td>
+                <td><span style="color: var(--accent-red); font-weight: bold;">❌ VULNERABLE</span> (부채널 100% 누출)</td>
+                <td>0% (기본 성능)</td>
+                <td>초기 리눅스 및 레거시 드라이버</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; color: var(--accent-yellow);">직접 시리얼라이징 (lfence / isb)</td>
+                <td>분기 직후 강제 직렬화 배리어 삽입</td>
+                <td><span style="color: var(--accent-green); font-weight: bold;">✅ PROTECTED</span> (투기 파이프라인 정지)</td>
+                <td><span style="color: var(--accent-red); font-weight: bold;">높음 (15~40%)</span></td>
+                <td>핫패스 성능 치명적, I/O 루프에 부적합</td>
+              </tr>
+              <tr style="background: rgba(34, 197, 94, 0.1);">
+                <td style="font-weight: bold; color: var(--accent-green);">array_index_nospec() [표준]</td>
+                <td>x86 <code>sbb</code> / ARM64 <code>sbc</code> + <code>csdb</code> 산술 마스킹</td>
+                <td><span style="color: var(--accent-green); font-weight: bold;">✅ PROTECTED</span> (OOB 인덱스 강제 0 클램프)</td>
+                <td><span style="color: var(--accent-green); font-weight: bold;">극소 (< 1%)</span></td>
+                <td>현대 리눅스 커널 표준 권장 (<linux/nospec.h>)</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; color: var(--accent-blue);">KVM / Hypervisor 격리</td>
+                <td>게스트 투기적 접근 차단 및 vCPU 경계</td>
+                <td><span style="color: var(--accent-green); font-weight: bold;">✅ PROTECTED</span></td>
+                <td>중간 (가상화 문맥 교환)</td>
+                <td>클라우드 멀티테넌트 환경 필수</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px;">
+            <div style="background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px; padding: 10px;">
+              <h4 style="color: var(--accent-blue); font-size: 0.9rem; margin-bottom: 4px;">🎯 x86_64 산술 어셈블리</h4>
+              <pre style="font-family: monospace; font-size: 0.8rem; color: #f8fafc;">cmp %1, %2; sbb %0, %0
+// index < size 이면 mask = ~0UL (-1)
+// index >= size 이면 mask = 0
+// safe_index = index & mask;</pre>
+            </div>
+            <div style="background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px; padding: 10px;">
+              <h4 style="color: var(--accent-blue); font-size: 0.9rem; margin-bottom: 4px;">🎯 ARM64 산술 + csdb 어셈블리</h4>
+              <pre style="font-family: monospace; font-size: 0.8rem; color: #f8fafc;">cmp %1, %2; sbc %0, xzr, xzr
+csdb  // Control Speculation Data Barrier
+// safe_index = index & mask;</pre>
+            </div>
+          </div>
+        </div>
+      </foreignObject>
+    `;
+
+    cardsGrid.innerHTML = `
+      <div class="card">
+        <h3>📊 하드닝 기법의 실질적 가치</h3>
+        <p><code>array_index_nospec</code>은 비싼 직렬화 명령어(<code>lfence</code>)로 파이프라인 전체를 멈추지 않고, 투기적 엔진이 참조하는 값 자체를 수학적으로 0으로 수렴시켜 안전을 확보합니다.</p>
+      </div>
+      <div class="card">
+        <h3>📊 커널 공격 표면 최소화</h3>
+        <p>시스템 콜 인자(예: 파일 디스크립터 번호, 소켓 옵션, ioctl 인덱스) 등 유저스페이스로부터 인덱스를 전달받는 모든 커널 인터페이스의 표준 방패로 채택되어 있습니다.</p>
+      </div>
+      <div class="card">
+        <h3>📊 하드웨어 취약점과 소프트웨어 치료</h3>
+        <p>CPU 하드웨어의 비순차적 설계 결함을 커널 컴파일러와 아키텍처 의존적 어셈블리 마스킹 기법을 통해 소프트웨어적으로 100% 치료한 대표적 성공 사례입니다.</p>
+      </div>
+    `;
+  }
+
+  // Initialize
+  renderTab(1);
+</script>
+</body>
+</html>
+
