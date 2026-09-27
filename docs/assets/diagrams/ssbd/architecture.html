@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Speculative Store Bypass Disable (SSBD / Spectre v4) Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--accent-purple);
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Standard Simulation Toolbar (STYLE_GUIDE.md v2.0) */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 10px 16px;
+      border-radius: 8px;
+    }
+
+    .sim-btn {
+      background: #2a3a58;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    [data-theme="light"] .sim-btn {
+      background: #e2e8f0;
+    }
+
+    .sim-btn:hover {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.active {
+      background: var(--accent-blue);
+      color: #ffffff;
+    }
+
+    .sim-select {
+      background: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .live-badge {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid var(--accent-green);
+      color: var(--accent-green);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .live-badge.paused {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+    }
+
+    .led-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.8s infinite;
+    }
+
+    .live-badge.paused .led-dot {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--accent-yellow);
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    /* Tabs Navigation */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--card-border);
+      padding-bottom: 4px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+      position: relative;
+      white-space: nowrap;
+      transition: color 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+    }
+
+    .tab-btn.active::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--accent-blue);
+      border-radius: 2px;
+    }
+
+    /* Main Simulator Stage */
+    .sim-stage {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      max-height: 520px;
+      user-select: none;
+    }
+
+    /* Explanation & Telemetry Card */
+    .details-card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    [data-theme="light"] .details-card {
+      background: rgba(241, 245, 249, 0.7);
+    }
+
+    .details-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+    }
+
+    .details-body {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: var(--text-main);
+    }
+
+    .code-preview {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: #070d1e;
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      margin-top: 6px;
+      overflow-x: auto;
+    }
+
+    [data-theme="light"] .code-preview {
+      background: #f8fafc;
+      color: #0369a1;
+    }
+
+    /* Comparison Matrix Table */
+    .matrix-container {
+      display: none;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 18px;
+      overflow-x: auto;
+    }
+
+    table.matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    table.matrix-table th, table.matrix-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    table.matrix-table th {
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    table.matrix-table tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    [data-theme="light"] table.matrix-table tr:hover {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    /* SVG Flow animation keyframes */
+    @keyframes dashMove {
+      to { stroke-dashoffset: -40; }
+    }
+
+    .flow-line {
+      stroke-dasharray: 6 4;
+      animation: dashMove 1.5s linear infinite;
+    }
+
+    .flow-line.fast {
+      animation-duration: 0.8s;
+    }
+
+    .flow-line.blocked {
+      animation: none;
+      stroke-dasharray: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        Speculative Store Bypass Disable (SSBD)
+        <span class="badge">Spectre v4 / CVE-2018-3639</span>
+      </h1>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">
+        Interactive Hardware Memory Disambiguation & SSBD Simulator v2.0
+      </div>
+    </header>
+
+    <!-- Top Simulation Toolbar conforming to STYLE_GUIDE.md v2.0 -->
+    <div class="sim-toolbar">
+      <button class="sim-btn" id="btn-play">
+        <span id="play-icon">⏸ Pause</span>
+      </button>
+      <button class="sim-btn" id="btn-step">⏭ Step</button>
+      <button class="sim-btn" id="btn-reset">🔄 Reset</button>
+      
+      <span style="font-size: 0.85rem; color: var(--text-muted); margin-left: 8px;">Speed:</span>
+      <select class="sim-select" id="speed-select">
+        <option value="2000">0.5x Slow</option>
+        <option value="1200" selected>1.0x Normal</option>
+        <option value="600">1.5x Fast</option>
+      </select>
+
+      <button class="sim-btn" id="theme-toggle">🌓 Theme</button>
+
+      <div class="live-badge" id="live-indicator">
+        <div class="led-dot"></div>
+        <span id="live-text">SIMULATION RUNNING</span>
+      </div>
+    </div>
+
+    <!-- 4 Standard Scenario Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="normal">1. Normal In-Order Store/Load</button>
+      <button class="tab-btn" data-tab="bypass">2. Speculative Store Bypass (Spectre v4)</button>
+      <button class="tab-btn" data-tab="ssbd">3. SSBD Hardware & Software Mitigation</button>
+      <button class="tab-btn" data-tab="matrix">4. Architecture Comparison Matrix</button>
+    </div>
+
+    <!-- Interactive SVG Visualization Canvas -->
+    <div class="sim-stage" id="stage-svg">
+      <svg viewBox="0 0 1000 520" id="main-svg">
+        <defs>
+          <!-- Filters for Glowing and Shadows -->
+          <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+
+          <!-- Marker Arrows -->
+          <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8" />
+          </marker>
+          <marker id="arrow-red" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#ef4444" />
+          </marker>
+          <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#22c55e" />
+          </marker>
+          <marker id="arrow-yellow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#f59e0b" />
+          </marker>
+        </defs>
+
+        <!-- Outer CPU Boundary -->
+        <rect x="20" y="20" width="960" height="480" rx="12" fill="#131e3a" stroke="#2a3d66" stroke-width="2" />
+        <text x="40" y="50" fill="#94a3b8" font-size="14" font-weight="700" letter-spacing="1">CPU OUT-OF-ORDER EXECUTION CORE</text>
+
+        <!-- Module 1: Instruction Stream / ROB (Left) -->
+        <g id="mod-pipeline" transform="translate(40, 75)">
+          <rect width="220" height="230" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+          <text x="15" y="26" fill="#38bdf8" font-size="13" font-weight="700">1. Instruction Pipeline</text>
+          
+          <!-- Instructions in ROB -->
+          <g id="rob-store" transform="translate(15, 45)">
+            <rect width="190" height="45" rx="5" fill="#0f172a" stroke="#64748b" stroke-width="1" />
+            <text x="10" y="22" fill="#f8fafc" font-size="12" font-weight="600">STORE *ptr_x = 0x55</text>
+            <text x="10" y="38" fill="#94a3b8" font-size="10">(Address calc delayed)</text>
+          </g>
+
+          <g id="rob-load" transform="translate(15, 105)">
+            <rect width="190" height="45" rx="5" fill="#0f172a" stroke="#64748b" stroke-width="1" />
+            <text x="10" y="22" fill="#f8fafc" font-size="12" font-weight="600">LOAD val = *ptr_y</text>
+            <text x="10" y="38" fill="#94a3b8" font-size="10">(Aliased: ptr_y == ptr_x)</text>
+          </g>
+
+          <g id="rob-probe" transform="translate(15, 165)">
+            <rect width="190" height="45" rx="5" fill="#0f172a" stroke="#64748b" stroke-width="1" />
+            <text x="10" y="22" fill="#f8fafc" font-size="12" font-weight="600">LOAD probe_array[val * 512]</text>
+            <text x="10" y="38" fill="#94a3b8" font-size="10">(Flush+Reload Side-Channel)</text>
+          </g>
+        </g>
+
+        <!-- Module 2: Store Buffer (Top Center) -->
+        <g id="mod-store-buffer" transform="translate(320, 75)">
+          <rect width="290" height="105" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" />
+          <text x="15" y="25" fill="#f59e0b" font-size="13" font-weight="700">2. Store Buffer & Pending Queue</text>
+          
+          <rect x="15" y="40" width="260" height="50" rx="6" fill="#0f172a" stroke="#334155" />
+          <text x="25" y="60" fill="#f8fafc" font-size="11" font-weight="600">Slot 0: [Address: PENDING...]</text>
+          <text x="25" y="78" fill="#f59e0b" font-size="11">Data: 0x55 (Safe Committed Val)</text>
+          
+          <!-- Animated Status Pill inside Store Buffer -->
+          <rect id="sb-status-bg" x="180" y="50" width="85" height="24" rx="4" fill="rgba(245, 158, 11, 0.2)" stroke="#f59e0b" />
+          <text id="sb-status-text" x="188" y="66" fill="#f59e0b" font-size="10" font-weight="700">WAIT ADDR</text>
+        </g>
+
+        <!-- Module 3: Memory Disambiguator & SSBD Control (Center) -->
+        <g id="mod-disambiguator" transform="translate(320, 205)">
+          <rect width="290" height="125" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="1.5" />
+          <text x="15" y="24" fill="#a855f7" font-size="13" font-weight="700">3. Memory Disambiguation Predictor</text>
+
+          <rect x="15" y="38" width="260" height="34" rx="4" fill="#0f172a" stroke="#334155" />
+          <text id="disamb-pred-text" x="25" y="59" fill="#f8fafc" font-size="11">Prediction: NO ALIAS (ptr_x != ptr_y)</text>
+
+          <!-- SSBD Control Register Box -->
+          <g id="reg-ssbd-box" transform="translate(15, 80)">
+            <rect width="260" height="34" rx="4" fill="#132338" stroke="#38bdf8" stroke-dasharray="4 2" />
+            <text id="reg-ssbd-text" x="12" y="22" fill="#38bdf8" font-size="10.5" font-weight="700">
+              MSR IA32_SPEC_CTRL[2] = 0 (SSB Allowed)
+            </text>
+          </g>
+        </g>
+
+        <!-- Module 4: Memory & L1 Cache Slot (Right Center) -->
+        <g id="mod-memory" transform="translate(670, 75)">
+          <rect width="280" height="255" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+          <text x="15" y="25" fill="#38bdf8" font-size="13" font-weight="700">4. Memory Slot (ptr_x / ptr_y)</text>
+          
+          <!-- Memory Content Representation -->
+          <rect x="15" y="42" width="250" height="85" rx="6" fill="#0f172a" stroke="#334155" />
+          <text x="25" y="64" fill="#94a3b8" font-size="11">Memory Physical Addr: 0x41B20000</text>
+          
+          <rect id="slot-val-bg" x="25" y="74" width="230" height="42" rx="4" fill="rgba(239, 68, 68, 0.2)" stroke="#ef4444" />
+          <text id="slot-val-title" x="35" y="93" fill="#ef4444" font-size="11" font-weight="700">Current Memory Value:</text>
+          <text id="slot-val-text" x="35" y="108" fill="#f8fafc" font-size="12" font-family="monospace">0x46 ('F' - Stale Secret Byte)</text>
+
+          <!-- Cache Probe Array Area -->
+          <g transform="translate(15, 140)">
+            <rect width="250" height="100" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="12" y="20" fill="#94a3b8" font-size="11" font-weight="600">Flush+Reload Probe Array (128 KB)</text>
+            
+            <!-- Cache Lines -->
+            <g id="cache-lines" transform="translate(12, 32)">
+              <rect class="cline" id="cline-0" x="0" y="0" width="226" height="16" rx="2" fill="#1e293b" stroke="#334155" />
+              <text x="8" y="12" fill="#64748b" font-size="9">Line 0x00: FLUSHED (Cache Miss)</text>
+
+              <rect class="cline" id="cline-safe" x="0" y="20" width="226" height="16" rx="2" fill="#1e293b" stroke="#334155" />
+              <text id="cline-safe-text" x="8" y="32" fill="#64748b" font-size="9">Line 0x55 (Safe): FLUSHED</text>
+
+              <rect class="cline" id="cline-secret" x="0" y="40" width="226" height="16" rx="2" fill="#1e293b" stroke="#334155" />
+              <text id="cline-secret-text" x="8" y="52" fill="#64748b" font-size="9">Line 0x46 ('F' Secret): FLUSHED</text>
+            </g>
+          </g>
+        </g>
+
+        <!-- Module 5: Transient Execution Timeline & Results (Bottom) -->
+        <g id="mod-timeline" transform="translate(40, 350)">
+          <rect width="910" height="130" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+          <text x="20" y="25" fill="#94a3b8" font-size="12" font-weight="700">5. Microarchitectural Speculation State Machine</text>
+
+          <!-- Step Indicators -->
+          <g transform="translate(20, 42)">
+            <!-- Phase 1 -->
+            <rect id="step-box-1" x="0" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#38bdf8" />
+            <text x="10" y="20" fill="#38bdf8" font-size="11" font-weight="700">Step 1: Store Stalled</text>
+            <text x="10" y="38" fill="#94a3b8" font-size="10">Store ptr_x = 0x55</text>
+            <text x="10" y="52" fill="#94a3b8" font-size="10">Address unknown</text>
+
+            <!-- Phase 2 -->
+            <rect id="step-box-2" x="180" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="190" y="20" fill="#94a3b8" font-size="11" font-weight="700">Step 2: Disambiguation</text>
+            <text x="190" y="38" fill="#94a3b8" font-size="10">Predict ptr_x != ptr_y</text>
+            <text x="190" y="52" fill="#94a3b8" font-size="10">SSB Bypass decision</text>
+
+            <!-- Phase 3 -->
+            <rect id="step-box-3" x="360" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="370" y="20" fill="#94a3b8" font-size="11" font-weight="700">Step 3: Speculative Load</text>
+            <text x="370" y="38" fill="#94a3b8" font-size="10">Reads stale memory</text>
+            <text x="370" y="52" fill="#94a3b8" font-size="10">val = 0x46 ('F')</text>
+
+            <!-- Phase 4 -->
+            <rect id="step-box-4" x="540" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="550" y="20" fill="#94a3b8" font-size="11" font-weight="700">Step 4: Cache Side-Channel</text>
+            <text x="550" y="38" fill="#94a3b8" font-size="10">probe_array[val*512]</text>
+            <text x="550" y="52" fill="#94a3b8" font-size="10">Line warms in L1D</text>
+
+            <!-- Phase 5 -->
+            <rect id="step-box-5" x="720" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="730" y="20" fill="#94a3b8" font-size="11" font-weight="700">Step 5: Architectural Squash</text>
+            <text x="730" y="38" fill="#94a3b8" font-size="10">Hazard detected & revert</text>
+            <text x="730" y="52" fill="#94a3b8" font-size="10">Cache remains warm!</text>
+          </g>
+        </g>
+
+        <!-- Connecting Flow Lines -->
+        <!-- Pipeline to Store Buffer -->
+        <path id="path-pipe-sb" d="M 260 120 L 320 120" stroke="#f59e0b" stroke-width="2.5" fill="none" class="flow-line" marker-end="url(#arrow-yellow)" />
+        
+        <!-- Pipeline to Disambiguator -->
+        <path id="path-pipe-disamb" d="M 260 180 L 290 180 L 290 260 L 320 260" stroke="#38bdf8" stroke-width="2.5" fill="none" class="flow-line" marker-end="url(#arrow-blue)" />
+
+        <!-- Disambiguator to Memory (Speculative Bypass Path) -->
+        <path id="path-disamb-mem" d="M 610 260 L 640 260 L 640 180 L 670 180" stroke="#ef4444" stroke-width="3" fill="none" class="flow-line fast" marker-end="url(#arrow-red)" />
+
+        <!-- Store Buffer to Memory (Committed Store Path) -->
+        <path id="path-sb-mem" d="M 610 120 L 670 120" stroke="#f59e0b" stroke-width="2.5" fill="none" marker-end="url(#arrow-yellow)" />
+
+        <!-- Moving Particle Packet -->
+        <circle id="anim-packet" cx="260" cy="120" r="6" fill="#38bdf8" filter="url(#glow-blue)" style="display: none;" />
+      </svg>
+    </div>
+
+    <!-- Telemetry and Detailed Explanations Card -->
+    <div class="details-card">
+      <div class="details-header">
+        <span id="card-step-title">CURRENT PHASE: SPECULATIVE STORE BYPASS (SPECTRE V4)</span>
+        <span id="card-state-badge" style="color: var(--accent-yellow);">STATUS: INITIALIZING</span>
+      </div>
+      <div class="details-body" id="card-explanation">
+        현대 슈퍼스칼라 CPU의 아웃오브오더(Out-of-Order) 실행 엔진은 선행 Store 명령어의 목적지 주소 계산이 지연될 때,
+        후행 Load 명령어와의 충돌 여부를 <strong>메모리 비모호화 예측기(Memory Disambiguator)</strong>를 통해 예측함.
+        예측기가 별칭(Aliasing)이 없다고 판단하면 Store 이전에 Load를 투기적으로 실행하여 지연시간을 줄이지만,
+        실제 주소가 일치할 경우 갱신 전의 <strong>Stale(이전 비밀) 데이터</strong>를 투기적으로 읽어 사이드 채널로 유출하는 취약점이 발생함.
+      </div>
+      <div class="code-preview" id="card-code">
+// [Speculative Store Bypass Vulnerable Pattern]
+*ptr_x = SAFE_VAL;             // 1. 선행 Store: 복잡한 주소 계산으로 Store Buffer 대기
+val = *ptr_y;                  // 2. 후행 Load: ptr_y == ptr_x임에도 투기적으로 먼저 읽음 -> Stale Secret 누출!
+probe_array[val * STRIDE] = 1; // 3. 부수 효과: L1D 캐시 라인 워밍업으로 Flush+Reload 측정 허용
+      </div>
+    </div>
+
+    <!-- Tab 4: Architecture Comparison Matrix -->
+    <div class="matrix-container" id="stage-matrix">
+      <h3 style="margin-bottom: 14px; color: var(--accent-blue);">Spectre v4 (SSBD) Architecture & Defense Comparison Matrix</h3>
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th>구분 (Metric)</th>
+            <th>Baseline (Vulnerable)</th>
+            <th>x86_64 SSBD (MSR IA32_SPEC_CTRL)</th>
+            <th>ARM64 SSBD (PSTATE.SSBS / SMCCC)</th>
+            <th>Software Barrier (LFENCE / DSB)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>방어 원리</strong></td>
+            <td>투기적 스토어 바이패스 허용 (기본값)</td>
+            <td>MSR 0x48 bit 2 세팅으로 메모리 비모호화기 투기 완전 비활성화</td>
+            <td>PSTATE.SSBS=0 설정 또는 SMCCC 펌웨어 워크어라운드2 호출</td>
+            <td>Store 직후 LFENCE / DSB SY 실행하여 파이프라인 직렬화 강제</td>
+          </tr>
+          <tr>
+            <td><strong>하드웨어 제어</strong></td>
+            <td>없음 (CPU 기본 예측 동작)</td>
+            <td>Intel/AMD 하드웨어 지원 MSR 레지스터</td>
+            <td>ARMv8.5-A SSBS 또는 ARMv8.0 시스템 레지스터</td>
+            <td>표준 아키텍처 배리어 명령어</td>
+          </tr>
+          <tr>
+            <td><strong>유저 통제 (prctl)</strong></td>
+            <td>PR_SPEC_ENABLE (취약 모드)</td>
+            <td>prctl(PR_SET_SPECULATION_CTRL, PR_SPEC_STORE_BYPASS, PR_SPEC_DISABLE)</td>
+            <td>prctl(PR_SET_SPECULATION_CTRL, PR_SPEC_STORE_BYPASS, PR_SPEC_DISABLE)</td>
+            <td>컴파일러/코드 레벨 삽입 (유저 공간 prctl 무관)</td>
+          </tr>
+          <tr>
+            <td><strong>성능 오버헤드</strong></td>
+            <td>0% (최고의 파이프라인 처리량)</td>
+            <td>약 2% ~ 8% (메모리 집약 워크로드에 한함)</td>
+            <td>약 1% ~ 5% (Core 마이크로아키텍처에 따름)</td>
+            <td>국소적 오버헤드 높음 (해당 함수 지연 수십~수백 사이클)</td>
+          </tr>
+          <tr>
+            <td><strong>sysfs 상태 문자열</strong></td>
+            <td>Vulnerable</td>
+            <td>Mitigation: Speculative Store Bypass disabled via prctl and seccomp</td>
+            <td>Mitigation: Speculative Store Bypass disabled via prctl</td>
+            <td>(하드웨어 완화 미적용 시 Vulnerable 표기)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // State Machine and Animation Engine
+    const state = {
+      theme: 'dark',
+      currentTab: 'normal',
+      isPlaying: true,
+      currentStep: 1,
+      maxSteps: 5,
+      speed: 1200,
+      timer: null
+    };
+
+    // DOM Elements
+    const btnPlay = document.getElementById('btn-play');
+    const playIcon = document.getElementById('play-icon');
+    const btnStep = document.getElementById('btn-step');
+    const btnReset = document.getElementById('btn-reset');
+    const speedSelect = document.getElementById('speed-select');
+    const themeToggle = document.getElementById('theme-toggle');
+    const liveIndicator = document.getElementById('live-indicator');
+    const liveText = document.getElementById('live-text');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const stageSvg = document.getElementById('stage-svg');
+    const stageMatrix = document.getElementById('stage-matrix');
+
+    // SVG elements
+    const pathDisambMem = document.getElementById('path-disamb-mem');
+    const disambPredText = document.getElementById('disamb-pred-text');
+    const regSsbdText = document.getElementById('reg-ssbd-text');
+    const sbStatusText = document.getElementById('sb-status-text');
+    const sbStatusBg = document.getElementById('sb-status-bg');
+    const slotValText = document.getElementById('slot-val-text');
+    const slotValBg = document.getElementById('slot-val-bg');
+    const clineSecret = document.getElementById('cline-secret');
+    const clineSecretText = document.getElementById('cline-secret-text');
+    const clineSafe = document.getElementById('cline-safe');
+    const clineSafeText = document.getElementById('cline-safe-text');
+
+    const cardStepTitle = document.getElementById('card-step-title');
+    const cardStateBadge = document.getElementById('card-state-badge');
+    const cardExplanation = document.getElementById('card-explanation');
+    const cardCode = document.getElementById('card-code');
+
+    // Tab content descriptions
+    const tabConfigs = {
+      normal: {
+        title: "1. NORMAL IN-ORDER STORE/LOAD EXECUTION",
+        steps: [
+          {
+            title: "Step 1: Store Dispatched & Address Resolved",
+            state: "IN-ORDER EXECUTION",
+            color: "var(--accent-blue)",
+            desc: "Store 명령어(*ptr_x = 0x55)가 디스패치되고 주소 계산이 지연 없이 완료됨. Store Buffer에 정확한 목적지 주소가 등록됨.",
+            code: "*ptr_x = 0x55; // Store address (0x41B20000) resolved immediately\n// Store Buffer enqueues write request to memory slot",
+            sbText: "ADDR READY",
+            sbBg: "rgba(56, 189, 248, 0.2)",
+            predText: "Prediction: In-Order Commit Mode",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (Normal Operation)",
+            slotVal: "0x46 ('F' - Previous Data)",
+            cSecret: false,
+            cSafe: false,
+            bypassActive: false
+          },
+          {
+            title: "Step 2: Store Buffer Drains to L1D Cache",
+            state: "MEMORY COMMITTED",
+            color: "var(--accent-green)",
+            desc: "Store Buffer의 데이터 0x55가 메모리 슬롯(0x41B20000)에 안전하게 커밋되어 이전 값 0x46을 덮어씀.",
+            code: "// Store Buffer drains to L1D Cache line\n// [0x41B20000] updated from 0x46 to 0x55",
+            sbText: "DRAINED",
+            sbBg: "rgba(34, 197, 94, 0.2)",
+            predText: "Prediction: In-Order Commit Mode",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (Normal Operation)",
+            slotVal: "0x55 (Safe Committed Val)",
+            cSecret: false,
+            cSafe: false,
+            bypassActive: false
+          },
+          {
+            title: "Step 3: Subsequent Load Dispatched",
+            state: "ARCHITECTURAL LOAD",
+            color: "var(--accent-blue)",
+            desc: "후행 Load 명령어(val = *ptr_y)가 실행됨. ptr_y는 이미 0x55로 갱신된 메모리 슬롯을 참조함.",
+            code: "val = *ptr_y; // Reads newly committed 0x55 from L1D Cache\nassert(val == 0x55);",
+            sbText: "IDLE",
+            sbBg: "rgba(100, 116, 139, 0.2)",
+            predText: "Address Match: ptr_y == ptr_x",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (Normal Operation)",
+            slotVal: "0x55 (Safe Committed Val)",
+            cSecret: false,
+            cSafe: true,
+            bypassActive: false
+          },
+          {
+            title: "Step 4: Dependent Array Access",
+            state: "SAFE PROBE ACCESS",
+            color: "var(--accent-green)",
+            desc: "probe_array[val * 512]가 실행되어 0x55 라인만 캐시에 로드됨. 비밀 데이터 라인은 전혀 접근되지 않음.",
+            code: "probe_array[val * 512] = 1; // Touches line 0x55\n// Cache lines for secret data remain cold / unaffected",
+            sbText: "IDLE",
+            sbBg: "rgba(100, 116, 139, 0.2)",
+            predText: "Execution Finished",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (Normal Operation)",
+            slotVal: "0x55 (Safe Committed Val)",
+            cSecret: false,
+            cSafe: true,
+            bypassActive: false
+          },
+          {
+            title: "Step 5: Finished In-Order Sequence",
+            state: "SUCCESS",
+            color: "var(--accent-green)",
+            desc: "완전한 순차적 정합성 유지. 어떠한 미세구조적 비밀 정보 누출도 발생하지 않음.",
+            code: "// Architectural order respected. Zero leakage detected.",
+            sbText: "IDLE",
+            sbBg: "rgba(100, 116, 139, 0.2)",
+            predText: "In-Order Complete",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (Normal Operation)",
+            slotVal: "0x55 (Safe Committed Val)",
+            cSecret: false,
+            cSafe: true,
+            bypassActive: false
+          }
+        ]
+      },
+      bypass: {
+        title: "2. SPECULATIVE STORE BYPASS (SPECTRE V4 / CVE-2018-3639)",
+        steps: [
+          {
+            title: "Step 1: Store Stalled in Store Buffer",
+            state: "HAZARD SETUP",
+            color: "var(--accent-yellow)",
+            desc: "Store 명령어(*ptr_x = 0x55)의 주소 계산이 캐시 미스나 복잡한 포인터 산술 연산으로 지연되어 Store Buffer에 펜딩됨.",
+            code: "*ptr_x = 0x55; // Address calculation delayed in reservation station\n// Store Buffer holds data 0x55, but physical target is yet unknown!",
+            sbText: "WAIT ADDR",
+            sbBg: "rgba(245, 158, 11, 0.2)",
+            predText: "Evaluating Memory Disambiguation...",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (SSB Allowed)",
+            slotVal: "0x46 ('F' - Stale Secret)",
+            cSecret: false,
+            cSafe: false,
+            bypassActive: false
+          },
+          {
+            title: "Step 2: Memory Disambiguator Predicts No Conflict",
+            state: "SPECULATIVE BYPASS DECISION",
+            color: "var(--accent-red)",
+            desc: "메모리 비모호화 예측기가 'ptr_x != ptr_y'로 잘못 예측함! Store 완료를 기다리지 않고 후행 Load를 즉시 투기 실행하기로 결정함.",
+            code: "// Memory Disambiguator: Predicts NO ALIASING (ptr_y != ptr_x)\n// Decision: Speculatively bypass uncompleted store!",
+            sbText: "BLOCKED",
+            sbBg: "rgba(245, 158, 11, 0.2)",
+            predText: "PREDICTION: NO ALIAS (BYPASS GRANTED)",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (SSB Allowed)",
+            slotVal: "0x46 ('F' - Stale Secret)",
+            cSecret: false,
+            cSafe: false,
+            bypassActive: true
+          },
+          {
+            title: "Step 3: Speculative Load Reads Stale Secret",
+            state: "TRANSIENT DATA LEAK",
+            color: "var(--accent-red)",
+            desc: "Load 명령어가 메모리 슬롯을 직접 읽음. 아직 0x55가 커밋되지 않았으므로 이전 값인 비밀 바이트 0x46('F')을 투기적으로 획득함!",
+            code: "val = *ptr_y; // Speculatively reads stale data 0x46 ('F')!\n// Transient execution registers val = 0x46",
+            sbText: "WAIT ADDR",
+            sbBg: "rgba(245, 158, 11, 0.2)",
+            predText: "TRANSIENT LOAD: val = 0x46 ('F')",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (SSB Allowed)",
+            slotVal: "0x46 ('F' - Stale Secret)",
+            cSecret: false,
+            cSafe: false,
+            bypassActive: true
+          },
+          {
+            title: "Step 4: Cache Side-Channel Encoding",
+            state: "PROBE ARRAY TOUCHED",
+            color: "var(--accent-red)",
+            desc: "probe_array[val * 512]가 투기 실행되어 캐시 라인 0x46이 L1D 캐시로 로드됨! 마이크로아키텍처 캐시 태그가 변경됨.",
+            code: "probe_array[val * 512] = 1; // Touches line for byte 0x46 ('F')\n// Cache line 0x46 warmed up in L1D cache!",
+            sbText: "WAIT ADDR",
+            sbBg: "rgba(245, 158, 11, 0.2)",
+            predText: "Cache Probe Activated",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (SSB Allowed)",
+            slotVal: "0x46 ('F' - Stale Secret)",
+            cSecret: true,
+            cSafe: false,
+            bypassActive: true
+          },
+          {
+            title: "Step 5: Architectural Rollback But Cache Remains Warm",
+            state: "VULNERABILITY CONFIRMED",
+            color: "var(--accent-red)",
+            desc: "Store 주소가 확정되어 ptr_x == ptr_y임이 밝혀짐. CPU는 투기적 연산 결과를 폐기하지만, L1D 캐시 라인 0x46은 그대로 남아 비특권 Flush+Reload로 100% 복원됨!",
+            code: "// Store address resolved: ALIAS HAZARD DETECTED!\n// CPU flushes pipeline and re-executes with 0x55\n// BUT: probe_array[0x46 * 512] remains cached! Attack Succeeded.",
+            sbText: "DRAINED",
+            sbBg: "rgba(34, 197, 94, 0.2)",
+            predText: "Misprediction Squash & Re-execute",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 0 (SSB Allowed)",
+            slotVal: "0x55 (Safe Committed Val)",
+            cSecret: true,
+            cSafe: true,
+            bypassActive: false
+          }
+        ]
+      },
+      ssbd: {
+        title: "3. SSBD HARDWARE & SOFTWARE MITIGATION",
+        steps: [
+          {
+            title: "Step 1: SSBD Enforced via MSR / PSTATE.SSBS",
+            state: "MITIGATION ACTIVE",
+            color: "var(--accent-green)",
+            desc: "커널이 MSR IA32_SPEC_CTRL bit 2=1(x86) 또는 PSTATE.SSBS=0(ARM64)을 설정하여 하드웨어 메모리 비모호화 예측기를 비활성화함.",
+            code: "prctl(PR_SET_SPECULATION_CTRL, PR_SPEC_STORE_BYPASS, PR_SPEC_DISABLE);\n// CPU sets IA32_SPEC_CTRL.SSBD = 1 (or PSTATE.SSBS = 0)",
+            sbText: "WAIT ADDR",
+            sbBg: "rgba(245, 158, 11, 0.2)",
+            predText: "DISAMBIGUATION DISABLED (FORCED STALL)",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 1 (SSBD Active / Protected)",
+            slotVal: "0x46 ('F' - Memory)",
+            cSecret: false,
+            cSafe: false,
+            bypassActive: false
+          },
+          {
+            title: "Step 2: Store Dispatched & Load Forced to Wait",
+            state: "STORE-LOAD SERIALIZATION",
+            color: "var(--accent-green)",
+            desc: "Store 명령어 주소 계산이 지연되더라도, SSBD 하드웨어 제약으로 인해 후행 Load는 Store Buffer가 해결될 때까지 강제 대기(Stall)함.",
+            code: "*ptr_x = 0x55; // Store address pending\nval = *ptr_y;  // LOAD IS FORCED TO STALL UNTIL STORE COMMITS!",
+            sbText: "RESOLVING...",
+            sbBg: "rgba(245, 158, 11, 0.2)",
+            predText: "DISAMBIGUATION DISABLED (FORCED STALL)",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 1 (SSBD Active / Protected)",
+            slotVal: "0x46 ('F' - Memory)",
+            cSecret: false,
+            cSafe: false,
+            bypassActive: false
+          },
+          {
+            title: "Step 3: Store Resolves and Writes Safe Value",
+            state: "SAFE COMMIT",
+            color: "var(--accent-green)",
+            desc: "Store Buffer의 데이터 0x55가 메모리 슬롯으로 안전하게 커밋됨. 이제 대기 중이던 Load 파이프라인의 진입이 허용됨.",
+            code: "// Store Buffer resolves address and commits 0x55 to L1D\n// Memory slot successfully updated to 0x55",
+            sbText: "COMMITTED",
+            sbBg: "rgba(34, 197, 94, 0.2)",
+            predText: "Store Committed -> Release Load Stall",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 1 (SSBD Active / Protected)",
+            slotVal: "0x55 (Safe Committed Val)",
+            cSecret: false,
+            cSafe: false,
+            bypassActive: false
+          },
+          {
+            title: "Step 4: Load Executes with Guaranteed Safe Data",
+            state: "SAFE ACCESS ONLY",
+            color: "var(--accent-green)",
+            desc: "Load 명령어가 안전하게 실행되어 최신 갱신값인 0x55만 읽어들임. Stale 비밀 데이터 0x46은 결코 읽히지 않음.",
+            code: "val = *ptr_y; // Reads guaranteed safe value 0x55\nprobe_array[val * 512] = 1; // Touches line 0x55 only!",
+            sbText: "IDLE",
+            sbBg: "rgba(100, 116, 139, 0.2)",
+            predText: "Safe Load: val == 0x55",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 1 (SSBD Active / Protected)",
+            slotVal: "0x55 (Safe Committed Val)",
+            cSecret: false,
+            cSafe: true,
+            bypassActive: false
+          },
+          {
+            title: "Step 5: Zero Secret Leakage Verified",
+            state: "PASS / PROTECTED",
+            color: "var(--accent-green)",
+            desc: "비밀 데이터 라인은 단 한 번도 캐시에 로드되지 않았음. 투기적 스토어 바이패스 공격이 100% 원천 차단됨.",
+            code: "// Result: 0 bytes leaked via Speculative Store Bypass.\n// [PASS/PROTECTED] Verified via SSBD & Memory Barrier.",
+            sbText: "IDLE",
+            sbBg: "rgba(100, 116, 139, 0.2)",
+            predText: "Protected by SSBD",
+            ssbdText: "MSR IA32_SPEC_CTRL[2] = 1 (SSBD Active / Protected)",
+            slotVal: "0x55 (Safe Committed Val)",
+            cSecret: false,
+            cSafe: true,
+            bypassActive: false
+          }
+        ]
+      }
+    };
+
+    function updateSimulationView() {
+      if (state.currentTab === 'matrix') {
+        stageSvg.style.display = 'none';
+        stageMatrix.style.display = 'block';
+        return;
+      }
+
+      stageSvg.style.display = 'flex';
+      stageMatrix.style.display = 'none';
+
+      const config = tabConfigs[state.currentTab];
+      const stepData = config.steps[state.currentStep - 1];
+
+      // Update Step Box highlights
+      for (let i = 1; i <= 5; i++) {
+        const box = document.getElementById(`step-box-${i}`);
+        if (i === state.currentStep) {
+          box.setAttribute('stroke', stepData.color);
+          box.setAttribute('stroke-width', '2');
+          box.setAttribute('fill', '#1a2642');
+        } else {
+          box.setAttribute('stroke', '#334155');
+          box.setAttribute('stroke-width', '1');
+          box.setAttribute('fill', '#0f172a');
+        }
+      }
+
+      // Update SVG dynamic values
+      sbStatusText.textContent = stepData.sbText;
+      sbStatusBg.setAttribute('fill', stepData.sbBg);
+      disambPredText.textContent = stepData.predText;
+      regSsbdText.textContent = stepData.ssbdText;
+      slotValText.textContent = stepData.slotVal;
+
+      if (stepData.bypassActive) {
+        pathDisambMem.style.display = 'block';
+        pathDisambMem.setAttribute('stroke', '#ef4444');
+        slotValBg.setAttribute('stroke', '#ef4444');
+      } else {
+        pathDisambMem.setAttribute('stroke', '#334155');
+        slotValBg.setAttribute('stroke', '#38bdf8');
+      }
+
+      // Cache Lines state
+      if (stepData.cSecret) {
+        clineSecret.setAttribute('fill', 'rgba(239, 68, 68, 0.35)');
+        clineSecret.setAttribute('stroke', '#ef4444');
+        clineSecretText.textContent = "Line 0x46 ('F' Secret): CACHE HIT (WARMED)";
+        clineSecretText.setAttribute('fill', '#ef4444');
+      } else {
+        clineSecret.setAttribute('fill', '#1e293b');
+        clineSecret.setAttribute('stroke', '#334155');
+        clineSecretText.textContent = "Line 0x46 ('F' Secret): FLUSHED (MISS)";
+        clineSecretText.setAttribute('fill', '#64748b');
+      }
+
+      if (stepData.cSafe) {
+        clineSafe.setAttribute('fill', 'rgba(34, 197, 94, 0.35)');
+        clineSafe.setAttribute('stroke', '#22c55e');
+        clineSafeText.textContent = "Line 0x55 (Safe): CACHE HIT (WARMED)";
+        clineSafeText.setAttribute('fill', '#22c55e');
+      } else {
+        clineSafe.setAttribute('fill', '#1e293b');
+        clineSafe.setAttribute('stroke', '#334155');
+        clineSafeText.textContent = "Line 0x55 (Safe): FLUSHED (MISS)";
+        clineSafeText.setAttribute('fill', '#64748b');
+      }
+
+      // Update Telemetry Card
+      cardStepTitle.textContent = `${config.title} - ${stepData.title.toUpperCase()}`;
+      cardStateBadge.textContent = `STATUS: ${stepData.state}`;
+      cardStateBadge.style.color = stepData.color;
+      cardExplanation.innerHTML = stepData.desc;
+      cardCode.textContent = stepData.code;
+    }
+
+    function nextStep() {
+      state.currentStep++;
+      if (state.currentStep > state.maxSteps) {
+        state.currentStep = 1;
+      }
+      updateSimulationView();
+    }
+
+    function startTimer() {
+      if (state.timer) clearInterval(state.timer);
+      if (state.isPlaying && state.currentTab !== 'matrix') {
+        state.timer = setInterval(nextStep, state.speed);
+        liveIndicator.classList.remove('paused');
+        liveText.textContent = "SIMULATION RUNNING";
+      } else {
+        liveIndicator.classList.add('paused');
+        liveText.textContent = "SIMULATION PAUSED";
+      }
+    }
+
+    // Event Handlers
+    btnPlay.addEventListener('click', () => {
+      state.isPlaying = !state.isPlaying;
+      playIcon.textContent = state.isPlaying ? "⏸ Pause" : "▶ Play";
+      startTimer();
+    });
+
+    btnStep.addEventListener('click', () => {
+      state.isPlaying = false;
+      playIcon.textContent = "▶ Play";
+      startTimer();
+      nextStep();
+    });
+
+    btnReset.addEventListener('click', () => {
+      state.currentStep = 1;
+      updateSimulationView();
+    });
+
+    speedSelect.addEventListener('change', (e) => {
+      state.speed = parseInt(e.target.value, 10);
+      startTimer();
+    });
+
+    themeToggle.addEventListener('click', () => {
+      state.theme = (state.theme === 'dark') ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', state.theme);
+    });
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.currentTab = btn.getAttribute('data-tab');
+        state.currentStep = 1;
+        updateSimulationView();
+        startTimer();
+      });
+    });
+
+    // Initial startup
+    updateSimulationView();
+    startTimer();
+  </script>
+</body>
+</html>
+

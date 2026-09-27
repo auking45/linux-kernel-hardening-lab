@@ -133,6 +133,7 @@ nav:
       - 07. Speculative Execution Defenses:
           - Spectre v1 (array_index_nospec): features/22-spectre-v1.md
           - Spectre v2 (Retpoline, IBPB, STIBP): features/23-spectre-v2.md
+          - Speculative Store Bypass Disable (SSBD): features/24-ssbd.md
 
 
 
