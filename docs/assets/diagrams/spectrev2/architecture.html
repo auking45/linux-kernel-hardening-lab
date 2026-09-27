@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spectre v2 & Retpoline Dynamic Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --perm-user: #fb923c;
+      --perm-kernel: #38bdf8;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--accent-purple);
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Standard Simulation Toolbar */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      border-radius: 8px;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 4px;
+    }
+
+    button {
+      background: var(--bg-color);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    button:hover {
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    button.active {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .sim-status {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    .status-dot.danger {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--accent-red);
+    }
+
+    .status-dot.warning {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--accent-yellow);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); opacity: 0.7; }
+      50% { transform: scale(1.15); opacity: 1; }
+      100% { transform: scale(0.95); opacity: 0.7; }
+    }
+
+    /* Scenario Tabs */
+    .scenario-tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .scenario-btn {
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      border-radius: 6px;
+    }
+
+    /* Canvas Panel */
+    .canvas-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    svg {
+      width: 100%;
+      height: 520px;
+      display: block;
+    }
+
+    /* Dynamic SVG Animations */
+    @keyframes flowDash {
+      to { stroke-dashoffset: -48; }
+    }
+
+    .flow-path {
+      stroke-dasharray: 8 6;
+      animation: flowDash 1.2s linear infinite;
+    }
+
+    .flow-path.attack {
+      stroke: var(--accent-red);
+      animation-duration: 0.8s;
+      filter: drop-shadow(0 0 6px var(--accent-red));
+    }
+
+    .flow-path.normal {
+      stroke: var(--accent-blue);
+    }
+
+    .flow-path.blocked {
+      stroke: var(--accent-yellow);
+      stroke-dasharray: 6 4;
+    }
+
+    .flow-path.speculative {
+      stroke: var(--accent-purple);
+      stroke-dasharray: 4 4;
+      animation: flowDash 0.6s linear infinite;
+    }
+
+    @keyframes rippleExpand {
+      0% { r: 6px; opacity: 1; stroke-width: 3; }
+      100% { r: 42px; opacity: 0; stroke-width: 1; }
+    }
+
+    .trap-ripple {
+      animation: rippleExpand 1.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+    }
+
+    @keyframes ghostPulse {
+      0%, 100% { opacity: 0.25; }
+      50% { opacity: 0.85; }
+    }
+
+    .ghost-box {
+      animation: ghostPulse 1.8s ease-in-out infinite;
+    }
+
+    /* Explanatory Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .card h3 {
+      font-size: 0.95rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent-blue);
+    }
+
+    .card p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    .code-box {
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      margin-top: 8px;
+      overflow-x: auto;
+    }
+
+    table.compare-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin-top: 10px;
+    }
+
+    table.compare-table th,
+    table.compare-table td {
+      border: 1px solid var(--card-border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    table.compare-table th {
+      background: var(--bg-color);
+      color: var(--accent-blue);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>
+      <span>⚡ Spectre v2 & Retpoline (BTI Defense)</span>
+      <span class="badge">INDIRECT BRANCH HARDENING</span>
+    </h1>
+    <button id="themeToggleBtn">🌓 테마 전환</button>
+  </header>
+
+  <!-- Simulation Toolbar -->
+  <div class="sim-toolbar">
+    <div class="btn-group">
+      <button id="playBtn" class="active">⏸️ 일시정지</button>
+      <button id="resetBtn">🔄 처음부터</button>
+    </div>
+
+    <div class="btn-group">
+      <button class="speed-btn" data-speed="0.5">0.5x</button>
+      <button class="speed-btn active" data-speed="1.0">1.0x</button>
+      <button class="speed-btn" data-speed="1.5">1.5x</button>
+    </div>
+
+    <div class="sim-status">
+      <div id="statusDot" class="status-dot"></div>
+      <span id="statusText">정상 모델: 정상 간접 함수 포인터 디스패치</span>
+    </div>
+  </div>
+
+  <!-- Scenario Navigation Tabs -->
+  <div class="scenario-tabs">
+    <button class="scenario-btn active" data-tab="1">Tab 1: 정상 간접 호출 (Normal Dispatch)</button>
+    <button class="scenario-btn" data-tab="2">Tab 2: Spectre v2 공격 벡터 (BTB 오염 & BTI)</button>
+    <button class="scenario-btn" data-tab="3">Tab 3: Retpoline 방어 (RSB 무한루프 트랩)</button>
+    <button class="scenario-btn" data-tab="4">Tab 4: 보안/성능 비교 매트릭스 (Matrix)</button>
+  </div>
+
+  <!-- Main Canvas Panel -->
+  <div class="canvas-panel">
+    <svg id="simCanvas" viewBox="0 0 1100 500">
+      <defs>
+        <!-- Marker definitions -->
+        <marker id="arrow-blue" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#38bdf8" />
+        </marker>
+        <marker id="arrow-red" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#ef4444" />
+        </marker>
+        <marker id="arrow-purple" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#a855f7" />
+        </marker>
+        <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#22c55e" />
+        </marker>
+        <marker id="arrow-yellow" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+          <path d="M 0 0 L 8 4 L 0 8 z" fill="#f59e0b" />
+        </marker>
+
+        <!-- Filters -->
+        <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="glow-purple" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="5" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      <!-- Background Partitions -->
+      <!-- User Space (EL0 / Ring 3) -->
+      <rect x="20" y="30" width="260" height="440" rx="8" fill="#1c2541" stroke="#3a506b" stroke-width="1.5" />
+      <text x="35" y="55" fill="#fb923c" font-weight="bold" font-size="13">USER SPACE (EL0 / Ring 3)</text>
+      <text x="35" y="75" fill="#94a3b8" font-size="11">공격자 프로세스 / BTI 훈련</text>
+
+      <!-- CPU Microarchitecture Pipeline -->
+      <rect x="310" y="30" width="460" height="440" rx="8" fill="#151e3f" stroke="#3a506b" stroke-width="1.5" />
+      <text x="325" y="55" fill="#38bdf8" font-weight="bold" font-size="13">CPU PIPELINE: BTB & RSB</text>
+      <text x="325" y="75" fill="#94a3b8" font-size="11">Branch Target Buffer & Return Stack Buffer</text>
+
+      <!-- Kernel Space (EL1 / Ring 0) -->
+      <rect x="800" y="30" width="280" height="440" rx="8" fill="#1c2541" stroke="#3a506b" stroke-width="1.5" />
+      <text x="815" y="55" fill="#38bdf8" font-weight="bold" font-size="13">KERNEL SPACE (EL1 / Ring 0)</text>
+      <text x="815" y="75" fill="#94a3b8" font-size="11">Target Handlers & Victim Gadget</text>
+
+      <!-- Dynamic Content Injection Container -->
+      <g id="dynamicContent"></g>
+    </svg>
+  </div>
+
+  <!-- Detailed Explanation Cards Grid -->
+  <div class="cards-grid" id="cardsGrid">
+    <!-- Populated by JS -->
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById('simCanvas');
+  const dynamicContent = document.getElementById('dynamicContent');
+  const cardsGrid = document.getElementById('cardsGrid');
+  const playBtn = document.getElementById('playBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const themeToggleBtn = document.getElementById('themeToggleBtn');
+  const statusDot = document.getElementById('statusDot');
+  const statusText = document.getElementById('statusText');
+  const speedBtns = document.querySelectorAll('.speed-btn');
+  const scenarioBtns = document.querySelectorAll('.scenario-btn');
+
+  let currentTab = 1;
+  let isPlaying = true;
+  let currentSpeed = 1.0;
+
+  // Theme Toggle
+  themeToggleBtn.addEventListener('click', () => {
+    const isLight = document.body.getAttribute('data-theme') === 'light';
+    document.body.setAttribute('data-theme', isLight ? 'dark' : 'light');
+  });
+
+  // Play / Pause
+  playBtn.addEventListener('click', () => {
+    isPlaying = !isPlaying;
+    playBtn.textContent = isPlaying ? '⏸️ 일시정지' : '▶️ 재생';
+    playBtn.classList.toggle('active', isPlaying);
+    toggleAnimationPlayState(isPlaying);
+  });
+
+  function toggleAnimationPlayState(play) {
+    const animElements = document.querySelectorAll('#dynamicContent *');
+    animElements.forEach(el => {
+      el.style.animationPlayState = play ? 'running' : 'paused';
+    });
+    const animMotion = document.querySelectorAll('#dynamicContent animateMotion');
+    animMotion.forEach(am => {
+      if (play) am.beginElement();
+    });
+  }
+
+  // Speed Control
+  speedBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      speedBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentSpeed = parseFloat(btn.getAttribute('data-speed'));
+      applyAnimationSpeed(currentSpeed);
+    });
+  });
+
+  function applyAnimationSpeed(speed) {
+    const factor = 1.0 / speed;
+    const flowingPaths = document.querySelectorAll('.flow-path');
+    flowingPaths.forEach(p => {
+      p.style.animationDuration = `${1.2 * factor}s`;
+    });
+    const particles = document.querySelectorAll('animateMotion');
+    particles.forEach(am => {
+      am.setAttribute('dur', `${1.5 * factor}s`);
+    });
+  }
+
+  // Reset
+  resetBtn.addEventListener('click', () => {
+    renderTab(currentTab);
+  });
+
+  // Tab Selection
+  scenarioBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      scenarioBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentTab = parseInt(btn.getAttribute('data-tab'));
+      renderTab(currentTab);
+    });
+  });
+
+  function renderTab(tab) {
+    dynamicContent.innerHTML = '';
+    cardsGrid.innerHTML = '';
+
+    if (tab === 1) renderTab1();
+    else if (tab === 2) renderTab2();
+    else if (tab === 3) renderTab3();
+    else if (tab === 4) renderTab4();
+
+    applyAnimationSpeed(currentSpeed);
+    toggleAnimationPlayState(isPlaying);
+  }
+
+  /* ----------------------------------------------------
+   * Tab 1: Normal Indirect Call Dispatch
+   * ---------------------------------------------------- */
+  function renderTab1() {
+    statusDot.className = 'status-dot';
+    statusText.textContent = '정상 모델: 정상 간접 함수 포인터 디스패치 및 안전한 리턴';
+
+    dynamicContent.innerHTML = `
+      <!-- User Calling Block -->
+      <g transform="translate(40, 120)">
+        <rect width="220" height="90" rx="6" fill="#151e3f" stroke="#38bdf8" stroke-width="1.5" />
+        <text x="15" y="28" fill="#38bdf8" font-size="12" font-weight="bold">System Call Trigger</text>
+        <text x="15" y="50" fill="#94a3b8" font-size="11">sys_write / ioctl(fd, ...)</text>
+        <rect x="15" y="60" width="160" height="20" rx="3" fill="#0b132b" />
+        <text x="22" y="74" fill="#22c55e" font-family="monospace" font-size="11">dispatch_fn = &safe_target</text>
+      </g>
+
+      <!-- CPU BTB Table -->
+      <g transform="translate(340, 110)">
+        <rect width="400" height="150" rx="6" fill="#1c2541" stroke="#3a506b" stroke-width="1.5" />
+        <text x="15" y="25" fill="#38bdf8" font-size="12" font-weight="bold">Branch Target Buffer (BTB)</text>
+        <text x="15" y="45" fill="#94a3b8" font-size="11">간접 분기 명령어: call *%rax / blr x0</text>
+
+        <rect x="15" y="60" width="370" height="35" rx="4" fill="#0b132b" stroke="#22c55e" />
+        <text x="25" y="78" fill="#22c55e" font-family="monospace" font-size="11">BTB Entry: [Site: 0xffffffff812a] -> [&safe_target]</text>
+        <text x="25" y="90" fill="#94a3b8" font-size="10">예측 대상과 실제 함수 포인터 일치</text>
+
+        <rect x="15" y="105" width="370" height="30" rx="4" fill="#0b132b" />
+        <text x="25" y="125" fill="#22c55e" font-weight="bold" font-size="11">✅ Direct Execution: safe_target_function()</text>
+      </g>
+
+      <!-- Kernel Target Functions -->
+      <g transform="translate(820, 110)">
+        <rect width="240" height="150" rx="6" fill="#151e3f" stroke="#22c55e" stroke-width="1.5" />
+        <text x="15" y="25" fill="#22c55e" font-size="12" font-weight="bold">safe_target_function()</text>
+        <text x="15" y="45" fill="#94a3b8" font-size="11">정상 디스패치 핸들러</text>
+        
+        <rect x="15" y="60" width="210" height="30" rx="3" fill="#0b132b" stroke="#22c55e" />
+        <text x="22" y="78" fill="#22c55e" font-family="monospace" font-size="11">return 0 (정상 완료)</text>
+
+        <rect x="15" y="100" width="210" height="35" rx="3" fill="#0b132b" stroke="#3a506b" />
+        <text x="22" y="118" fill="#94a3b8" font-size="11">victim_spectre_gadget()</text>
+        <text x="22" y="128" fill="#94a3b8" font-size="10">💤 미실행 (콜드 상태)</text>
+      </g>
+
+      <!-- Flow Lines -->
+      <path id="f1" d="M 260 165 L 340 165" fill="none" class="flow-path normal" marker-end="url(#arrow-blue)" />
+      <path id="f2" d="M 740 165 L 820 165" fill="none" class="flow-path normal" marker-end="url(#arrow-green)" />
+
+      <!-- Pulse Particle -->
+      <circle r="6" fill="#38bdf8" filter="url(#glow-blue)">
+        <animateMotion dur="1.5s" repeatCount="indefinite" path="M 260 165 L 340 165" />
+      </circle>
+      <circle r="6" fill="#22c55e" filter="url(#glow-green)">
+        <animateMotion dur="1.5s" repeatCount="indefinite" path="M 740 165 L 820 165" />
+      </circle>
+    `;
+
+    cardsGrid.innerHTML = `
+      <div class="card">
+        <h3>🔹 간접 분기(Indirect Branch) 동작</h3>
+        <p>C 언어의 함수 포인터 호출, C++ 가상 함수(vtable), 리눅스 VFS 연산 등은 <code>call *%rax</code> 형태의 간접 분기를 사용합니다.</p>
+      </div>
+      <div class="card">
+        <h3>🔹 분기 대상 버퍼 (BTB) 캐싱</h3>
+        <p>CPU는 파이프라인 지연을 없애기 위해 이전에 점프했던 대상 주소를 BTB에 캐싱하고, 다음 번 호출 시 해당 주소로 즉시 분기합니다.</p>
+      </div>
+      <div class="card">
+        <h3>🔹 정상 상태에서의 보안</h3>
+        <p>BTB가 오염되지 않은 정상 환경에서는 올바른 목적지(<code>safe_target_function</code>)로만 예측되어 투기적 탈취가 발생하지 않습니다.</p>
+      </div>
+    `;
+  }
+
+  /* ----------------------------------------------------
+   * Tab 2: Spectre v2 BTB Poisoning Attack Vector
+   * ---------------------------------------------------- */
+  function renderTab2() {
+    statusDot.className = 'status-dot danger';
+    statusText.textContent = '공격 벡터 (Baseline): 유저 공간 BTB 오염 -> 커널 간접 분기 희생자 가젯 투기 탈취';
+
+    dynamicContent.innerHTML = `
+      <!-- Userland Attacker Block -->
+      <g transform="translate(40, 100)">
+        <rect width="220" height="160" rx="6" fill="#151e3f" stroke="#ef4444" stroke-width="1.5" />
+        <text x="15" y="25" fill="#ef4444" font-size="12" font-weight="bold">Attacker (BTB Poisoning)</text>
+        <text x="15" y="45" fill="#94a3b8" font-size="11">1. 커널 간접분기 가상주소 계산</text>
+        <text x="15" y="65" fill="#ef4444" font-size="11" font-weight="bold">2. Loop BTI: target = &victim_gadget</text>
+        <text x="15" y="85" fill="#94a3b8" font-size="11">3. 하위 비트 매핑 BTB 슬롯 오염</text>
+        <rect x="15" y="100" width="190" height="45" rx="4" fill="#0b132b" stroke="#ef4444" />
+        <text x="22" y="118" fill="#ef4444" font-family="monospace" font-size="11">Trigger Kernel Syscall</text>
+        <text x="22" y="132" fill="#fb923c" font-size="10">-> Speculative Gadget Executed!</text>
+      </g>
+
+      <!-- CPU BTB Table (Poisoned) -->
+      <g transform="translate(330, 90)">
+        <rect width="420" height="360" rx="6" fill="#151e3f" stroke="#ef4444" stroke-width="1.5" />
+        <text x="15" y="25" fill="#ef4444" font-size="12" font-weight="bold">CPU BTB: POISONED BY ATTACKER</text>
+
+        <!-- Poisoned BTB Slot -->
+        <rect x="15" y="40" width="390" height="70" rx="4" fill="#0b132b" stroke="#ef4444" />
+        <text x="25" y="58" fill="#ef4444" font-weight="bold" font-size="11">⚠️ BTB Aliasing Conflict Detected!</text>
+        <text x="25" y="78" fill="#f8fafc" font-family="monospace" font-size="11">Call Site [0xffffffff812a] -> [&victim_gadget]</text>
+        <text x="25" y="95" fill="#94a3b8" font-size="10">BTB 엔트리가 공격자 주입 주소(&victim_gadget)로 변조됨</text>
+
+        <!-- Ghost Speculative Box -->
+        <rect x="15" y="125" width="390" height="140" rx="4" fill="rgba(168, 85, 247, 0.15)" stroke="#a855f7" stroke-width="1.5" class="ghost-box" />
+        <text x="25" y="145" fill="#a855f7" font-weight="bold" font-size="12">👻 Transient Speculative Jump (BTI)</text>
+        <text x="25" y="168" fill="#ef4444" font-family="monospace" font-size="11">CPU가 BTB를 신뢰하고 victim_spectre_gadget() 점프!</text>
+        <text x="25" y="188" fill="#a855f7" font-family="monospace" font-size="11">secret = g_secret_data[arg] -> 'F' (0x46)</text>
+        <text x="25" y="208" fill="#a855f7" font-family="monospace" font-size="11">probe_array['F' * 512] 캐시 라인 가열!</text>
+
+        <!-- Rollback -->
+        <rect x="15" y="280" width="390" height="55" rx="4" fill="#0b132b" stroke="#ef4444" />
+        <text x="25" y="300" fill="#ef4444" font-weight="bold" font-size="11">❌ Target Resolved to safe_target -> Rollback!</text>
+        <text x="25" y="320" fill="#94a3b8" font-size="10">레지스터는 복구되나, 캐시 라인 0x46은 뜨겁게 잔류!</text>
+      </g>
+
+      <!-- Kernel Space: Target vs Victim Gadget -->
+      <g transform="translate(820, 90)">
+        <rect width="240" height="360" rx="6" fill="#151e3f" stroke="#ef4444" stroke-width="1.5" />
+        <text x="15" y="25" fill="#38bdf8" font-size="12" font-weight="bold">Kernel Memory Targets</text>
+
+        <!-- Safe target (non-speculative) -->
+        <rect x="15" y="45" width="210" height="60" rx="4" fill="#0b132b" stroke="#3a506b" />
+        <text x="22" y="65" fill="#94a3b8" font-size="11" font-weight="bold">safe_target_function()</text>
+        <text x="22" y="85" fill="#94a3b8" font-size="10">(비투기적 실제 목적지)</text>
+
+        <!-- Victim Spectre Gadget -->
+        <rect x="15" y="125" width="210" height="100" rx="4" fill="#0b132b" stroke="#ef4444" stroke-width="1.5" />
+        <text x="22" y="145" fill="#ef4444" font-size="11" font-weight="bold">victim_spectre_gadget()</text>
+        <text x="22" y="165" fill="#fb923c" font-family="monospace" font-size="11">secret: "FLAG{...}"</text>
+        <text x="22" y="185" fill="#ef4444" font-size="10">🔥 투기적으로 실행됨!</text>
+        <text x="22" y="205" fill="#94a3b8" font-size="10">probe_array[0x46] = 0xBB</text>
+
+        <!-- Probe Array Status -->
+        <rect x="15" y="245" width="210" height="95" rx="4" fill="#0b132b" stroke="#ef4444" />
+        <text x="22" y="265" fill="#ef4444" font-size="11" font-weight="bold">Probe Array (Side-Channel)</text>
+        <text x="22" y="285" fill="#ef4444" font-family="monospace" font-size="11">Line 'F' (0x46): HIT</text>
+        <text x="22" y="305" fill="#22c55e" font-size="10">공격자: 비밀 데이터 획득!</text>
+      </g>
+
+      <!-- Flow Lines -->
+      <path id="atk1" d="M 260 170 L 330 130" fill="none" class="flow-path attack" marker-end="url(#arrow-red)" />
+      <path id="atk2" d="M 750 180 L 820 170" fill="none" class="flow-path speculative" marker-end="url(#arrow-purple)" />
+      <path id="atk3" d="M 925 225 L 925 245" fill="none" class="flow-path attack" marker-end="url(#arrow-red)" />
+
+      <!-- Particles -->
+      <circle r="6" fill="#ef4444" filter="url(#glow-red)">
+        <animateMotion dur="1.2s" repeatCount="indefinite" path="M 260 170 L 330 130" />
+      </circle>
+      <circle r="6" fill="#a855f7" filter="url(#glow-purple)">
+        <animateMotion dur="1.0s" repeatCount="indefinite" path="M 750 180 L 820 170" />
+      </circle>
+    `;
+
+    cardsGrid.innerHTML = `
+      <div class="card">
+        <h3>⚠️ 1단계: BTB 엔트리 충돌 오염 (Aliasing)</h3>
+        <p>BTB는 전체 주소가 아닌 하위 가상 주소 비트만을 해시로 사용합니다. 공격자는 유저 영역에서 커널의 간접 분기와 동일한 BTB 슬롯을 지속적으로 오염시킵니다.</p>
+      </div>
+      <div class="card">
+        <h3>⚠️ 2단계: BTI (Branch Target Injection)</h3>
+        <p>커널이 간접 분기(<code>call *%rax</code>)를 만났을 때, CPU는 오염된 BTB를 참조하여 커널 내부의 희생자 가젯(<code>victim_spectre_gadget</code>)으로 투기 점프합니다.</p>
+      </div>
+      <div class="card">
+        <h3>⚠️ 3단계: 부채널 캐시 상태 추출</h3>
+        <p>희생자 가젯이 기밀 문자열을 읽고 프로브 배열의 특정 캐시 라인을 가열하면, 유저스페이스에서 Flush+Reload 타이밍 측정을 통해 기밀 바이트를 역산합니다.</p>
+      </div>
+    `;
+  }
+
+  /* ----------------------------------------------------
+   * Tab 3: Retpoline Defense Mechanism (RSB Loop Trap)
+   * ---------------------------------------------------- */
+  function renderTab3() {
+    statusDot.className = 'status-dot warning';
+    statusText.textContent = '하드닝 모델: Retpoline 트램펄린에 의한 RSB 무한루프 투기 격리 & 안전한 리턴';
+
+    dynamicContent.innerHTML = `
+      <!-- Userland Attacker Block -->
+      <g transform="translate(40, 100)">
+        <rect width="220" height="150" rx="6" fill="#151e3f" stroke="#3a506b" stroke-width="1.5" />
+        <text x="15" y="25" fill="#38bdf8" font-size="12" font-weight="bold">Attacker (Same BTI Attack)</text>
+        <text x="15" y="45" fill="#94a3b8" font-size="11">BTB 오염 시도 지속</text>
+        <rect x="15" y="60" width="190" height="30" rx="3" fill="#0b132b" />
+        <text x="22" y="80" fill="#f59e0b" font-family="monospace" font-size="11">Trigger Kernel Indirect Call</text>
+        <rect x="15" y="100" width="190" height="35" rx="3" fill="#0b132b" stroke="#22c55e" />
+        <text x="22" y="118" fill="#22c55e" font-size="11" font-weight="bold">결과: 가젯 탈취 실패</text>
+        <text x="22" y="128" fill="#94a3b8" font-size="10">0 bytes leaked (All Miss)</text>
+      </g>
+
+      <!-- Retpoline Engine with RSB Loop -->
+      <g transform="translate(330, 90)">
+        <rect width="420" height="360" rx="6" fill="#151e3f" stroke="#22c55e" stroke-width="1.5" />
+        <text x="15" y="25" fill="#22c55e" font-size="12" font-weight="bold">HARDENED RETPOLINE TRAMPOLINE</text>
+
+        <!-- Retpoline Assembly Thunk Structure -->
+        <g transform="translate(15, 40)">
+          <rect width="390" height="150" rx="5" fill="#0b132b" stroke="#38bdf8" stroke-width="1.5" />
+          <text x="15" y="22" fill="#38bdf8" font-weight="bold" font-size="11">🛡️ Retpoline Thunk (__x86_indirect_thunk_rax)</text>
+          
+          <rect x="15" y="32" width="360" height="50" rx="4" fill="#1c2541" stroke="#f59e0b" />
+          <text x="25" y="50" fill="#f59e0b" font-family="monospace" font-size="11">1: pause; lfence; jmp 1b</text>
+          <text x="25" y="68" fill="#f8fafc" font-size="10">CPU의 RSB 투기 엔진은 이 무한 루프에 안전하게 갇힘!</text>
+
+          <rect x="15" y="90" width="360" height="42" rx="4" fill="#1c2541" stroke="#22c55e" />
+          <text x="25" y="108" fill="#22c55e" font-family="monospace" font-size="11">2: mov %rax, (%rsp); ret</text>
+          <text x="25" y="122" fill="#94a3b8" font-size="10">하드웨어는 스택의 실제 대상(%rax)을 읽어 안전하게 점프</text>
+        </g>
+
+        <!-- Speculative Trap Ring (Detonation Circle) -->
+        <g transform="translate(210, 260)">
+          <circle cx="0" cy="0" r="24" fill="#f59e0b" opacity="0.25" />
+          <circle cx="0" cy="0" r="14" fill="#f59e0b" stroke="#ffffff" stroke-width="2" />
+          <circle cx="0" cy="0" r="38" fill="none" stroke="#f59e0b" class="trap-ripple" />
+          <text x="-65" y="-30" fill="#f59e0b" font-weight="bold" font-size="11">⛔ SPECULATION TRAPPED</text>
+          <text x="-75" y="42" fill="#22c55e" font-weight="bold" font-size="11">BTB는 결코 참조되지 않음!</text>
+        </g>
+
+        <rect x="15" y="315" width="390" height="32" rx="4" fill="#0b132b" stroke="#22c55e" />
+        <text x="20" y="335" fill="#22c55e" font-size="11">✅ RSB 기반 직렬화 완료: BTB 오염 우회 100% 무력화</text>
+      </g>
+
+      <!-- Kernel Space in Protected Mode -->
+      <g transform="translate(820, 90)">
+        <rect width="240" height="360" rx="6" fill="#151e3f" stroke="#22c55e" stroke-width="1.5" />
+        <text x="15" y="25" fill="#22c55e" font-size="12" font-weight="bold">Protected Kernel Execution</text>
+
+        <!-- Safe target executes -->
+        <rect x="15" y="45" width="210" height="80" rx="4" fill="#0b132b" stroke="#22c55e" stroke-width="1.5" />
+        <text x="22" y="68" fill="#22c55e" font-size="12" font-weight="bold">safe_target_function()</text>
+        <text x="22" y="88" fill="#38bdf8" font-size="11">정상적으로 호출됨</text>
+        <text x="22" y="105" fill="#22c55e" font-size="10">오버헤드: ~몇 사이클</text>
+
+        <!-- Victim gadget completely protected -->
+        <rect x="15" y="145" width="210" height="80" rx="4" fill="#0b132b" stroke="#3a506b" />
+        <text x="22" y="168" fill="#94a3b8" font-size="11" font-weight="bold">victim_spectre_gadget()</text>
+        <text x="22" y="188" fill="#22c55e" font-size="11">🔒 100% BLOCKED & UNREACHED</text>
+        <text x="22" y="205" fill="#94a3b8" font-size="10">투기적 도달 불가능</text>
+
+        <!-- Probe array is cold -->
+        <rect x="15" y="245" width="210" height="95" rx="4" fill="#0b132b" stroke="#22c55e" />
+        <text x="22" y="265" fill="#22c55e" font-size="11" font-weight="bold">Probe Array Status</text>
+        <text x="22" y="285" fill="#22c55e" font-family="monospace" font-size="11">Line 'F' (0x46): COLD</text>
+        <text x="22" y="305" fill="#94a3b8" font-size="10">공격자: 캐시 미스 (0 bytes)</text>
+      </g>
+
+      <!-- Flow Lines -->
+      <path id="hFlow1" d="M 260 170 L 330 170" fill="none" class="flow-path blocked" marker-end="url(#arrow-yellow)" />
+      <path id="hFlow2" d="M 750 200 L 820 85" fill="none" class="flow-path normal" marker-end="url(#arrow-green)" />
+
+      <!-- Particles -->
+      <circle r="6" fill="#f59e0b" filter="url(#glow-blue)">
+        <animateMotion dur="1.4s" repeatCount="indefinite" path="M 260 170 L 330 170" />
+      </circle>
+      <circle r="6" fill="#22c55e" filter="url(#glow-green)">
+        <animateMotion dur="1.2s" repeatCount="indefinite" path="M 750 200 L 820 85" />
+      </circle>
+    `;
+
+    cardsGrid.innerHTML = `
+      <div class="card">
+        <h3>🛡️ 리턴 스택 버퍼 (RSB) 역이용</h3>
+        <p>Retpoline은 간접 점프를 수행하기 전 <code>call</code> 명령으로 RSB에 무한 루프 주소를 밀어 넣습니다. CPU의 투기적 엔진은 RSB를 참조하여 루프에 안전하게 갇힙니다.</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ 하드웨어 BTB 완전 우회</h3>
+        <p>간접 분기가 <code>ret</code> 명령어로 변환되어 실행되므로, 공격자가 유저 공간에서 아무리 BTB를 오염시켜 놓아도 하드웨어는 BTB 엔트리를 전혀 읽지 않습니다.</p>
+      </div>
+      <div class="card">
+        <h3>🛡️ IBPB 및 하드웨어 연계 방어</h3>
+        <p>현대 커널은 문맥 교환 시 <code>IBPB</code>(하드웨어 MSR)로 BTB를 비우고, 하이퍼스레딩 환경에서는 <code>STIBP</code>를 가동하여 완벽한 방어 계층을 구축합니다.</p>
+      </div>
+    `;
+  }
+
+  /* ----------------------------------------------------
+   * Tab 4: Comparison & Security Matrix
+   * ---------------------------------------------------- */
+  function renderTab4() {
+    statusDot.className = 'status-dot';
+    statusText.textContent = '비교 매트릭스: Spectre v2 완화 기법(Retpoline, IBPB, eIBRS, BHB) 종합 비교';
+
+    dynamicContent.innerHTML = `
+      <foreignObject x="30" y="40" width="1040" height="420">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="color: var(--text-main);">
+          <h2 style="font-size: 1.15rem; color: var(--accent-blue); margin-bottom: 8px;">📊 Spectre v2 Defense Mechanisms Comparative Matrix</h2>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 12px;">
+            간접 분기 대상 주입(Branch Target Injection - CVE-2017-5715)에 대응하는 핵심 완화 기술 비교:
+          </p>
+
+          <table class="compare-table">
+            <thead>
+              <tr>
+                <th>완화 기술 (Mitigation)</th>
+                <th>방어 계층 (Layer)</th>
+                <th>방어 원리 (Principle)</th>
+                <th>CPU 오버헤드</th>
+                <th>적용 대상 및 상태</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="background: rgba(239, 68, 68, 0.1);">
+                <td style="font-weight: bold; color: var(--accent-red);">Baseline (미방어)</td>
+                <td>하드웨어 기본</td>
+                <td>원시 간접 분기 (<code>call *%rax</code>)</td>
+                <td>0% (기본값)</td>
+                <td><span style="color: var(--accent-red); font-weight: bold;">❌ VULNERABLE</span> (BTB 오염 및 BTI 탈취)</td>
+              </tr>
+              <tr style="background: rgba(34, 197, 94, 0.1);">
+                <td style="font-weight: bold; color: var(--accent-green);">Retpoline (Return Trampoline)</td>
+                <td>컴파일러 / 소프트웨어</td>
+                <td>RSB 기반 무한루프 투기 트랩</td>
+                <td>낮음~중간 (간접분기당 ~10-20c)</td>
+                <td><span style="color: var(--accent-green); font-weight: bold;">✅ PROTECTED</span> (x86 구형/중간 CPU 표준)</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; color: var(--accent-blue);">eIBRS (Enhanced IBRS)</td>
+                <td>하드웨어 마이크로코드</td>
+                <td>Ring 0 진입 시 자동 BTB 격리</td>
+                <td>극소 (< 1%)</td>
+                <td><span style="color: var(--accent-green); font-weight: bold;">✅ PROTECTED</span> (Intel 9세대+ / AMD Zen3+)</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; color: var(--accent-yellow);">IBPB (Indirect Branch Barrier)</td>
+                <td>하드웨어 MSR (0x49)</td>
+                <td>문맥 교환 시 BTB 구조 전면 플러시</td>
+                <td>문맥 교환 시 약간 증가</td>
+                <td><span style="color: var(--accent-green); font-weight: bold;">✅ PROTECTED</span> (프로세스 간 BTB 격리)</td>
+              </tr>
+              <tr>
+                <td style="font-weight: bold; color: var(--accent-purple);">ARM64 CSV2 & BHB Clearing</td>
+                <td>ARMv8/v9 하드웨어/FW</td>
+                <td>컨텍스트별 BTB 태깅 & BHB 소거 루프</td>
+                <td>극소 (< 2%)</td>
+                <td><span style="color: var(--accent-green); font-weight: bold;">✅ PROTECTED</span> (ARM64 Cortex-A7x/Neoverse)</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px;">
+            <div style="background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px; padding: 10px;">
+              <h4 style="color: var(--accent-blue); font-size: 0.9rem; margin-bottom: 4px;">🎯 x86 Retpoline Thunk 구조</h4>
+              <pre style="font-family: monospace; font-size: 0.8rem; color: #f8fafc;">call 2f
+1: pause; lfence; jmp 1b  // RSB speculative trap
+2: pushq %rax; ret        // Non-speculative jump</pre>
+            </div>
+            <div style="background: var(--bg-color); border: 1px solid var(--card-border); border-radius: 6px; padding: 10px;">
+              <h4 style="color: var(--accent-blue); font-size: 0.9rem; margin-bottom: 4px;">🎯 sysfs 커널 보고 형식</h4>
+              <pre style="font-family: monospace; font-size: 0.8rem; color: #f8fafc;">/sys/devices/system/cpu/vulnerabilities/spectre_v2
+Mitigation: Retpolines, IBPB: conditional,
+            IBRS_FW, STIBP: conditional, RSB filling</pre>
+            </div>
+          </div>
+        </div>
+      </foreignObject>
+    `;
+
+    cardsGrid.innerHTML = `
+      <div class="card">
+        <h3>📊 하드웨어 진화와 소프트웨어의 공존</h3>
+        <p>구형 프로세서에서는 Retpoline이 주력 완화책으로 동작하며, 최신 프로세서(Intel Ice Lake+, AMD Zen 3+)에서는 하드웨어 eIBRS와 결합하여 성능 저하를 0%대로 줄입니다.</p>
+      </div>
+      <div class="card">
+        <h3>📊 다층 방어 (Defense-in-Depth)</h3>
+        <p>단일 기법에 의존하지 않고 Retpoline(소프트웨어) + IBPB(프로세스 격리) + STIBP(하이퍼스레딩 격리) + RSB filling(스택 언더플로우 방지)의 4중 방어막을 구축합니다.</p>
+      </div>
+      <div class="card">
+        <h3>📊 ARM64 아키텍처 특화 대응</h3>
+        <p>ARMv8.5+의 CSV2 하드웨어 비트와 펌웨어 레벨의 SMCCC 워크어라운드 및 Spectre-BHB 루프를 통해 아키텍처별로 최적화된 방어선을 제공합니다.</p>
+      </div>
+    `;
+  }
+
+  // Initialize
+  renderTab(1);
+</script>
+</body>
+</html>
+
