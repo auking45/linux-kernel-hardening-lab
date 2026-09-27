@@ -106,7 +106,7 @@
 - [x] **Task 9-1:** Spectre v1 (`array_index_nospec`) 방어 메커니즘.
 - [x] **Task 9-2:** Spectre v2 (Retpoline, IBPB, STIBP) 간접 분기 예측 방어.
 - [x] **Task 9-3:** Speculative Store Bypass Disable (SSBD - Spectre v4).
-- [ ] **Task 9-4:** MDS (Microarchitectural Data Sampling) & TAA 완화.
+- [x] **Task 9-4:** MDS (Microarchitectural Data Sampling) & TAA 완화.
 
 ### [Phase 10] Category 8: Mandatory Access Control & LSM Framework
 

@@ -1,0 +1,1065 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MDS & TAA Buffer Clearing (VERW) Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--accent-purple);
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Standard Simulation Toolbar (STYLE_GUIDE.md v2.0) */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 10px 16px;
+      border-radius: 8px;
+    }
+
+    .sim-btn {
+      background: #2a3a58;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    [data-theme="light"] .sim-btn {
+      background: #e2e8f0;
+    }
+
+    .sim-btn:hover {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+    }
+
+    .sim-select {
+      background: var(--card-bg);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+
+    .live-badge {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid var(--accent-green);
+      color: var(--accent-green);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .live-badge.paused {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+    }
+
+    .led-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.8s infinite;
+    }
+
+    .live-badge.paused .led-dot {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--accent-yellow);
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 0.4; transform: scale(0.9); }
+    }
+
+    /* Tabs Navigation */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--card-border);
+      padding-bottom: 4px;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 8px 16px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+      position: relative;
+      white-space: nowrap;
+      transition: color 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+    }
+
+    .tab-btn.active::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: var(--accent-blue);
+      border-radius: 2px;
+    }
+
+    /* Main Simulator Stage */
+    .sim-stage {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      position: relative;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      max-height: 520px;
+      user-select: none;
+    }
+
+    /* Explanation & Telemetry Card */
+    .details-card {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    [data-theme="light"] .details-card {
+      background: rgba(241, 245, 249, 0.7);
+    }
+
+    .details-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+    }
+
+    .details-body {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: var(--text-main);
+    }
+
+    .code-preview {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      background: #070d1e;
+      border: 1px solid var(--card-border);
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      margin-top: 6px;
+      overflow-x: auto;
+    }
+
+    [data-theme="light"] .code-preview {
+      background: #f8fafc;
+      color: #0369a1;
+    }
+
+    /* Comparison Matrix Table */
+    .matrix-container {
+      display: none;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 18px;
+      overflow-x: auto;
+    }
+
+    table.matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.88rem;
+    }
+
+    table.matrix-table th, table.matrix-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    table.matrix-table th {
+      background: rgba(56, 189, 248, 0.12);
+      color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    table.matrix-table tr:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    [data-theme="light"] table.matrix-table tr:hover {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    /* Flow Animations */
+    @keyframes dashMove {
+      to { stroke-dashoffset: -40; }
+    }
+
+    .flow-line {
+      stroke-dasharray: 6 4;
+      animation: dashMove 1.5s linear infinite;
+    }
+
+    .flow-line.fast {
+      animation-duration: 0.8s;
+    }
+
+    .flow-line.blocked {
+      animation: none;
+      stroke-dasharray: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        MDS & TAA Buffer Clearing (VERW)
+        <span class="badge">ZombieLoad / RIDL / Fallout</span>
+      </h1>
+      <div style="font-size: 0.85rem; color: var(--text-muted);">
+        Interactive Microarchitectural Data Sampling Simulator v2.0
+      </div>
+    </header>
+
+    <!-- Top Simulation Toolbar (STYLE_GUIDE.md v2.0) -->
+    <div class="sim-toolbar">
+      <button class="sim-btn" id="btn-play">
+        <span id="play-icon">⏸ Pause</span>
+      </button>
+      <button class="sim-btn" id="btn-step">⏭ Step</button>
+      <button class="sim-btn" id="btn-reset">🔄 Reset</button>
+      
+      <span style="font-size: 0.85rem; color: var(--text-muted); margin-left: 8px;">Speed:</span>
+      <select class="sim-select" id="speed-select">
+        <option value="2000">0.5x Slow</option>
+        <option value="1200" selected>1.0x Normal</option>
+        <option value="600">1.5x Fast</option>
+      </select>
+
+      <button class="sim-btn" id="theme-toggle">🌓 Theme</button>
+
+      <div class="live-badge" id="live-indicator">
+        <div class="led-dot"></div>
+        <span id="live-text">SIMULATION RUNNING</span>
+      </div>
+    </div>
+
+    <!-- 4 Standard Scenario Tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" data-tab="normal">1. Standard CPU Buffer Operations</button>
+      <button class="tab-btn" data-tab="sampling">2. MDS / TAA Speculative Sampling</button>
+      <button class="tab-btn" data-tab="verw">3. VERW Buffer Clearing Mitigation</button>
+      <button class="tab-btn" data-tab="matrix">4. Architecture Comparison Matrix</button>
+    </div>
+
+    <!-- Interactive SVG Visualization Canvas -->
+    <div class="sim-stage" id="stage-svg">
+      <svg viewBox="0 0 1000 520" id="main-svg">
+        <defs>
+          <filter id="glow-blue" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id="glow-red" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+
+          <!-- Marker Arrows -->
+          <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#38bdf8" />
+          </marker>
+          <marker id="arrow-red" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#ef4444" />
+          </marker>
+          <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#22c55e" />
+          </marker>
+          <marker id="arrow-yellow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M 0 1 L 8 5 L 0 9 z" fill="#f59e0b" />
+          </marker>
+        </defs>
+
+        <!-- Outer CPU Boundary -->
+        <rect x="20" y="20" width="960" height="480" rx="12" fill="#131e3a" stroke="#2a3d66" stroke-width="2" />
+        <text x="40" y="50" fill="#94a3b8" font-size="14" font-weight="700" letter-spacing="1">INTEL X86_64 CPU EXECUTION CORE & MICROARCHITECTURAL BUFFERS</text>
+
+        <!-- Module 1: Privileged Kernel Execution / Syscall (Left Top) -->
+        <g id="mod-kernel" transform="translate(40, 75)">
+          <rect width="240" height="120" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+          <text x="15" y="25" fill="#38bdf8" font-size="13" font-weight="700">1. Privileged Context (Ring 0)</text>
+          
+          <rect x="15" y="40" width="210" height="65" rx="5" fill="#0f172a" stroke="#334155" />
+          <text x="25" y="60" fill="#f8fafc" font-size="11" font-weight="600">Kernel Syscall Execution:</text>
+          <text id="kernel-act-text" x="25" y="78" fill="#ef4444" font-size="11">Processing Secret: 0x46 ('F')</text>
+          <text id="kernel-exit-text" x="25" y="94" fill="#94a3b8" font-size="10">Transition: SYSRET to Ring 3</text>
+        </g>
+
+        <!-- Module 2: Microarchitectural Internal Buffers (Center) -->
+        <g id="mod-buffers" transform="translate(320, 75)">
+          <rect width="330" height="255" rx="8" fill="#1e293b" stroke="#f59e0b" stroke-width="1.5" />
+          <text x="15" y="25" fill="#f59e0b" font-size="13" font-weight="700">2. Internal CPU Hardware Buffers</text>
+
+          <!-- Line Fill Buffer (LFB) - Primary MDS target (ZombieLoad/RIDL) -->
+          <g id="buf-lfb" transform="translate(15, 42)">
+            <rect id="lfb-bg" width="300" height="56" rx="6" fill="#0f172a" stroke="#f59e0b" />
+            <text x="12" y="22" fill="#f8fafc" font-size="11" font-weight="700">Line Fill Buffers (LFB - 12 Entries)</text>
+            <text id="lfb-status-text" x="12" y="42" fill="#ef4444" font-size="11.5" font-family="monospace">
+              Entry 0: Stale Residue = 0x46 ('F')
+            </text>
+          </g>
+
+          <!-- Store Buffer (SB) - MSBDS / Fallout target -->
+          <g id="buf-sb" transform="translate(15, 110)">
+            <rect id="sb-bg" width="300" height="48" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="12" y="20" fill="#94a3b8" font-size="11" font-weight="700">Store Buffers (SB - 56 Entries)</text>
+            <text id="sb-status-text" x="12" y="38" fill="#94a3b8" font-size="10.5" font-family="monospace">
+              Pending Write Data: Cleared / Flushed
+            </text>
+          </g>
+
+          <!-- Load Ports (LP) - MLPDS target -->
+          <g id="buf-lp" transform="translate(15, 170)">
+            <rect id="lp-bg" width="300" height="48" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="12" y="20" fill="#94a3b8" font-size="11" font-weight="700">Load Ports (LP - Ports 2/3)</text>
+            <text id="lp-status-text" x="12" y="38" fill="#94a3b8" font-size="10.5" font-family="monospace">
+              Read Bus Registers: Neutral
+            </text>
+          </g>
+
+          <!-- VERW Microcode Sanitization Indicator -->
+          <rect id="verw-sweep-bar" x="15" y="226" width="300" height="18" rx="3" fill="rgba(34, 197, 94, 0.2)" stroke="#22c55e" style="display: none;" />
+          <text id="verw-sweep-text" x="25" y="240" fill="#22c55e" font-size="10" font-weight="700" style="display: none;">
+            VERW Microcode: Clearing LFB, SB, and LP buffers with 0x00...
+          </text>
+        </g>
+
+        <!-- Module 3: Unprivileged Attacker / Faulting Load (Right Top) -->
+        <g id="mod-attacker" transform="translate(685, 75)">
+          <rect width="265" height="135" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" />
+          <text x="15" y="24" fill="#ef4444" font-size="13" font-weight="700">3. Attacker Process (Ring 3)</text>
+
+          <rect x="15" y="38" width="235" height="85" rx="6" fill="#0f172a" stroke="#334155" />
+          <text x="25" y="58" fill="#f8fafc" font-size="11" font-weight="600">Speculative Faulting Load:</text>
+          <text id="attack-op-text" x="25" y="76" fill="#ef4444" font-size="11">val = *(faulting_addr);</text>
+          <text id="attack-status-text" x="25" y="96" fill="#94a3b8" font-size="10">Samples LFB before page fault!</text>
+          <text id="attack-sig-text" x="25" y="112" fill="#94a3b8" font-size="10">SIGSEGV caught or TSX aborted</text>
+        </g>
+
+        <!-- Module 4: Cache Probe Array Side-Channel (Right Bottom) -->
+        <g id="mod-probe" transform="translate(685, 225)">
+          <rect width="265" height="105" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="1.5" />
+          <text x="15" y="22" fill="#38bdf8" font-size="12" font-weight="700">4. Flush+Reload Probe Array</text>
+
+          <!-- Cache lines -->
+          <g transform="translate(15, 35)">
+            <rect id="probe-line-safe" x="0" y="0" width="235" height="18" rx="3" fill="#0f172a" stroke="#334155" />
+            <text id="probe-safe-text" x="10" y="13" fill="#64748b" font-size="9.5">Line 0x00 (Neutral): FLUSHED (MISS)</text>
+
+            <rect id="probe-line-secret" x="0" y="26" width="235" height="18" rx="3" fill="#0f172a" stroke="#334155" />
+            <text id="probe-secret-text" x="10" y="39" fill="#64748b" font-size="9.5">Line 0x46 ('F' Secret): FLUSHED (MISS)</text>
+          </g>
+        </g>
+
+        <!-- Module 5: VERW Defense Control Unit (Left Bottom) -->
+        <g id="mod-verw" transform="translate(40, 215)">
+          <rect width="240" height="115" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="1.5" />
+          <text x="15" y="24" fill="#22c55e" font-size="13" font-weight="700">5. VERW Defense Engine</text>
+
+          <rect x="15" y="38" width="210" height="65" rx="5" fill="#0f172a" stroke="#334155" />
+          <text id="verw-cfg-title" x="25" y="58" fill="#22c55e" font-size="11" font-weight="700">X86_FEATURE_MD_CLEAR</text>
+          <text id="verw-cfg-status" x="25" y="76" fill="#f8fafc" font-size="10.5">Instruction: verw %[ds]</text>
+          <text id="verw-cfg-desc" x="25" y="94" fill="#94a3b8" font-size="10">Invoked on sysret / iret / ctx-sw</text>
+        </g>
+
+        <!-- Module 6: Speculation State Machine (Bottom Full) -->
+        <g id="mod-timeline" transform="translate(40, 350)">
+          <rect width="910" height="130" rx="8" fill="#1e293b" stroke="#334155" stroke-width="1.5" />
+          <text x="20" y="25" fill="#94a3b8" font-size="12" font-weight="700">6. Microarchitectural Sampling & Mitigation State Machine</text>
+
+          <!-- Step Indicators -->
+          <g transform="translate(20, 42)">
+            <!-- Step 1 -->
+            <rect id="step-box-1" x="0" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#38bdf8" />
+            <text x="10" y="20" fill="#38bdf8" font-size="11" font-weight="700">Step 1: Kernel Workload</text>
+            <text x="10" y="38" fill="#94a3b8" font-size="10">Secret in memory</text>
+            <text x="10" y="52" fill="#94a3b8" font-size="10">Leaves LFB residue</text>
+
+            <!-- Step 2 -->
+            <rect id="step-box-2" x="180" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="190" y="20" fill="#94a3b8" font-size="11" font-weight="700">Step 2: Kernel Exit</text>
+            <text x="190" y="38" fill="#94a3b8" font-size="10">Transition to Userland</text>
+            <text x="190" y="52" fill="#94a3b8" font-size="10">Buffers dirty or clean?</text>
+
+            <!-- Step 3 -->
+            <rect id="step-box-3" x="360" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="370" y="20" fill="#94a3b8" font-size="11" font-weight="700">Step 3: Faulting Load</text>
+            <text x="370" y="38" fill="#94a3b8" font-size="10">Pipeline stalls on fault</text>
+            <text x="370" y="52" fill="#94a3b8" font-size="10">Speculative buffer sample</text>
+
+            <!-- Step 4 -->
+            <rect id="step-box-4" x="540" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="550" y="20" fill="#94a3b8" font-size="11" font-weight="700">Step 4: Cache Encoding</text>
+            <text x="550" y="38" fill="#94a3b8" font-size="10">probe_array[val * 512]</text>
+            <text x="550" y="52" fill="#94a3b8" font-size="10">Warms cache line</text>
+
+            <!-- Step 5 -->
+            <rect id="step-box-5" x="720" y="0" width="165" height="65" rx="6" fill="#0f172a" stroke="#334155" />
+            <text x="730" y="20" fill="#94a3b8" font-size="11" font-weight="700">Step 5: Flush+Reload</text>
+            <text x="730" y="38" fill="#94a3b8" font-size="10">Timing measurement</text>
+            <text x="730" y="52" fill="#94a3b8" font-size="10">Secret leak or safe 0s</text>
+          </g>
+        </g>
+
+        <!-- Dynamic Connection Paths -->
+        <!-- Kernel to LFB -->
+        <path id="path-kernel-lfb" d="M 280 135 L 320 135" stroke="#ef4444" stroke-width="2.5" fill="none" class="flow-line" marker-end="url(#arrow-red)" />
+
+        <!-- LFB to Attacker Load (Sampling Path) -->
+        <path id="path-lfb-attacker" d="M 650 115 L 685 115" stroke="#ef4444" stroke-width="3" fill="none" class="flow-line fast" marker-end="url(#arrow-red)" />
+
+        <!-- Attacker to Probe Array -->
+        <path id="path-attacker-probe" d="M 815 210 L 815 225" stroke="#38bdf8" stroke-width="2" fill="none" class="flow-line" marker-end="url(#arrow-blue)" />
+
+        <!-- VERW to LFB (Sanitization Sweep) -->
+        <path id="path-verw-lfb" d="M 280 270 L 320 270" stroke="#22c55e" stroke-width="3" fill="none" class="flow-line" marker-end="url(#arrow-green)" style="display: none;" />
+      </svg>
+    </div>
+
+    <!-- Telemetry and Detailed Explanations Card -->
+    <div class="details-card">
+      <div class="details-header">
+        <span id="card-step-title">CURRENT PHASE: MDS & TAA SPECULATIVE SAMPLING</span>
+        <span id="card-state-badge" style="color: var(--accent-yellow);">STATUS: INITIALIZING</span>
+      </div>
+      <div class="details-body" id="card-explanation">
+        MDS(Microarchitectural Data Sampling - ZombieLoad/RIDL/Fallout)는 비순차적 CPU가 페이지 폴트, TSX 어보트 등 비정상적 로드를 처리하는 동안
+        파이프라인 지연을 메우기 위해 <strong>Line Fill Buffer(LFB)</strong> 등 내부 마이크로아키텍처 버퍼의 잔여 데이터를 무분별하게 읽어들이는 취약점임.
+        리눅스 커널은 <code>VERW</code> 명령어를 유저 공간 복귀 직전에 실행하여 CPU 버퍼를 0으로 강제 소거함으로써 이 공격을 완벽히 차단함.
+      </div>
+      <div class="code-preview" id="card-code">
+// [MDS Speculative Sampling Gadget]
+// Faulting load triggers speculative fill from Line Fill Buffer (LFB)
+val = *(char *)faulting_unmapped_address; // Page Fault 발생 직전 투기 실행!
+probe_array[val * 512] = 1;              // LFB에 남아있던 커널 비밀 바이트 캐시 적재!
+      </div>
+    </div>
+
+    <!-- Tab 4: Architecture Comparison Matrix -->
+    <div class="matrix-container" id="stage-matrix">
+      <h3 style="margin-bottom: 14px; color: var(--accent-blue);">MDS & TAA Vulnerability Variants & Mitigation Matrix</h3>
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th>취약점 명칭 (Variant)</th>
+            <th>공격 대상 마이크로아키텍처 버퍼</th>
+            <th>영향받는 CPU 아키텍처</th>
+            <th>하드웨어 완화책</th>
+            <th>리눅스 커널 완화책</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>MFBDS (ZombieLoad v1)</strong><br>CVE-2018-12130</td>
+            <td>Line Fill Buffer (LFB)<br>코어 간 데이터 로드/캐시 라인 필링</td>
+            <td>Intel Sandy Bridge ~ Coffee Lake (x86_64)</td>
+            <td>마이크로코드 업데이트 (MD_CLEAR 지원)</td>
+            <td>커널-유저 공간 복귀 시 VERW 실행 + SMT 비활성화</td>
+          </tr>
+          <tr>
+            <td><strong>MSBDS (Fallout)</strong><br>CVE-2018-12126</td>
+            <td>Store Buffer (SB)<br>스토어-로드 포워딩 주소 계산 지연</td>
+            <td>Intel Haswell ~ Cascade Lake (x86_64)</td>
+            <td>마이크로코드 업데이트 (MD_CLEAR)</td>
+            <td>VERW 버퍼 소거 + <code>mds=full</code></td>
+          </tr>
+          <tr>
+            <td><strong>MLPDS (RIDL)</strong><br>CVE-2018-12127</td>
+            <td>Load Ports (LP)<br>임시 로드 버퍼 레지스터</td>
+            <td>Intel Nehalem ~ Whiskey Lake (x86_64)</td>
+            <td>마이크로코드 업데이트 (MD_CLEAR)</td>
+            <td>VERW 버퍼 소거</td>
+          </tr>
+          <tr>
+            <td><strong>TAA (ZombieLoad v2)</strong><br>CVE-2019-11135</td>
+            <td>TSX Transactional Abort 중 LFB 잔여 데이터 우회</td>
+            <td>Intel TSX 지원 프로세서 (Skylake, Cascade Lake)</td>
+            <td>TSX 비활성화 (IA32_TSX_CTRL) / Microcode</td>
+            <td><code>tsx_async_abort=full</code> + VERW 버퍼 소거</td>
+          </tr>
+          <tr>
+            <td><strong>MMIO Stale Data</strong><br>CVE-2022-21123 등</td>
+            <td>Device MMIO 읽기 버퍼 잔여 데이터</td>
+            <td>Intel 전반 (x86_64)</td>
+            <td>마이크로코드 버퍼 소거 기능 확장</td>
+            <td><code>mmio_stale_data=full</code> (VERW 연동)</td>
+          </tr>
+          <tr>
+            <td><strong>ARM64 Status</strong></td>
+            <td>해당 없음 (ARM Core는 공유 LFB 우회 미구현)</td>
+            <td>ARMv8 / ARMv9 (Cortex-A, Neoverse)</td>
+            <td>하드웨어 자체 면역 (Not affected)</td>
+            <td>별도 버퍼 소거 불필요</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // State Engine
+    const state = {
+      theme: 'dark',
+      currentTab: 'normal',
+      isPlaying: true,
+      currentStep: 1,
+      maxSteps: 5,
+      speed: 1200,
+      timer: null
+    };
+
+    // DOM Elements
+    const btnPlay = document.getElementById('btn-play');
+    const playIcon = document.getElementById('play-icon');
+    const btnStep = document.getElementById('btn-step');
+    const btnReset = document.getElementById('btn-reset');
+    const speedSelect = document.getElementById('speed-select');
+    const themeToggle = document.getElementById('theme-toggle');
+    const liveIndicator = document.getElementById('live-indicator');
+    const liveText = document.getElementById('live-text');
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const stageSvg = document.getElementById('stage-svg');
+    const stageMatrix = document.getElementById('stage-matrix');
+
+    // SVG Elements
+    const kernelActText = document.getElementById('kernel-act-text');
+    const kernelExitText = document.getElementById('kernel-exit-text');
+    const lfbStatusText = document.getElementById('lfb-status-text');
+    const lfbBg = document.getElementById('lfb-bg');
+    const verwSweepBar = document.getElementById('verw-sweep-bar');
+    const verwSweepText = document.getElementById('verw-sweep-text');
+    const attackOpText = document.getElementById('attack-op-text');
+    const attackStatusText = document.getElementById('attack-status-text');
+    const probeLineSafe = document.getElementById('probe-line-safe');
+    const probeSafeText = document.getElementById('probe-safe-text');
+    const probeLineSecret = document.getElementById('probe-line-secret');
+    const probeSecretText = document.getElementById('probe-secret-text');
+    const pathLfbAttacker = document.getElementById('path-lfb-attacker');
+    const pathVerwLfb = document.getElementById('path-verw-lfb');
+
+    const cardStepTitle = document.getElementById('card-step-title');
+    const cardStateBadge = document.getElementById('card-state-badge');
+    const cardExplanation = document.getElementById('card-explanation');
+    const cardCode = document.getElementById('card-code');
+
+    const tabConfigs = {
+      normal: {
+        title: "1. STANDARD CPU BUFFER OPERATIONS",
+        steps: [
+          {
+            title: "Step 1: Kernel Reads Secret Data",
+            state: "RING 0 KERNEL EXECUTION",
+            color: "var(--accent-blue)",
+            desc: "커널이 시스템 콜 처리 중 기밀 데이터 0x46('F')을 메모리에서 로드함. L1D 캐시 필링을 위해 Line Fill Buffer(LFB)에 데이터가 일시 상주함.",
+            code: "// Privileged Kernel Task:\nuint8_t secret = *kernel_secret_ptr; // Loaded into CPU registers\n// Microarchitecture: LFB Entry 0 holds 0x46 during bus fill",
+            lfbText: "Entry 0: Active Transfer = 0x46 ('F')",
+            lfbBg: "#0f172a",
+            lfbStroke: "#38bdf8",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 2: Normal Memory Read Complete",
+            state: "L1D CACHE FILL COMPLETE",
+            color: "var(--accent-green)",
+            desc: "L1D 캐시 라인 채우기가 완료되고 데이터가 레지스터로 전달됨. 정상적인 인-오더 동작에서는 유저 공간이 LFB 엔트리를 직접 참조할 수 없음.",
+            code: "// Architectural state updated. Normal operation continues.\n// Memory load committed cleanly.",
+            lfbText: "Entry 0: Dormant / Idle Residue",
+            lfbBg: "#0f172a",
+            lfbStroke: "#334155",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 3: User Space Program Executes",
+            state: "RING 3 USERSPACE",
+            color: "var(--accent-blue)",
+            desc: "유저 프로그램이 정상적인 인가 메모리 접근을 수행함. 비인가 메모리 접근이 없으므로 파이프라인 스톨이나 투기적 샘플링이 발생하지 않음.",
+            code: "// User application executes standard instructions\nval = my_normal_data; // Normal valid memory load",
+            lfbText: "Entry 0: Dormant Residue",
+            lfbBg: "#0f172a",
+            lfbStroke: "#334155",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 4: Cache Probe Lines Untouched",
+            state: "COLD CACHE STATE",
+            color: "var(--accent-green)",
+            desc: "캐시 프로브 배열 라인은 모두 비어있는(Flushed) 상태를 유지함. 비밀 데이터 유출 부채널이 생성되지 않음.",
+            code: "// Probe array lines remain cold\nassert(cache_miss_count == 100%);",
+            lfbText: "Entry 0: Inactive",
+            lfbBg: "#0f172a",
+            lfbStroke: "#334155",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 5: Normal Execution Complete",
+            state: "NO LEAKAGE",
+            color: "var(--accent-green)",
+            desc: "정상 워크로드에서는 하드웨어 보안 경계가 완벽히 유지됨.",
+            code: "// Complete normal execution sequence.",
+            lfbText: "Entry 0: Inactive",
+            lfbBg: "#0f172a",
+            lfbStroke: "#334155",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          }
+        ]
+      },
+      sampling: {
+        title: "2. MDS / TAA SPECULATIVE DATA SAMPLING",
+        steps: [
+          {
+            title: "Step 1: Kernel Leaves Secret Residue in LFB",
+            state: "DIRTY BUFFER RESIDUE",
+            color: "var(--accent-yellow)",
+            desc: "커널이 기밀 데이터 0x46('F')을 처리한 후, 버퍼 소거 없이 즉시 유저 공간으로 복귀함(SYSRET). Line Fill Buffer(LFB) 엔트리에 기밀 바이트 0x46 잔여물이 방치됨!",
+            code: "// Kernel performs privileged work and exits without VERW:\nsysret; // Returns to Ring 3 with DIRTY internal CPU buffers!",
+            lfbText: "Entry 0: Stale Residue = 0x46 ('F')",
+            lfbBg: "rgba(245, 158, 11, 0.2)",
+            lfbStroke: "#f59e0b",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 2: Attacker Issues Faulting Speculative Load",
+            state: "SPECULATIVE SAMPLING TRIGGER",
+            color: "var(--accent-red)",
+            desc: "공격자가 매핑되지 않은 주소(또는 권한 없는 커널 주소)를 읽는 Load 명령어를 발행함. CPU는 페이지 폴트(Page Fault)를 확인하는 동안 파이프라인 정지를 피하려 함.",
+            code: "// Attacker triggers faulting load:\nval = *(char *)unmapped_address; // Fault occurs, but pipeline speculates!",
+            lfbText: "Entry 0: Speculatively Sampled by Load!",
+            lfbBg: "rgba(239, 68, 68, 0.25)",
+            lfbStroke: "#ef4444",
+            verwActive: false,
+            leakPath: true,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 3: Microarchitectural Forwarding from LFB",
+            state: "STALE SECRET EXFILTRATED",
+            color: "var(--accent-red)",
+            desc: "CPU의 비순차적 로드 유닛이 주소 해결 지연시간 동안 LFB 엔트리 0의 잔여 데이터 0x46('F')을 후행 투기 명령어에 무단 전달함!",
+            code: "// Transient execution registers val = 0x46 ('F')!\n// Stale data exfiltrated directly from Line Fill Buffer",
+            lfbText: "Entry 0: Forwarding 0x46 to Load Port",
+            lfbBg: "rgba(239, 68, 68, 0.35)",
+            lfbStroke: "#ef4444",
+            verwActive: false,
+            leakPath: true,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 4: Cache Probe Array Line Warmed",
+            state: "CACHE SIDE-CHANNEL ENCODED",
+            color: "var(--accent-red)",
+            desc: "probe_array[val * 512]가 투기적으로 실행되어 캐시 라인 0x46이 L1D 캐시로 로드됨! 하드웨어 캐시 태그가 변경됨.",
+            code: "probe_array[val * 512] = 1; // Touches line for byte 0x46\n// L1D Cache line 0x46 warmed up!",
+            lfbText: "Entry 0: Stale Residue = 0x46 ('F')",
+            lfbBg: "rgba(239, 68, 68, 0.2)",
+            lfbStroke: "#ef4444",
+            verwActive: false,
+            leakPath: true,
+            pSecret: true,
+            pSafe: false
+          },
+          {
+            title: "Step 5: Fault Caught & Secret Recovered via Flush+Reload",
+            state: "ATTACK SUCCEEDED (LEAK DETECTED)",
+            color: "var(--accent-red)",
+            desc: "공격자는 SIGSEGV 핸들러 또는 TSX 트랜잭션 롤백으로 충돌을 수습한 후, Flush+Reload 타이밍 측정으로 캐시된 라인 0x46('F')을 100% 복원함!",
+            code: "// Flush+Reload timing reveals cache hit at line 0x46 ('F')\n// Leaked secret byte: 'F' (0x46). [FAIL/VULNERABLE]",
+            lfbText: "Entry 0: Stale Residue = 0x46 ('F')",
+            lfbBg: "rgba(239, 68, 68, 0.2)",
+            lfbStroke: "#ef4444",
+            verwActive: false,
+            leakPath: false,
+            pSecret: true,
+            pSafe: false
+          }
+        ]
+      },
+      verw: {
+        title: "3. VERW BUFFER CLEARING MITIGATION",
+        steps: [
+          {
+            title: "Step 1: Kernel Completes Work with Secret",
+            state: "KERNEL OPERATION COMPLETE",
+            color: "var(--accent-yellow)",
+            desc: "커널이 기밀 데이터 0x46을 처리하여 일시적으로 LFB에 잔여물이 형성됨.",
+            code: "// Privileged Kernel Task:\nprocess_crypto_secret(); // Temporary residue in LFB",
+            lfbText: "Entry 0: Stale Residue = 0x46 ('F')",
+            lfbBg: "rgba(245, 158, 11, 0.2)",
+            lfbStroke: "#f59e0b",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 2: Kernel Issues VERW Instruction on Exit",
+            state: "VERW MICROCODE SWEEP",
+            color: "var(--accent-green)",
+            desc: "유저 공간으로 복귀(SYSRET) 직전, 커널이 하드웨어 VERW 명령어를 실행함! 인텔 마이크로코드가 LFB, Store Buffer, Load Port 전체를 0x00으로 일괄 소거함.",
+            code: "/* Kernel-to-userspace return path */\nasm volatile(\"verw %[ds]\" : : [ds] \"m\" (ds) : \"cc\");\n// Microcode overwrites all internal buffers with zeroes!",
+            lfbText: "Entry 0..11: OVERWRITING WITH ZEROES (0x00)",
+            lfbBg: "rgba(34, 197, 94, 0.35)",
+            lfbStroke: "#22c55e",
+            verwActive: true,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 3: All Internal Buffers Sanitized",
+            state: "BUFFERS CLEAN (SAFE RING 3 RETURN)",
+            color: "var(--accent-green)",
+            desc: "모든 CPU 내부 버퍼가 완전히 0으로 소거된 상태에서 안전하게 유저 공간으로 복귀함.",
+            code: "// Buffers fully sanitized:\n// LFB, SB, LP = 0x00 (Clean State)\nsysret; // Returns to Ring 3",
+            lfbText: "Entry 0: Cleared = 0x00 (Neutral)",
+            lfbBg: "rgba(34, 197, 94, 0.2)",
+            lfbStroke: "#22c55e",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: false
+          },
+          {
+            title: "Step 4: Faulting Load Samples Neutral Zero Data",
+            state: "SAFE SAMPLING (NO LEAK)",
+            color: "var(--accent-green)",
+            desc: "공격자가 폴팅 로드를 실행하더라도, LFB에서 전달되는 값은 0x00뿐임. 기밀 바이트 0x46은 영구 소멸되어 절대 샘플링되지 않음!",
+            code: "val = *(char *)unmapped_address;\n// Speculative sampling receives neutral 0x00 (Not secret 0x46!)",
+            lfbText: "Entry 0: Cleared = 0x00",
+            lfbBg: "rgba(34, 197, 94, 0.2)",
+            lfbStroke: "#22c55e",
+            verwActive: false,
+            leakPath: true,
+            pSecret: false,
+            pSafe: true
+          },
+          {
+            title: "Step 5: Zero Secret Leaks (PASS / PROTECTED)",
+            state: "PASS / PROTECTED",
+            color: "var(--accent-green)",
+            desc: "비밀 데이터 캐시 라인은 전혀 워밍업되지 않음. VERW 버퍼 소거를 통해 MDS 및 TAA 공격이 완벽히 무력화됨 실증.",
+            code: "// Result: 0 secret bytes sampled via MDS.\n// [PASS/PROTECTED] Microarchitectural buffers verified clean!",
+            lfbText: "Entry 0: Cleared = 0x00",
+            lfbBg: "rgba(34, 197, 94, 0.2)",
+            lfbStroke: "#22c55e",
+            verwActive: false,
+            leakPath: false,
+            pSecret: false,
+            pSafe: true
+          }
+        ]
+      }
+    };
+
+    function updateSimulationView() {
+      if (state.currentTab === 'matrix') {
+        stageSvg.style.display = 'none';
+        stageMatrix.style.display = 'block';
+        return;
+      }
+
+      stageSvg.style.display = 'flex';
+      stageMatrix.style.display = 'none';
+
+      const config = tabConfigs[state.currentTab];
+      const stepData = config.steps[state.currentStep - 1];
+
+      // Update Step Box highlights
+      for (let i = 1; i <= 5; i++) {
+        const box = document.getElementById(`step-box-${i}`);
+        if (i === state.currentStep) {
+          box.setAttribute('stroke', stepData.color);
+          box.setAttribute('stroke-width', '2');
+          box.setAttribute('fill', '#1a2642');
+        } else {
+          box.setAttribute('stroke', '#334155');
+          box.setAttribute('stroke-width', '1');
+          box.setAttribute('fill', '#0f172a');
+        }
+      }
+
+      // Update SVG dynamic values
+      lfbStatusText.textContent = stepData.lfbText;
+      lfbBg.setAttribute('fill', stepData.lfbBg);
+      lfbBg.setAttribute('stroke', stepData.lfbStroke);
+
+      if (stepData.verwActive) {
+        verwSweepBar.style.display = 'block';
+        verwSweepText.style.display = 'block';
+        pathVerwLfb.style.display = 'block';
+      } else {
+        verwSweepBar.style.display = 'none';
+        verwSweepText.style.display = 'none';
+        pathVerwLfb.style.display = 'none';
+      }
+
+      if (stepData.leakPath) {
+        pathLfbAttacker.style.display = 'block';
+        pathLfbAttacker.setAttribute('stroke', (state.currentTab === 'verw') ? '#22c55e' : '#ef4444');
+      } else {
+        pathLfbAttacker.setAttribute('stroke', '#334155');
+      }
+
+      // Cache Lines state
+      if (stepData.pSecret) {
+        probeLineSecret.setAttribute('fill', 'rgba(239, 68, 68, 0.35)');
+        probeLineSecret.setAttribute('stroke', '#ef4444');
+        probeSecretText.textContent = "Line 0x46 ('F' Secret): CACHE HIT (WARMED)";
+        probeSecretText.setAttribute('fill', '#ef4444');
+      } else {
+        probeLineSecret.setAttribute('fill', '#0f172a');
+        probeLineSecret.setAttribute('stroke', '#334155');
+        probeSecretText.textContent = "Line 0x46 ('F' Secret): FLUSHED (MISS)";
+        probeSecretText.setAttribute('fill', '#64748b');
+      }
+
+      if (stepData.pSafe) {
+        probeLineSafe.setAttribute('fill', 'rgba(34, 197, 94, 0.35)');
+        probeLineSafe.setAttribute('stroke', '#22c55e');
+        probeSafeText.textContent = "Line 0x00 (Neutral): CACHE HIT (WARMED)";
+        probeSafeText.setAttribute('fill', '#22c55e');
+      } else {
+        probeLineSafe.setAttribute('fill', '#0f172a');
+        probeLineSafe.setAttribute('stroke', '#334155');
+        probeSafeText.textContent = "Line 0x00 (Neutral): FLUSHED (MISS)";
+        probeSafeText.setAttribute('fill', '#64748b');
+      }
+
+      // Update Telemetry Card
+      cardStepTitle.textContent = `${config.title} - ${stepData.title.toUpperCase()}`;
+      cardStateBadge.textContent = `STATUS: ${stepData.state}`;
+      cardStateBadge.style.color = stepData.color;
+      cardExplanation.innerHTML = stepData.desc;
+      cardCode.textContent = stepData.code;
+    }
+
+    function nextStep() {
+      state.currentStep++;
+      if (state.currentStep > state.maxSteps) {
+        state.currentStep = 1;
+      }
+      updateSimulationView();
+    }
+
+    function startTimer() {
+      if (state.timer) clearInterval(state.timer);
+      if (state.isPlaying && state.currentTab !== 'matrix') {
+        state.timer = setInterval(nextStep, state.speed);
+        liveIndicator.classList.remove('paused');
+        liveText.textContent = "SIMULATION RUNNING";
+      } else {
+        liveIndicator.classList.add('paused');
+        liveText.textContent = "SIMULATION PAUSED";
+      }
+    }
+
+    // Event Listeners
+    btnPlay.addEventListener('click', () => {
+      state.isPlaying = !state.isPlaying;
+      playIcon.textContent = state.isPlaying ? "⏸ Pause" : "▶ Play";
+      startTimer();
+    });
+
+    btnStep.addEventListener('click', () => {
+      state.isPlaying = false;
+      playIcon.textContent = "▶ Play";
+      startTimer();
+      nextStep();
+    });
+
+    btnReset.addEventListener('click', () => {
+      state.currentStep = 1;
+      updateSimulationView();
+    });
+
+    speedSelect.addEventListener('change', (e) => {
+      state.speed = parseInt(e.target.value, 10);
+      startTimer();
+    });
+
+    themeToggle.addEventListener('click', () => {
+      state.theme = (state.theme === 'dark') ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', state.theme);
+    });
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.currentTab = btn.getAttribute('data-tab');
+        state.currentStep = 1;
+        updateSimulationView();
+        startTimer();
+      });
+    });
+
+    // Startup
+    updateSimulationView();
+    startTimer();
+  </script>
+</body>
+</html>
