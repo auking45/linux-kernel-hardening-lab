@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SELinux Architecture & Type Enforcement Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--accent-purple);
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Standard Simulation Toolbar (STYLE_GUIDE.md v2.0) */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 10px 16px;
+      border-radius: 8px;
+    }
+
+    .sim-btn {
+      background: #2a3a58;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    [data-theme="light"] .sim-btn {
+      background: #e2e8f0;
+    }
+
+    .sim-btn:hover {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.active {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+    }
+
+    .sim-select {
+      background: var(--bg-color);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-left: auto;
+    }
+
+    .status-led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--glow-green);
+      transition: all 0.3s;
+    }
+
+    .status-led.paused {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--glow-yellow);
+    }
+
+    .status-led.stepping {
+      background: var(--accent-blue);
+      box-shadow: 0 0 8px var(--glow-blue);
+    }
+
+    .theme-toggle-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--card-border);
+      padding-bottom: 0;
+    }
+
+    .tab-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* SVG Canvas */
+    .svg-container {
+      width: 100%;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      max-height: 480px;
+      user-select: none;
+    }
+
+    /* Terminal / Log */
+    .terminal-box {
+      background: #050b14;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      height: 180px;
+      overflow-y: auto;
+      line-height: 1.45;
+    }
+
+    [data-theme="light"] .terminal-box {
+      background: #0f172a;
+      color: #38bdf8;
+    }
+
+    .terminal-line {
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .terminal-line.error { color: #f87171; }
+    .terminal-line.success { color: #4ade80; }
+    .terminal-line.warn { color: #fbbf24; }
+    .terminal-line.info { color: #94a3b8; }
+
+    /* Comparison Table */
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .matrix-table th, .matrix-table td {
+      border: 1px solid var(--card-border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    .matrix-table th {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .matrix-table tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    [data-theme="light"] .matrix-table tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .tag-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+    .tag-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+    .tag-blue { background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); }
+    .tag-yellow { background: rgba(245, 158, 11, 0.2); color: var(--accent-yellow); }
+
+    pre.code-block {
+      background: #050b14;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>🛡️ SELinux Type Enforcement & MLS Engine</span>
+        <span class="badge">Kernel 6.12+</span>
+      </h1>
+      <button class="theme-toggle-btn" id="theme-btn">🌓 테마 전환</button>
+    </header>
+
+    <!-- Standard Simulation Toolbar -->
+    <div class="sim-toolbar">
+      <label for="scenario-select" style="font-size: 0.85rem; font-weight: 600;">접근 시나리오:</label>
+      <select id="scenario-select" class="sim-select">
+        <option value="content">1. 웹 서버 정상 파일 읽기 (httpd_t -> httpd_sys_content_t)</option>
+        <option value="shadow">2. 섀도우 패스워드 읽기 시도 (httpd_t -> shadow_t / TE 위반)</option>
+        <option value="mls">3. 기밀 레벨 상승 읽기 (s0 -> s1:c0 / MLS Bell-LaPadula 위반)</option>
+        <option value="trans">4. 비인가 도메인 탈출 전이 (httpd_t -> unconfined_t / 전이 위반)</option>
+      </select>
+
+      <label for="mode-select" style="font-size: 0.85rem; font-weight: 600; margin-left: 8px;">SELinux 모드:</label>
+      <select id="mode-select" class="sim-select">
+        <option value="enforcing" selected>Enforcing Mode (강제 차단 - Hardened)</option>
+        <option value="permissive">Permissive Mode (감사만 기록 - Baseline)</option>
+      </select>
+
+      <button id="btn-play" class="sim-btn">▶ 자동 실행</button>
+      <button id="btn-step" class="sim-btn">⏭ 단계별 실행 (Step)</button>
+      <button id="btn-reset" class="sim-btn">↺ 초기화</button>
+
+      <label for="speed-select" style="font-size: 0.85rem; margin-left: 10px;">속도:</label>
+      <select id="speed-select" class="sim-select">
+        <option value="1200">0.75x</option>
+        <option value="800" selected>1.0x</option>
+        <option value="400">2.0x</option>
+      </select>
+
+      <div class="status-indicator">
+        <div id="status-led" class="status-led paused"></div>
+        <span id="status-text">대기 중 (PAUSED)</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="tab-avc">1. Type Enforcement & AVC 파이프라인</button>
+      <button class="tab-btn" data-tab="tab-transition">2. 도메인 전이 (Domain Transition)</button>
+      <button class="tab-btn" data-tab="tab-mls">3. MLS (Bell-LaPadula 다중 레벨 보안)</button>
+      <button class="tab-btn" data-tab="tab-matrix">4. MAC 비교 매트릭스 (SELinux vs AppArmor)</button>
+    </div>
+
+    <!-- TAB 1: Type Enforcement & AVC Pipeline -->
+    <div id="tab-avc" class="tab-pane active">
+      <div class="card">
+        <h2>⚡ Access Vector Cache (AVC) & Security Server Architecture</h2>
+        <p style="font-size: 0.88rem; color: var(--text-muted);">
+          SELinux는 모든 접근 결정 시 주체 보안 컨텍스트(Subject Context), 객체 보안 컨텍스트(Target Context), 클래스(Object Class)를 인덱스로 삼아
+          초고속 인메모리 캐시인 **AVC(Access Vector Cache)**를 먼저 조회합니다. 캐시 미스 시 커널 내 Security Server가 정책 데이터베이스를 순회하여 판정을 내립니다.
+        </p>
+
+        <div class="svg-container">
+          <svg viewBox="0 0 1000 320" id="svg-avc">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+              </marker>
+              <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- Subject Node -->
+            <g id="avc-node-0" transform="translate(30, 90)">
+              <rect width="150" height="110" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+              <text x="75" y="30" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle">Subject Process</text>
+              <text x="75" y="52" fill="#f8fafc" font-size="10" text-anchor="middle" id="avc-scontext">system_u:system_r:</text>
+              <text x="75" y="70" fill="#a855f7" font-size="12" font-weight="700" text-anchor="middle">httpd_t:s0</text>
+              <text x="75" y="92" fill="#94a3b8" font-size="9" text-anchor="middle">PID: 1042 (Apache)</text>
+            </g>
+
+            <line x1="180" y1="145" x2="240" y2="145" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" id="avc-line-0"/>
+
+            <!-- Object Target Node -->
+            <g id="avc-node-1" transform="translate(240, 90)">
+              <rect width="160" height="110" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="avc-rect-1"/>
+              <text x="80" y="30" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Target Inode Object</text>
+              <text x="80" y="52" fill="#94a3b8" font-size="10" text-anchor="middle" id="avc-target-file">/var/www/html/index.html</text>
+              <text x="80" y="72" fill="#38bdf8" font-size="11" font-weight="700" text-anchor="middle" id="avc-tcontext">httpd_sys_content_t:s0</text>
+              <text x="80" y="92" fill="#64748b" font-size="9" text-anchor="middle">Class: file (perms: read)</text>
+            </g>
+
+            <line x1="400" y1="145" x2="460" y2="145" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="avc-line-1"/>
+
+            <!-- AVC Cache Node -->
+            <g id="avc-node-2" transform="translate(460, 90)">
+              <rect width="150" height="110" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="avc-rect-2"/>
+              <text x="75" y="30" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">AVC (Fast Cache)</text>
+              <text x="75" y="52" fill="#94a3b8" font-size="9" text-anchor="middle">Access Vector Cache</text>
+              <text x="75" y="75" fill="#64748b" font-size="11" font-weight="700" text-anchor="middle" id="avc-cache-state">Lookup Hash...</text>
+              <text x="75" y="92" fill="#38bdf8" font-size="9" text-anchor="middle">O(1) Radix Tree</text>
+            </g>
+
+            <line x1="610" y1="145" x2="670" y2="145" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="avc-line-2"/>
+
+            <!-- Security Server Node -->
+            <g id="avc-node-3" transform="translate(670, 90)">
+              <rect width="150" height="110" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="avc-rect-3"/>
+              <text x="75" y="30" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Security Server</text>
+              <text x="75" y="52" fill="#94a3b8" font-size="9" text-anchor="middle">Policy DB Evaluation</text>
+              <text x="75" y="75" fill="#64748b" font-size="11" font-weight="700" text-anchor="middle" id="avc-secsrv-state">TE Rule Check</text>
+              <text x="75" y="92" fill="#22c55e" font-size="9" text-anchor="middle">MLS Dominance</text>
+            </g>
+
+            <line x1="820" y1="145" x2="870" y2="145" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="avc-line-3"/>
+
+            <!-- Enforcement Decision Node -->
+            <g id="avc-node-4" transform="translate(870, 90)">
+              <rect width="105" height="110" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="avc-rect-4"/>
+              <text x="52" y="30" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">Decision</text>
+              <text x="52" y="52" fill="#94a3b8" font-size="8" text-anchor="middle" id="avc-mode-text">ENFORCING</text>
+              <text x="52" y="80" fill="#64748b" font-size="12" font-weight="700" text-anchor="middle" id="avc-action-label">PENDING</text>
+            </g>
+
+            <!-- Animated Evaluation Token -->
+            <circle id="avc-token" cx="105" cy="145" r="7" fill="#38bdf8" filter="url(#glow-filter)" opacity="0"/>
+          </svg>
+        </div>
+
+        <div class="grid-2col">
+          <div class="card">
+            <h2>📜 SELinux 감사 로그 (auditd / var/log/audit/audit.log)</h2>
+            <div class="terminal-box" id="term-log">
+              <div class="terminal-line info">[    0.057000] SELinux: Initializing.</div>
+              <div class="terminal-line info">[    0.145000] SELinux: Starting in enforcing mode by default</div>
+              <div class="terminal-line">[Ready] 접근 시나리오 및 동작 모드를 선택하고 [단계별 실행] 또는 [자동 실행]을 클릭하십시오.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>📋 Type Enforcement (TE) 규칙 선언 문법</h2>
+            <pre class="code-block">
+# Type Enforcement 핵심 규칙 예시
+# 문법: allow [주체_도메인] [객체_타입]:[클래스] { [권한목록] };
+
+allow httpd_t httpd_sys_content_t:file { read open getattr ioctl };
+allow httpd_t httpd_log_t:file { create write append };
+
+# 거부 기본 정책 (Neverallow 원칙)
+neverallow httpd_t shadow_t:file { read write execute };</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Domain Transition -->
+    <div id="tab-transition" class="tab-pane">
+      <div class="card">
+        <h2>🔀 도메인 전이 (Domain Transition) 메커니즘</h2>
+        <p style="font-size: 0.88rem; color: var(--text-muted);">
+          프로세스가 새로운 프로그램을 실행(<code>execve</code>)할 때, 공격자가 임의의 고권한 도메인으로 상승하지 못하도록
+          <strong>3가지 필수 조건</strong>이 만족되어야만 안전하게 도메인이 전이됩니다.
+        </p>
+
+        <div class="svg-container">
+          <svg viewBox="0 0 950 280">
+            <!-- Source Domain -->
+            <rect x="40" y="50" width="200" height="180" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+            <text x="140" y="80" fill="#38bdf8" font-size="13" font-weight="700" text-anchor="middle">Source Domain</text>
+            <text x="140" y="105" fill="#f8fafc" font-size="11" text-anchor="middle">init_t (systemd)</text>
+            <text x="60" y="140" fill="#94a3b8" font-size="10">1. allow init_t</text>
+            <text x="75" y="160" fill="#38bdf8" font-size="10">httpd_exec_t:file { execute };</text>
+            <text x="60" y="185" fill="#94a3b8" font-size="10">2. allow init_t</text>
+            <text x="75" y="205" fill="#a855f7" font-size="10">httpd_t:process { transition };</text>
+
+            <!-- Entry Point Binary -->
+            <rect x="375" y="50" width="200" height="180" rx="8" fill="#1e293b" stroke="#22c55e" stroke-width="2"/>
+            <text x="475" y="80" fill="#22c55e" font-size="13" font-weight="700" text-anchor="middle">Entrypoint Binary</text>
+            <text x="475" y="105" fill="#f8fafc" font-size="11" text-anchor="middle">/usr/sbin/httpd</text>
+            <text x="475" y="125" fill="#a855f7" font-size="11" font-weight="700" text-anchor="middle">type: httpd_exec_t</text>
+            <text x="395" y="160" fill="#94a3b8" font-size="10">3. allow httpd_t</text>
+            <text x="410" y="180" fill="#22c55e" font-size="10">httpd_exec_t:file { entrypoint };</text>
+
+            <!-- Target Domain -->
+            <rect x="710" y="50" width="200" height="180" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+            <text x="810" y="80" fill="#a855f7" font-size="13" font-weight="700" text-anchor="middle">Target Domain</text>
+            <text x="810" y="105" fill="#f8fafc" font-size="11" text-anchor="middle">httpd_t (Apache)</text>
+            <text x="730" y="145" fill="#22c55e" font-size="10">✓ 최소 권한으로 격리됨</text>
+            <text x="730" y="170" fill="#ef4444" font-size="10">✗ shadow_t 접근 불가</text>
+            <text x="730" y="195" fill="#ef4444" font-size="10">✗ rootfs 임의 쓰기 불가</text>
+
+            <line x1="240" y1="140" x2="375" y2="140" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+            <line x1="575" y1="140" x2="710" y2="140" stroke="#a855f7" stroke-width="2" marker-end="url(#arrow)"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: MLS Bell-LaPadula -->
+    <div id="tab-mls" class="tab-pane">
+      <div class="card">
+        <h2>🔒 Multi-Level Security (MLS) & Bell-LaPadula 모델</h2>
+        <p style="font-size: 0.88rem; color: var(--text-muted);">
+          MLS(다중 레벨 보안)는 정부 및 국방 등급의 엄격한 기밀성을 유지하기 위해 <strong>Bell-LaPadula 수학적 보안 정리</strong>를 강제합니다.
+        </p>
+
+        <div class="grid-2col">
+          <div class="card" style="border-left: 4px solid var(--accent-blue);">
+            <h3 style="color: var(--accent-blue);">1. No Read Up (단순 보안 속성 - Simple Security Property)</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+              주체는 자신보다 <strong>높은 민감도 등급</strong>을 가진 객체를 절대 읽을 수 없습니다.
+            </p>
+            <pre class="code-block">
+주체 (Clearance: s0 - 일반)
+  ├── 읽기 시도 ──► 객체 (Level: s0)    [허용: GRANTED]
+  └── 읽기 시도 ──► 객체 (Level: s1:c0) [차단: -EACCES No Read Up!]</pre>
+          </div>
+          <div class="card" style="border-left: 4px solid var(--accent-yellow);">
+            <h3 style="color: var(--accent-yellow);">2. No Write Down (*-속성 - Star Property)</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+              높은 보안 등급을 가진 주체는 <strong>낮은 등급의 객체로 데이터를 유출(쓰기)</strong>할 수 없습니다.
+            </p>
+            <pre class="code-block">
+주체 (Clearance: s1:c0 - 극비)
+  ├── 쓰기 시도 ──► 객체 (Level: s1:c0) [허용: GRANTED]
+  └── 쓰기 시도 ──► 객체 (Level: s0)    [차단: -EACCES No Write Down!]</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: MAC Matrix -->
+    <div id="tab-matrix" class="tab-pane">
+      <div class="card">
+        <h2>📊 Linux MAC 메커니즘 심층 비교: SELinux vs AppArmor</h2>
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>비교 항목</th>
+              <th>전통적 DAC</th>
+              <th>SELinux (레이블 기반 MAC)</th>
+              <th>AppArmor (경로 기반 MAC)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>보안 통제 기준</strong></td>
+              <td>소유자 UID/GID</td>
+              <td><span class="tag tag-yellow">아이노드 보안 컨텍스트 (xattr 레이블)</span></td>
+              <td><span class="tag tag-blue">정규화된 파일 절대 경로명</span></td>
+            </tr>
+            <tr>
+              <td><strong>접근 통제 모델</strong></td>
+              <td>임의적 접근 제어</td>
+              <td><strong>Type Enforcement (TE) + MLS/MCS</strong></td>
+              <td><strong>경로 와일드카드 화이트리스트</strong></td>
+            </tr>
+            <tr>
+              <td><strong>하드링크 변조 방어</strong></td>
+              <td>취약</td>
+              <td><span class="tag tag-green">완벽 (아이노드에 레이블이 직접 귀속)</span></td>
+              <td>보통 (경로명 변경 시 새로운 프로필 매칭)</td>
+            </tr>
+            <tr>
+              <td><strong>운영 및 튜닝 복잡도</strong></td>
+              <td>매우 낮음</td>
+              <td><span class="tag tag-red">높음 (audit2allow, setsebool, chcon 필요)</span></td>
+              <td><span class="tag tag-green">낮음 ~ 보통 (aa-genprof, aa-logprof)</span></td>
+            </tr>
+            <tr>
+              <td><strong>커널 캐시 엔진</strong></td>
+              <td>dcache</td>
+              <td><strong>AVC (Access Vector Cache)</strong></td>
+              <td><strong>DFA (Deterministic Finite Automaton)</strong></td>
+            </tr>
+            <tr>
+              <td><strong>주요 채택 생태계</strong></td>
+              <td>모든 리눅스/유닉스</td>
+              <td>RHEL, CentOS, Fedora, Android, NSA</td>
+              <td>Ubuntu, Debian, SUSE</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabPanes.forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        const targetId = btn.getAttribute('data-tab');
+        document.getElementById(targetId).classList.add('active');
+      });
+    });
+
+    // Theme Toggle
+    const themeBtn = document.getElementById('theme-btn');
+    themeBtn.addEventListener('click', () => {
+      const isLight = document.body.getAttribute('data-theme') === 'light';
+      if (isLight) {
+        document.body.removeAttribute('data-theme');
+      } else {
+        document.body.setAttribute('data-theme', 'light');
+      }
+    });
+
+    // AVC Engine Elements
+    const scenarioSelect = document.getElementById('scenario-select');
+    const modeSelect = document.getElementById('mode-select');
+    const btnPlay = document.getElementById('btn-play');
+    const btnStep = document.getElementById('btn-step');
+    const btnReset = document.getElementById('btn-reset');
+    const speedSelect = document.getElementById('speed-select');
+    const statusLed = document.getElementById('status-led');
+    const statusText = document.getElementById('status-text');
+    const termLog = document.getElementById('term-log');
+
+    // SVG elements
+    const avcToken = document.getElementById('avc-token');
+    const avcTargetFile = document.getElementById('avc-target-file');
+    const avcTcontext = document.getElementById('avc-tcontext');
+    const avcCacheState = document.getElementById('avc-cache-state');
+    const avcSecsrvState = document.getElementById('avc-secsrv-state');
+    const avcModeText = document.getElementById('avc-mode-text');
+    const avcActionLabel = document.getElementById('avc-action-label');
+    const avcRect1 = document.getElementById('avc-rect-1');
+    const avcRect2 = document.getElementById('avc-rect-2');
+    const avcRect3 = document.getElementById('avc-rect-3');
+    const avcRect4 = document.getElementById('avc-rect-4');
+
+    const avcSteps = [
+      { id: 1, x: 320, y: 145, rect: avcRect1, title: 'Target Context Lookup' },
+      { id: 2, x: 535, y: 145, rect: avcRect2, title: 'AVC Cache Query' },
+      { id: 3, x: 745, y: 145, rect: avcRect3, title: 'Security Server Evaluation' },
+      { id: 4, x: 922, y: 145, rect: avcRect4, title: 'Final AVC Decision' }
+    ];
+
+    let currentStep = 0;
+    let isPlaying = false;
+    let timerId = null;
+
+    function logMsg(text, type = '') {
+      const line = document.createElement('div');
+      line.className = 'terminal-line ' + type;
+      line.textContent = `[${new Date().toISOString().substring(11, 19)}] ${text}`;
+      termLog.appendChild(line);
+      termLog.scrollTop = termLog.scrollHeight;
+    }
+
+    function setStatus(state, text) {
+      statusLed.className = 'status-led ' + state;
+      statusText.textContent = text;
+    }
+
+    function resetSimulation() {
+      if (timerId) clearTimeout(timerId);
+      isPlaying = false;
+      currentStep = 0;
+      btnPlay.textContent = '▶ 자동 실행';
+      btnPlay.classList.remove('active');
+      setStatus('paused', '대기 중 (PAUSED)');
+
+      avcSteps.forEach(s => {
+        s.rect.setAttribute('stroke', '#3a506b');
+        s.rect.setAttribute('fill', '#1e293b');
+      });
+
+      for (let i = 0; i <= 3; i++) {
+        const line = document.getElementById('avc-line-' + i);
+        if (line) line.setAttribute('stroke', '#3a506b');
+      }
+
+      avcToken.setAttribute('opacity', '0');
+      avcToken.setAttribute('cx', '105');
+      avcToken.setAttribute('cy', '145');
+      avcToken.setAttribute('fill', '#38bdf8');
+
+      const scenario = scenarioSelect.value;
+      const mode = modeSelect.value;
+      avcModeText.textContent = mode.toUpperCase();
+      avcActionLabel.textContent = 'PENDING';
+      avcActionLabel.setAttribute('fill', '#64748b');
+
+      if (scenario === 'content') {
+        avcTargetFile.textContent = '/var/www/html/index.html';
+        avcTcontext.textContent = 'httpd_sys_content_t:s0';
+        avcCacheState.textContent = 'Cache HIT: ALLOW';
+        avcSecsrvState.textContent = 'TE: allow rule exists';
+      } else if (scenario === 'shadow') {
+        avcTargetFile.textContent = '/etc/shadow';
+        avcTcontext.textContent = 'shadow_t:s0';
+        avcCacheState.textContent = 'Cache MISS / Check';
+        avcSecsrvState.textContent = 'TE: neverallow matched';
+      } else if (scenario === 'mls') {
+        avcTargetFile.textContent = '/var/data/classified.doc';
+        avcTcontext.textContent = 'secret_t:s1:c0';
+        avcCacheState.textContent = 'Cache MISS / Check';
+        avcSecsrvState.textContent = 'MLS: s0 cannot read s1';
+      } else if (scenario === 'trans') {
+        avcTargetFile.textContent = 'exec(/bin/sh)';
+        avcTcontext.textContent = 'unconfined_t:s0';
+        avcCacheState.textContent = 'Cache MISS / Check';
+        avcSecsrvState.textContent = 'Domain: transition denied';
+      }
+    }
+
+    function evaluateStep() {
+      const scenario = scenarioSelect.value;
+      const mode = modeSelect.value;
+
+      if (currentStep >= avcSteps.length) {
+        // Complete evaluation
+        const isViolation = (scenario !== 'content');
+        if (!isViolation) {
+          avcRect4.setAttribute('stroke', '#22c55e');
+          avcRect4.setAttribute('fill', 'rgba(34, 197, 94, 0.15)');
+          avcActionLabel.textContent = 'ALLOWED';
+          avcActionLabel.setAttribute('fill', '#22c55e');
+          logMsg('[PASS] AVC: allowed { read } for scontext=httpd_t tcontext=httpd_sys_content_t (ret=0).', 'success');
+          setStatus('paused', '완료 (ALLOWED)');
+        } else {
+          if (mode === 'permissive') {
+            avcRect4.setAttribute('stroke', '#f59e0b');
+            avcRect4.setAttribute('fill', 'rgba(245, 158, 11, 0.15)');
+            avcActionLabel.textContent = 'AUDIT / ALLOW';
+            avcActionLabel.setAttribute('fill', '#f59e0b');
+            logMsg(`[AUDIT] type=1400 audit(avc): denied { read/trans } scontext=httpd_t tcontext=${avcTcontext.textContent} permissive=1`, 'warn');
+            setStatus('paused', '감사 기록 (PERMISSIVE ALLOWED)');
+          } else {
+            avcRect4.setAttribute('stroke', '#ef4444');
+            avcRect4.setAttribute('fill', 'rgba(239, 68, 68, 0.2)');
+            avcActionLabel.textContent = 'DENIED';
+            avcActionLabel.setAttribute('fill', '#ef4444');
+            logMsg(`[DENIED] type=1400 audit(avc): denied for scontext=httpd_t tcontext=${avcTcontext.textContent} (ENFORCING: -EACCES)!`, 'error');
+            setStatus('paused', '접근 차단 (ENFORCING DENIED)');
+          }
+        }
+
+        isPlaying = false;
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+        return;
+      }
+
+      const s = avcSteps[currentStep];
+      setStatus('stepping', `평가 단계: [${s.id}/4] ${s.title}`);
+
+      avcToken.setAttribute('opacity', '1');
+      avcToken.setAttribute('cx', s.x);
+      avcToken.setAttribute('cy', s.y);
+
+      s.rect.setAttribute('stroke', '#38bdf8');
+      s.rect.setAttribute('fill', 'rgba(56, 189, 248, 0.1)');
+
+      const line = document.getElementById('avc-line-' + currentStep);
+      if (line) line.setAttribute('stroke', '#38bdf8');
+
+      if (currentStep === 0) {
+        logMsg(`[1] Resolved target inode extended attribute: ${avcTcontext.textContent}`);
+      } else if (currentStep === 1) {
+        logMsg(`[2] AVC Hash query: (httpd_t, ${avcTcontext.textContent}, file)`);
+      } else if (currentStep === 2) {
+        const isViolation = (scenario !== 'content');
+        logMsg(`[3] Security Server policy search: ${isViolation ? 'No allow rule / Policy violation!' : 'Rule found: allow httpd_t httpd_sys_content_t'}`);
+      }
+
+      currentStep++;
+
+      if (isPlaying) {
+        const delay = parseInt(speedSelect.value, 10);
+        timerId = setTimeout(evaluateStep, delay);
+      }
+    }
+
+    btnStep.addEventListener('click', () => {
+      if (isPlaying) {
+        isPlaying = false;
+        if (timerId) clearTimeout(timerId);
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+      }
+      evaluateStep();
+    });
+
+    btnPlay.addEventListener('click', () => {
+      if (isPlaying) {
+        isPlaying = false;
+        if (timerId) clearTimeout(timerId);
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+        setStatus('paused', '일시 중지됨 (PAUSED)');
+      } else {
+        if (currentStep >= avcSteps.length) {
+          resetSimulation();
+        }
+        isPlaying = true;
+        btnPlay.textContent = '⏸ 일시 정지';
+        btnPlay.classList.add('active');
+        setStatus('active', '실행 중 (RUNNING)');
+        evaluateStep();
+      }
+    });
+
+    btnReset.addEventListener('click', () => {
+      resetSimulation();
+      logMsg('SELinux AVC 시뮬레이션 파이프라인이 초기화되었습니다.', 'info');
+    });
+
+    scenarioSelect.addEventListener('change', () => {
+      resetSimulation();
+      logMsg(`시나리오 변경: ${scenarioSelect.options[scenarioSelect.selectedIndex].text}`, 'info');
+    });
+
+    modeSelect.addEventListener('change', () => {
+      resetSimulation();
+      logMsg(`모드 변경: ${modeSelect.options[modeSelect.selectedIndex].text}`, 'warn');
+    });
+
+    // Initialize
+    resetSimulation();
+  </script>
+</body>
+</html>

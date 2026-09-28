@@ -138,6 +138,7 @@ nav:
       - 08. Mandatory Access Control & LSM Framework:
           - Stackable LSM Architecture: features/26-lsm-stacking.md
           - AppArmor Process Isolation: features/27-apparmor.md
+          - SELinux Type Enforcement: features/28-selinux.md
 
 
 
