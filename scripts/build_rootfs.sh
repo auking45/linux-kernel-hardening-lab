@@ -210,6 +210,7 @@ mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev
 mount -t debugfs debugfs /sys/kernel/debug 2>/dev/null || true
+mount -t securityfs securityfs /sys/kernel/security 2>/dev/null || true
 mount -t tmpfs tmpfs /tmp
 
 # Configure training lab permissions

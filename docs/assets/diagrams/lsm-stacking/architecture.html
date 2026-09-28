@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stackable LSM Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--accent-purple);
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Standard Simulation Toolbar (STYLE_GUIDE.md v2.0) */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 10px 16px;
+      border-radius: 8px;
+    }
+
+    .sim-btn {
+      background: #2a3a58;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    [data-theme="light"] .sim-btn {
+      background: #e2e8f0;
+    }
+
+    .sim-btn:hover {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.active {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+    }
+
+    .sim-select {
+      background: var(--bg-color);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-left: auto;
+    }
+
+    .status-led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--glow-green);
+      transition: all 0.3s;
+    }
+
+    .status-led.paused {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--glow-yellow);
+    }
+
+    .status-led.stepping {
+      background: var(--accent-blue);
+      box-shadow: 0 0 8px var(--glow-blue);
+    }
+
+    .theme-toggle-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--card-border);
+      padding-bottom: 0;
+    }
+
+    .tab-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* SVG Canvas */
+    .svg-container {
+      width: 100%;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      max-height: 480px;
+      user-select: none;
+    }
+
+    /* Chain Modules */
+    .lsm-node {
+      transition: all 0.3s ease;
+    }
+
+    .lsm-node.evaluating {
+      filter: drop-shadow(0 0 10px var(--accent-blue));
+    }
+
+    .lsm-node.passed {
+      filter: drop-shadow(0 0 10px var(--accent-green));
+    }
+
+    .lsm-node.denied {
+      filter: drop-shadow(0 0 12px var(--accent-red));
+    }
+
+    /* Terminal / Log */
+    .terminal-box {
+      background: #050b14;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      height: 180px;
+      overflow-y: auto;
+      line-height: 1.45;
+    }
+
+    [data-theme="light"] .terminal-box {
+      background: #0f172a;
+      color: #38bdf8;
+    }
+
+    .terminal-line {
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .terminal-line.error { color: #f87171; }
+    .terminal-line.success { color: #4ade80; }
+    .terminal-line.warn { color: #fbbf24; }
+    .terminal-line.info { color: #94a3b8; }
+
+    /* Comparison Table */
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .matrix-table th, .matrix-table td {
+      border: 1px solid var(--card-border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    .matrix-table th {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .matrix-table tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    [data-theme="light"] .matrix-table tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .tag-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+    .tag-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+    .tag-blue { background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); }
+    .tag-yellow { background: rgba(245, 158, 11, 0.2); color: var(--accent-yellow); }
+
+    /* Code block */
+    pre.code-block {
+      background: #050b14;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>🛡️ Linux Stackable LSM Architecture</span>
+        <span class="badge">Kernel 6.12+</span>
+      </h1>
+      <button class="theme-toggle-btn" id="theme-btn">🌓 테마 전환</button>
+    </header>
+
+    <!-- Standard Simulation Toolbar -->
+    <div class="sim-toolbar">
+      <label for="scenario-select" style="font-size: 0.85rem; font-weight: 600;">요청 시나리오:</label>
+      <select id="scenario-select" class="sim-select">
+        <option value="normal">1. 일반 파일 읽기 (Normal DAC / 모든 모듈 통과)</option>
+        <option value="yama">2. 타 프로세스 ptrace 연결 (Yama 위반 / 차단)</option>
+        <option value="landlock">3. 샌드박스 외 경로 쓰기 (Landlock 위반 / 차단)</option>
+        <option value="lockdown">4. 커널 메모리 직접 수정 (Lockdown 위반 / 차단)</option>
+      </select>
+
+      <button id="btn-play" class="sim-btn">▶ 자동 실행</button>
+      <button id="btn-step" class="sim-btn">⏭ 단계별 실행 (Step)</button>
+      <button id="btn-reset" class="sim-btn">↺ 초기화</button>
+
+      <label for="speed-select" style="font-size: 0.85rem; margin-left: 10px;">속도:</label>
+      <select id="speed-select" class="sim-select">
+        <option value="1500">0.75x</option>
+        <option value="1000" selected>1.0x</option>
+        <option value="500">2.0x</option>
+      </select>
+
+      <div class="status-indicator">
+        <div id="status-led" class="status-led paused"></div>
+        <span id="status-text">대기 중 (PAUSED)</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="tab-chain">1. 순차적 후크 체인 & Fail-Closed</button>
+      <button class="tab-btn" data-tab="tab-blobs">2. 복합 보안 블롭 (Shared Security Blobs)</button>
+      <button class="tab-btn" data-tab="tab-boot">3. 부팅 파라미터 & 순서 제어 (lsm=...)</button>
+      <button class="tab-btn" data-tab="tab-matrix">4. LSM 비교 매트릭스</button>
+    </div>
+
+    <!-- TAB 1: Sequential Hook Chain & Fail-Closed -->
+    <div id="tab-chain" class="tab-pane active">
+      <div class="card">
+        <h2>🔗 Stacked Hook Execution Pipeline</h2>
+        <p style="font-size: 0.88rem; color: var(--text-muted);">
+          리눅스 커널의 LSM 후크는 단일 함수 포인터가 아닌 이중 연결 리스트(<code>hlist_head</code>)로 관리됩니다.
+          보안 검사 요청 발생 시 체인에 등록된 모듈들이 순차적으로 호출되며, <strong>어느 한 모듈이라도 음수 에러(-EPERM, -EACCES)를 반환하면 즉시 거부(Fail-Closed)</strong>되고 후속 평가는 중단됩니다.
+        </p>
+
+        <div class="svg-container">
+          <svg viewBox="0 0 1000 320" id="svg-chain">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+              </marker>
+              <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#22c55e"/>
+              </marker>
+              <marker id="arrow-red" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#ef4444"/>
+              </marker>
+              <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- Hook Entry Point -->
+            <g id="node-entry" transform="translate(20, 110)">
+              <rect width="110" height="70" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+              <text x="55" y="32" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle">Kernel Syscall</text>
+              <text x="55" y="52" fill="#94a3b8" font-size="10" text-anchor="middle" id="svg-syscall-name">security_hook</text>
+            </g>
+
+            <!-- Path lines -->
+            <line x1="130" y1="145" x2="180" y2="145" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" id="line-0"/>
+
+            <!-- Node 1: Capability -->
+            <g id="node-1" class="lsm-node" transform="translate(180, 105)">
+              <rect width="130" height="80" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="rect-1"/>
+              <text x="65" y="30" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">[1] Capability</text>
+              <text x="65" y="50" fill="#94a3b8" font-size="10" text-anchor="middle">Standard DAC/Root</text>
+              <circle cx="65" cy="68" r="5" fill="#64748b" id="led-1"/>
+            </g>
+
+            <line x1="310" y1="145" x2="360" y2="145" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="line-1"/>
+
+            <!-- Node 2: Landlock -->
+            <g id="node-2" class="lsm-node" transform="translate(360, 105)">
+              <rect width="130" height="80" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="rect-2"/>
+              <text x="65" y="30" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">[2] Landlock</text>
+              <text x="65" y="50" fill="#94a3b8" font-size="10" text-anchor="middle">Unpriv Sandboxing</text>
+              <circle cx="65" cy="68" r="5" fill="#64748b" id="led-2"/>
+            </g>
+
+            <line x1="490" y1="145" x2="540" y2="145" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="line-2"/>
+
+            <!-- Node 3: Lockdown -->
+            <g id="node-3" class="lsm-node" transform="translate(540, 105)">
+              <rect width="130" height="80" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="rect-3"/>
+              <text x="65" y="30" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">[3] Lockdown</text>
+              <text x="65" y="50" fill="#94a3b8" font-size="10" text-anchor="middle">Kernel Tamper Block</text>
+              <circle cx="65" cy="68" r="5" fill="#64748b" id="led-3"/>
+            </g>
+
+            <line x1="670" y1="145" x2="720" y2="145" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="line-3"/>
+
+            <!-- Node 4: Yama -->
+            <g id="node-4" class="lsm-node" transform="translate(720, 105)">
+              <rect width="130" height="80" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="rect-4"/>
+              <text x="65" y="30" fill="#f8fafc" font-size="13" font-weight="700" text-anchor="middle">[4] Yama</text>
+              <text x="65" y="50" fill="#94a3b8" font-size="10" text-anchor="middle">Ptrace Protection</text>
+              <circle cx="65" cy="68" r="5" fill="#64748b" id="led-4"/>
+            </g>
+
+            <line x1="850" y1="145" x2="890" y2="145" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="line-4"/>
+
+            <!-- Terminal Outcome -->
+            <g id="node-outcome" transform="translate(890, 105)">
+              <rect width="90" height="80" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="rect-outcome"/>
+              <text x="45" y="35" fill="#94a3b8" font-size="11" font-weight="700" text-anchor="middle">Final Decision</text>
+              <text x="45" y="58" fill="#64748b" font-size="12" font-weight="700" text-anchor="middle" id="text-outcome">PENDING</text>
+            </g>
+
+            <!-- Animated Evaluation Token -->
+            <circle id="anim-token" cx="75" cy="145" r="7" fill="#38bdf8" filter="url(#glow-filter)" opacity="0"/>
+          </svg>
+        </div>
+
+        <div class="grid-2col">
+          <div class="card">
+            <h2>📜 커널 후크 평가 로그 (dmesg)</h2>
+            <div class="terminal-box" id="term-log">
+              <div class="terminal-line info">[    0.000000] LSM: Initializing: capability,landlock,lockdown,yama,bpf</div>
+              <div class="terminal-line info">[    0.000000] LSM: Registered 5 security modules in order.</div>
+              <div class="terminal-line">[Ready] 시나리오를 선택하고 [단계별 실행] 또는 [자동 실행]을 클릭하십시오.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>💡 후크 체인 평가 메커니즘</h2>
+            <pre class="code-block">
+/* include/linux/lsm_hook_defs.h */
+#define call_int_hook(FUNC, IRC, ...) ({       \
+    int RC = IRC;                              \
+    struct security_hook_list *P;              \
+    hlist_for_each_entry(P, &security_hook_heads.FUNC, list) { \
+        RC = P->hook.FUNC(__VA_ARGS__);        \
+        if (RC != 0)                           \
+            break; /* Fail-Closed! 즉시 중단 */ \
+    }                                          \
+    RC;                                        \
+})</pre>
+            <p style="font-size: 0.82rem; color: var(--text-muted); line-height: 1.4;">
+              체인에 등록된 모든 LSM이 0(성공)을 반환해야만 접근이 최종 허용됩니다. 어느 하나라도 0이 아닌 값을 반환하면 그 즉시 루프가 <code>break</code>되어 후속 모듈은 평가되지 않습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Shared Security Blobs -->
+    <div id="tab-blobs" class="tab-pane">
+      <div class="card">
+        <h2>📦 Composite Shared Security Blobs</h2>
+        <p style="font-size: 0.88rem; color: var(--text-muted);">
+          리눅스 5.1 이전에는 모듈마다 <code>void *security</code> 포인터를 독점하려 하여 복수 LSM 동시 활성화가 불가능했습니다.
+          현대 스택형 LSM은 커널 부팅 시 각 모듈이 요청한 크기(<code>lsm_blob_sizes</code>)를 합산하여 <strong>단일 연속 메모리 블록</strong>으로 할당하고, 각 모듈에 고정 오프셋을 제공합니다.
+        </p>
+
+        <div class="svg-container">
+          <svg viewBox="0 0 950 340">
+            <!-- Credential Structure -->
+            <rect x="30" y="30" width="220" height="260" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+            <text x="140" y="60" fill="#38bdf8" font-size="14" font-weight="700" text-anchor="middle">struct cred</text>
+            <text x="50" y="90" fill="#f8fafc" font-size="11">atomic_t usage</text>
+            <text x="50" y="115" fill="#f8fafc" font-size="11">kuid_t uid, gid</text>
+            <text x="50" y="140" fill="#f8fafc" font-size="11">kernel_cap_t cap_effective</text>
+            <text x="50" y="170" fill="#a855f7" font-size="12" font-weight="700">void *security ────▶</text>
+            <text x="50" y="200" fill="#64748b" font-size="10">/* Single shared pointer */</text>
+
+            <!-- Composite Security Blob -->
+            <rect x="330" y="30" width="580" height="260" rx="8" fill="#0f172a" stroke="#a855f7" stroke-width="2"/>
+            <text x="620" y="60" fill="#a855f7" font-size="14" font-weight="700" text-anchor="middle">Composite Security Blob (kmalloc)</text>
+
+            <!-- Slice 1: SELinux/AppArmor -->
+            <rect x="350" y="90" width="130" height="170" rx="4" fill="#1e293b" stroke="#3a506b"/>
+            <text x="415" y="120" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">AppArmor/SELinux</text>
+            <text x="415" y="145" fill="#38bdf8" font-size="10" text-anchor="middle">Offset: +0 bytes</text>
+            <text x="415" y="170" fill="#94a3b8" font-size="10" text-anchor="middle">Size: 16 bytes</text>
+            <text x="415" y="210" fill="#22c55e" font-size="9" text-anchor="middle">struct aa_task_ctx</text>
+
+            <!-- Slice 2: Landlock -->
+            <rect x="490" y="90" width="130" height="170" rx="4" fill="#1e293b" stroke="#3a506b"/>
+            <text x="555" y="120" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Landlock</text>
+            <text x="555" y="145" fill="#38bdf8" font-size="10" text-anchor="middle">Offset: +16 bytes</text>
+            <text x="555" y="170" fill="#94a3b8" font-size="10" text-anchor="middle">Size: 8 bytes</text>
+            <text x="555" y="210" fill="#22c55e" font-size="9" text-anchor="middle">struct landlock_ruleset*</text>
+
+            <!-- Slice 3: SafeSetID / LoadPin -->
+            <rect x="630" y="90" width="130" height="170" rx="4" fill="#1e293b" stroke="#3a506b"/>
+            <text x="695" y="120" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">SafeSetID</text>
+            <text x="695" y="145" fill="#38bdf8" font-size="10" text-anchor="middle">Offset: +24 bytes</text>
+            <text x="695" y="170" fill="#94a3b8" font-size="10" text-anchor="middle">Size: 8 bytes</text>
+            <text x="695" y="210" fill="#22c55e" font-size="9" text-anchor="middle">struct safesetid_ctx</text>
+
+            <!-- Slice 4: BPF LSM -->
+            <rect x="770" y="90" width="120" height="170" rx="4" fill="#1e293b" stroke="#3a506b"/>
+            <text x="830" y="120" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">BPF LSM</text>
+            <text x="830" y="145" fill="#38bdf8" font-size="10" text-anchor="middle">Offset: +32 bytes</text>
+            <text x="830" y="170" fill="#94a3b8" font-size="10" text-anchor="middle">Size: 16 bytes</text>
+            <text x="830" y="210" fill="#22c55e" font-size="9" text-anchor="middle">struct bpf_storage*</text>
+
+            <!-- Connection lines -->
+            <path d="M 250 165 L 330 165" stroke="#a855f7" stroke-width="2" stroke-dasharray="4"/>
+          </svg>
+        </div>
+
+        <div class="grid-2col">
+          <div class="card">
+            <h2>⚙️ 인프라 스트럭처: lsm_blob_sizes</h2>
+            <pre class="code-block">
+struct lsm_blob_sizes {
+    int lbs_cred;   /* Task credentials */
+    int lbs_file;   /* Open file description */
+    int lbs_inode;  /* Inode metadata */
+    int lbs_ipc;    /* IPC objects */
+    int lbs_msg;    /* SysV msg */
+    int lbs_task;   /* Task struct */
+    int lbs_xattr;  /* Security xattrs */
+};</pre>
+          </div>
+          <div class="card">
+            <h2>🚀 개인 오프셋 접근 매크로</h2>
+            <pre class="code-block">
+/* 예: Landlock 모듈의 개인 블롭 접근 */
+static inline struct landlock_ruleset *
+landlock_cred(const struct cred *cred)
+{
+    return (struct landlock_ruleset *)
+        (cred->security + landlock_blob_sizes.lbs_cred);
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Boot Parameters & Ordering -->
+    <div id="tab-boot" class="tab-pane">
+      <div class="card">
+        <h2>🛠️ 부팅 파라미터 제어 및 lsm=... 해석 엔진</h2>
+        <p style="font-size: 0.88rem; color: var(--text-muted);">
+          커널 컴파일 시 <code>CONFIG_LSM</code>으로 기본 스택을 지정하고, 부팅 시 커널 명령줄의 <code>lsm=...</code> 파라미터로 순서 변경 및 비활성화를 수행할 수 있습니다.
+        </p>
+
+        <div class="card" style="background: rgba(56, 189, 248, 0.05);">
+          <h3>인터랙티브 부팅 스택 시뮬레이터</h3>
+          <p style="font-size: 0.84rem; color: var(--text-muted);">아래 입력란에 원하는 <code>lsm=...</code> 파라미터를 입력하고 적용해 보십시오.</p>
+          <div style="display: flex; gap: 10px; margin-top: 8px;">
+            <input type="text" id="boot-param-input" value="landlock,lockdown,yama,loadpin,safesetid,bpf"
+                   style="flex: 1; background: var(--bg-color); color: var(--text-main); border: 1px solid var(--card-border); padding: 8px 12px; border-radius: 6px; font-family: monospace; font-size: 0.88rem;">
+            <button id="btn-apply-boot" class="sim-btn" style="background: var(--accent-blue); color: #fff;">부팅 적용</button>
+          </div>
+        </div>
+
+        <div class="grid-2col">
+          <div class="card">
+            <h2>🔍 SecurityFS 인터페이스 (/sys/kernel/security/lsm)</h2>
+            <pre class="code-block" id="securityfs-output">capability,landlock,lockdown,yama,loadpin,safesetid,bpf</pre>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">
+              현재 활성화된 LSM 목록이 컴마로 구분되어 유저스페이스에 노출됩니다.
+            </p>
+          </div>
+          <div class="card">
+            <h2>📡 LSM 전용 시스템 콜 (__NR_lsm_list_modules)</h2>
+            <pre class="code-block" id="syscall-output">
+syscall(461, ids, &size, 0)
+ -> Detected Modules:
+    [1] ID: 100 (capability)
+    [2] ID: 110 (landlock)
+    [3] ID: 108 (lockdown)
+    [4] ID: 105 (yama)
+    [5] ID: 106 (loadpin)
+    [6] ID: 107 (safesetid)
+    [7] ID: 109 (bpf)</pre>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">
+              리눅스 6.8에 추가된 UAPI 시스템 콜로 바이너리 ID 목록을 안전하게 질의합니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: LSM Matrix -->
+    <div id="tab-matrix" class="tab-pane">
+      <div class="card">
+        <h2>📊 리눅스 보안 모듈 (LSM) 종합 비교 매트릭스</h2>
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>모듈명 (LSM)</th>
+              <th>도입 버전</th>
+              <th>스택 지원</th>
+              <th>비특권자 사용</th>
+              <th>주요 방어 영역 및 메커니즘</th>
+              <th>블롭 요구</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Capability</strong></td>
+              <td>2.6.0 (필수)</td>
+              <td><span class="tag tag-green">항상 1순위</span></td>
+              <td><span class="tag tag-yellow">권한 상속</span></td>
+              <td>전통적 POSIX capability 및 DAC 권한 검사 (루트 분할)</td>
+              <td>0 bytes</td>
+            </tr>
+            <tr>
+              <td><strong>Landlock</strong></td>
+              <td>5.13</td>
+              <td><span class="tag tag-green">스택 가능</span></td>
+              <td><span class="tag tag-green">완전 지원</span></td>
+              <td>비특권 프로세스 샌드박싱 (파일시스템 경로 및 네트워크 포트 제한)</td>
+              <td>Cred, Inode</td>
+            </tr>
+            <tr>
+              <td><strong>Lockdown</strong></td>
+              <td>5.4</td>
+              <td><span class="tag tag-green">스택 가능</span></td>
+              <td><span class="tag tag-red">루트 전용</span></td>
+              <td>커널 무결성 및 기밀성 보호 (/dev/mem, I/O 포트, BPF 쓰기 방지)</td>
+              <td>0 bytes</td>
+            </tr>
+            <tr>
+              <td><strong>Yama</strong></td>
+              <td>3.4</td>
+              <td><span class="tag tag-green">스택 가능</span></td>
+              <td><span class="tag tag-green">기본 보호</span></td>
+              <td>ptrace 프로세스 메모리 주입 및 디버깅 접근 통제 (ptrace_scope)</td>
+              <td>0 bytes</td>
+            </tr>
+            <tr>
+              <td><strong>LoadPin</strong></td>
+              <td>4.7</td>
+              <td><span class="tag tag-green">스택 가능</span></td>
+              <td><span class="tag tag-red">부팅 전용</span></td>
+              <td>커널 모듈/펌웨어가 최초 마운트된 신뢰 루트에서만 로드되도록 고정</td>
+              <td>0 bytes</td>
+            </tr>
+            <tr>
+              <td><strong>SafeSetID</strong></td>
+              <td>5.1</td>
+              <td><span class="tag tag-green">스택 가능</span></td>
+              <td><span class="tag tag-red">루트 정책</span></td>
+              <td>UID/GID 전환 전이(Transition) 규칙 통제 (권한 상승 통로 제한)</td>
+              <td>Cred</td>
+            </tr>
+            <tr>
+              <td><strong>BPF LSM</strong></td>
+              <td>5.7</td>
+              <td><span class="tag tag-green">스택 가능</span></td>
+              <td><span class="tag tag-red">CAP_BPF</span></td>
+              <td>eBPF 프로그램을 통한 동적 런타임 보안 정책 주입 및 모니터링</td>
+              <td>Dynamic</td>
+            </tr>
+            <tr>
+              <td><strong>SELinux / AppArmor</strong></td>
+              <td>2.6.0 / 2.6.36</td>
+              <td><span class="tag tag-yellow">단일 주 모듈</span></td>
+              <td><span class="tag tag-red">관리자 정책</span></td>
+              <td>시스템 전역 강제적 접근 제어 (MAC - 레이블 및 경로 기반)</td>
+              <td>Full Blobs</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabPanes.forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        const targetId = btn.getAttribute('data-tab');
+        document.getElementById(targetId).classList.add('active');
+      });
+    });
+
+    // Theme Toggle
+    const themeBtn = document.getElementById('theme-btn');
+    themeBtn.addEventListener('click', () => {
+      const isLight = document.body.getAttribute('data-theme') === 'light';
+      if (isLight) {
+        document.body.removeAttribute('data-theme');
+      } else {
+        document.body.setAttribute('data-theme', 'light');
+      }
+    });
+
+    // Simulation Engine
+    const scenarioSelect = document.getElementById('scenario-select');
+    const btnPlay = document.getElementById('btn-play');
+    const btnStep = document.getElementById('btn-step');
+    const btnReset = document.getElementById('btn-reset');
+    const speedSelect = document.getElementById('speed-select');
+    const statusLed = document.getElementById('status-led');
+    const statusText = document.getElementById('status-text');
+    const termLog = document.getElementById('term-log');
+
+    // SVG elements
+    const animToken = document.getElementById('anim-token');
+    const textOutcome = document.getElementById('text-outcome');
+    const rectOutcome = document.getElementById('rect-outcome');
+    const svgSyscallName = document.getElementById('svg-syscall-name');
+
+    const nodes = [
+      { id: 1, name: 'Capability', rect: document.getElementById('rect-1'), led: document.getElementById('led-1'), x: 245, y: 145 },
+      { id: 2, name: 'Landlock',   rect: document.getElementById('rect-2'), led: document.getElementById('led-2'), x: 425, y: 145 },
+      { id: 3, name: 'Lockdown',   rect: document.getElementById('rect-3'), led: document.getElementById('led-3'), x: 605, y: 145 },
+      { id: 4, name: 'Yama',       rect: document.getElementById('rect-4'), led: document.getElementById('led-4'), x: 785, y: 145 }
+    ];
+
+    let currentStep = 0;
+    let isPlaying = false;
+    let timerId = null;
+
+    function logMsg(text, type = '') {
+      const line = document.createElement('div');
+      line.className = 'terminal-line ' + type;
+      line.textContent = `[${new Date().toISOString().substring(11, 19)}] ${text}`;
+      termLog.appendChild(line);
+      termLog.scrollTop = termLog.scrollHeight;
+    }
+
+    function setStatus(state, text) {
+      statusLed.className = 'status-led ' + state;
+      statusText.textContent = text;
+    }
+
+    function resetSimulation() {
+      if (timerId) clearTimeout(timerId);
+      isPlaying = false;
+      currentStep = 0;
+      btnPlay.textContent = '▶ 자동 실행';
+      btnPlay.classList.remove('active');
+      setStatus('paused', '대기 중 (PAUSED)');
+
+      nodes.forEach(n => {
+        n.rect.setAttribute('stroke', '#3a506b');
+        n.rect.setAttribute('fill', '#1e293b');
+        n.led.setAttribute('fill', '#64748b');
+      });
+
+      for (let i = 0; i <= 4; i++) {
+        const l = document.getElementById('line-' + i);
+        if (l) l.setAttribute('stroke', '#3a506b');
+      }
+
+      rectOutcome.setAttribute('stroke', '#3a506b');
+      rectOutcome.setAttribute('fill', '#1e293b');
+      textOutcome.textContent = 'PENDING';
+      textOutcome.setAttribute('fill', '#64748b');
+
+      animToken.setAttribute('opacity', '0');
+      animToken.setAttribute('cx', '75');
+      animToken.setAttribute('cy', '145');
+
+      const scenario = scenarioSelect.value;
+      if (scenario === 'normal') svgSyscallName.textContent = 'sys_read';
+      else if (scenario === 'yama') svgSyscallName.textContent = 'sys_ptrace';
+      else if (scenario === 'landlock') svgSyscallName.textContent = 'sys_openat';
+      else if (scenario === 'lockdown') svgSyscallName.textContent = 'sys_write';
+    }
+
+    function evaluateCurrentNode() {
+      const scenario = scenarioSelect.value;
+      if (currentStep >= nodes.length) {
+        // All passed!
+        rectOutcome.setAttribute('stroke', '#22c55e');
+        rectOutcome.setAttribute('fill', 'rgba(34, 197, 94, 0.15)');
+        textOutcome.textContent = 'GRANTED';
+        textOutcome.setAttribute('fill', '#22c55e');
+        logMsg('All stacked LSM modules returned 0 (SUCCESS). Access GRANTED!', 'success');
+        setStatus('paused', '완료 (GRANTED)');
+        isPlaying = false;
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+        return;
+      }
+
+      const node = nodes[currentStep];
+      setStatus('stepping', `평가 중: [${node.id}] ${node.name}`);
+      animToken.setAttribute('opacity', '1');
+      animToken.setAttribute('cx', node.x);
+      animToken.setAttribute('cy', node.y);
+
+      node.rect.setAttribute('stroke', '#38bdf8');
+      node.led.setAttribute('fill', '#38bdf8');
+
+      let isBlocked = false;
+      let errCode = 0;
+      let reason = '';
+
+      if (scenario === 'yama' && node.name === 'Yama') {
+        isBlocked = true;
+        errCode = -1; // -EPERM
+        reason = 'Yama blocked unprivileged ptrace of non-child PID (-EPERM)';
+      } else if (scenario === 'landlock' && node.name === 'Landlock') {
+        isBlocked = true;
+        errCode = -13; // -EACCES
+        reason = 'Landlock sandboxing denied write outside restricted path (-EACCES)';
+      } else if (scenario === 'lockdown' && node.name === 'Lockdown') {
+        isBlocked = true;
+        errCode = -1; // -EPERM
+        reason = 'Lockdown confidentiality mode blocked raw kernel memory tampering (-EPERM)';
+      }
+
+      if (isBlocked) {
+        node.rect.setAttribute('stroke', '#ef4444');
+        node.rect.setAttribute('fill', 'rgba(239, 68, 68, 0.2)');
+        node.led.setAttribute('fill', '#ef4444');
+        animToken.setAttribute('fill', '#ef4444');
+
+        rectOutcome.setAttribute('stroke', '#ef4444');
+        rectOutcome.setAttribute('fill', 'rgba(239, 68, 68, 0.2)');
+        textOutcome.textContent = 'DENIED';
+        textOutcome.setAttribute('fill', '#ef4444');
+
+        logMsg(`[DENY] [${node.id}] ${node.name} failed: ${reason}`, 'error');
+        logMsg(`[FAIL-CLOSED] Hook chain terminated immediately at index ${node.id}. Subsequent modules bypassed.`, 'warn');
+        setStatus('paused', `차단됨 (DENIED by ${node.name})`);
+
+        isPlaying = false;
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+      } else {
+        node.rect.setAttribute('stroke', '#22c55e');
+        node.rect.setAttribute('fill', 'rgba(34, 197, 94, 0.1)');
+        node.led.setAttribute('fill', '#22c55e');
+        logMsg(`[PASS] [${node.id}] ${node.name} check passed (ret=0).`);
+
+        const line = document.getElementById('line-' + currentStep);
+        if (line) line.setAttribute('stroke', '#22c55e');
+
+        currentStep++;
+        if (isPlaying) {
+          const delay = parseInt(speedSelect.value, 10);
+          timerId = setTimeout(evaluateCurrentNode, delay);
+        }
+      }
+    }
+
+    btnStep.addEventListener('click', () => {
+      if (isPlaying) {
+        isPlaying = false;
+        if (timerId) clearTimeout(timerId);
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+      }
+      evaluateCurrentNode();
+    });
+
+    btnPlay.addEventListener('click', () => {
+      if (isPlaying) {
+        isPlaying = false;
+        if (timerId) clearTimeout(timerId);
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+        setStatus('paused', '일시 중지됨 (PAUSED)');
+      } else {
+        if (currentStep >= nodes.length || textOutcome.textContent === 'DENIED') {
+          resetSimulation();
+        }
+        isPlaying = true;
+        btnPlay.textContent = '⏸ 일시 정지';
+        btnPlay.classList.add('active');
+        setStatus('active', '실행 중 (RUNNING)');
+        evaluateCurrentNode();
+      }
+    });
+
+    btnReset.addEventListener('click', () => {
+      resetSimulation();
+      logMsg('시뮬레이션 상태가 초기화되었습니다.', 'info');
+    });
+
+    scenarioSelect.addEventListener('change', () => {
+      resetSimulation();
+      logMsg(`시나리오 변경됨: ${scenarioSelect.options[scenarioSelect.selectedIndex].text}`, 'info');
+    });
+
+    // Boot simulator tab logic
+    const bootInput = document.getElementById('boot-param-input');
+    const btnApplyBoot = document.getElementById('btn-apply-boot');
+    const secfsOut = document.getElementById('securityfs-output');
+    const syscallOut = document.getElementById('syscall-output');
+
+    btnApplyBoot.addEventListener('click', () => {
+      const val = bootInput.value.trim();
+      secfsOut.textContent = val ? `capability,${val}` : 'capability';
+
+      const items = val.split(',').map(s => s.trim()).filter(Boolean);
+      let sysLog = `syscall(461, ids, &size, 0)\n -> Detected Modules:\n    [1] ID: 100 (capability)\n`;
+      let idx = 2;
+      const idMap = {
+        'landlock': 110,
+        'lockdown': 108,
+        'yama': 105,
+        'loadpin': 106,
+        'safesetid': 107,
+        'bpf': 109,
+        'selinux': 101,
+        'apparmor': 104,
+        'smack': 102,
+        'tomoyo': 103,
+        'ipe': 113
+      };
+      items.forEach(item => {
+        const id = idMap[item.toLowerCase()] || 999;
+        sysLog += `    [${idx}] ID: ${id} (${item})\n`;
+        idx++;
+      });
+      syscallOut.textContent = sysLog;
+      logMsg(`부팅 파라미터 적용됨: lsm=${val}`, 'warn');
+    });
+
+    // Initialize
+    resetSimulation();
+  </script>
+</body>
+</html>
