@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AppArmor Architecture & Path Confinement Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 14px;
+    }
+
+    h1 {
+      font-size: 1.45rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--accent-purple);
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    /* Standard Simulation Toolbar (STYLE_GUIDE.md v2.0) */
+    .sim-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 10px 16px;
+      border-radius: 8px;
+    }
+
+    .sim-btn {
+      background: #2a3a58;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+    }
+
+    [data-theme="light"] .sim-btn {
+      background: #e2e8f0;
+    }
+
+    .sim-btn:hover {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.active {
+      background: var(--accent-blue);
+      color: #ffffff;
+      border-color: var(--accent-blue);
+    }
+
+    .sim-select {
+      background: var(--bg-color);
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    .status-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-left: auto;
+    }
+
+    .status-led {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--glow-green);
+      transition: all 0.3s;
+    }
+
+    .status-led.paused {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--glow-yellow);
+    }
+
+    .status-led.stepping {
+      background: var(--accent-blue);
+      box-shadow: 0 0 8px var(--glow-blue);
+    }
+
+    .theme-toggle-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+    }
+
+    /* Tabs */
+    .tabs-nav {
+      display: flex;
+      gap: 8px;
+      border-bottom: 2px solid var(--card-border);
+      padding-bottom: 0;
+    }
+
+    .tab-btn {
+      background: transparent;
+      color: var(--text-muted);
+      border: none;
+      padding: 10px 18px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+
+    .tab-pane {
+      display: none;
+    }
+
+    .tab-pane.active {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card h2 {
+      font-size: 1.1rem;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* SVG Canvas */
+    .svg-container {
+      width: 100%;
+      background: var(--bg-color);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px;
+    }
+
+    svg {
+      width: 100%;
+      height: auto;
+      max-height: 480px;
+      user-select: none;
+    }
+
+    /* Terminal / Log */
+    .terminal-box {
+      background: #050b14;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.85rem;
+      color: #38bdf8;
+      height: 180px;
+      overflow-y: auto;
+      line-height: 1.45;
+    }
+
+    [data-theme="light"] .terminal-box {
+      background: #0f172a;
+      color: #38bdf8;
+    }
+
+    .terminal-line {
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .terminal-line.error { color: #f87171; }
+    .terminal-line.success { color: #4ade80; }
+    .terminal-line.warn { color: #fbbf24; }
+    .terminal-line.info { color: #94a3b8; }
+
+    /* Comparison Table */
+    .matrix-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .matrix-table th, .matrix-table td {
+      border: 1px solid var(--card-border);
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    .matrix-table th {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .matrix-table tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.1);
+    }
+
+    [data-theme="light"] .matrix-table tr:nth-child(even) {
+      background: rgba(0, 0, 0, 0.03);
+    }
+
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .tag-green { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+    .tag-red { background: rgba(239, 68, 68, 0.2); color: var(--accent-red); }
+    .tag-blue { background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); }
+    .tag-yellow { background: rgba(245, 158, 11, 0.2); color: var(--accent-yellow); }
+
+    pre.code-block {
+      background: #050b14;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>
+        <span>🛡️ AppArmor Path-based MAC Architecture</span>
+        <span class="badge">Kernel 6.12+</span>
+      </h1>
+      <button class="theme-toggle-btn" id="theme-btn">🌓 테마 전환</button>
+    </header>
+
+    <!-- Standard Simulation Toolbar -->
+    <div class="sim-toolbar">
+      <label for="scenario-select" style="font-size: 0.85rem; font-weight: 600;">요청 작업:</label>
+      <select id="scenario-select" class="sim-select">
+        <option value="normal">1. 허용된 파일 읽기 (/home/lab/** r)</option>
+        <option value="secret">2. 비인가 경로 접근 (/tmp/secret_token rw)</option>
+        <option value="network">3. 비인가 Raw 소켓 생성 (network raw)</option>
+        <option value="ptrace">4. 비인가 프로세스 디버깅 (ptrace trace)</option>
+      </select>
+
+      <label for="mode-select" style="font-size: 0.85rem; font-weight: 600; margin-left: 8px;">동작 모드:</label>
+      <select id="mode-select" class="sim-select">
+        <option value="enforce" selected>Enforce Mode (엄격 차단 - Hardened)</option>
+        <option value="complain">Complain Mode (감사 기록만 수행 - Baseline)</option>
+      </select>
+
+      <button id="btn-play" class="sim-btn">▶ 자동 실행</button>
+      <button id="btn-step" class="sim-btn">⏭ 단계별 실행 (Step)</button>
+      <button id="btn-reset" class="sim-btn">↺ 초기화</button>
+
+      <label for="speed-select" style="font-size: 0.85rem; margin-left: 10px;">속도:</label>
+      <select id="speed-select" class="sim-select">
+        <option value="1200">0.75x</option>
+        <option value="800" selected>1.0x</option>
+        <option value="400">2.0x</option>
+      </select>
+
+      <div class="status-indicator">
+        <div id="status-led" class="status-led paused"></div>
+        <span id="status-text">대기 중 (PAUSED)</span>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tabs-nav">
+      <button class="tab-btn active" data-tab="tab-pipeline">1. 경로 검증 파이프라인 (DFA 매칭)</button>
+      <button class="tab-btn" data-tab="tab-modes">2. Complain vs Enforce 모드 비교</button>
+      <button class="tab-btn" data-tab="tab-lifecycle">3. 프로필 라이프사이클 & SecurityFS</button>
+      <button class="tab-btn" data-tab="tab-matrix">4. MAC 기술 비교 (AppArmor vs SELinux)</button>
+    </div>
+
+    <!-- TAB 1: Path Verification Pipeline & DFA Matching -->
+    <div id="tab-pipeline" class="tab-pane active">
+      <div class="card">
+        <h2>🔍 Path-Based Confinement Pipeline & DFA Evaluation</h2>
+        <p style="font-size: 0.88rem; color: var(--text-muted);">
+          AppArmor는 프로세스가 파일에 접근할 때 dentry 계층을 순회하여 **정규화된 정규 경로(Canonical Path)**를 합성한 후,
+          커널에 사전 컴파일된 **결정적 유한 오토마톤(DFA)** 엔진을 통해 $O(1)$ 속도로 규칙을 대조합니다.
+        </p>
+
+        <div class="svg-container">
+          <svg viewBox="0 0 1000 320" id="svg-pipeline">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="#38bdf8"/>
+              </marker>
+              <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
+            </defs>
+
+            <!-- Node 1: Syscall Entry -->
+            <g id="node-0" transform="translate(30, 110)">
+              <rect width="120" height="75" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+              <text x="60" y="32" fill="#38bdf8" font-size="12" font-weight="700" text-anchor="middle">Syscall Entry</text>
+              <text x="60" y="52" fill="#94a3b8" font-size="10" text-anchor="middle" id="svg-op-name">sys_openat()</text>
+            </g>
+
+            <line x1="150" y1="147" x2="200" y2="147" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)" id="pipe-line-0"/>
+
+            <!-- Node 2: Canonical Path Synthesis -->
+            <g id="node-1" transform="translate(200, 105)">
+              <rect width="140" height="85" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="pipe-rect-1"/>
+              <text x="70" y="30" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Path Resolution</text>
+              <text x="70" y="50" fill="#94a3b8" font-size="9" text-anchor="middle">dentry -> full path</text>
+              <text x="70" y="68" fill="#38bdf8" font-size="10" font-weight="700" text-anchor="middle" id="pipe-path-label">/home/lab/notes.txt</text>
+            </g>
+
+            <line x1="340" y1="147" x2="390" y2="147" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="pipe-line-1"/>
+
+            <!-- Node 3: Profile Lookup -->
+            <g id="node-2" transform="translate(390, 105)">
+              <rect width="140" height="85" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="pipe-rect-2"/>
+              <text x="70" y="30" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Task Profile</text>
+              <text x="70" y="50" fill="#94a3b8" font-size="9" text-anchor="middle">cred->security</text>
+              <text x="70" y="68" fill="#a855f7" font-size="10" font-weight="700" text-anchor="middle">vuln_apparmor_service</text>
+            </g>
+
+            <line x1="530" y1="147" x2="580" y2="147" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="pipe-line-2"/>
+
+            <!-- Node 4: DFA Match Engine -->
+            <g id="node-3" transform="translate(580, 105)">
+              <rect width="140" height="85" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="pipe-rect-3"/>
+              <text x="70" y="30" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">DFA Match Engine</text>
+              <text x="70" y="50" fill="#94a3b8" font-size="9" text-anchor="middle">Path Graph Traversal</text>
+              <text x="70" y="68" fill="#64748b" font-size="10" font-weight="700" text-anchor="middle" id="pipe-dfa-state">State: S0 -> S_ACCEPT</text>
+            </g>
+
+            <line x1="720" y1="147" x2="770" y2="147" stroke="#3a506b" stroke-width="2" marker-end="url(#arrow)" id="pipe-line-3"/>
+
+            <!-- Node 5: Policy Enforcer -->
+            <g id="node-4" transform="translate(770, 105)">
+              <rect width="130" height="85" rx="8" fill="#1e293b" stroke="#3a506b" stroke-width="2" id="pipe-rect-4"/>
+              <text x="65" y="30" fill="#f8fafc" font-size="12" font-weight="700" text-anchor="middle">Enforcement Point</text>
+              <text x="65" y="50" fill="#94a3b8" font-size="9" text-anchor="middle" id="pipe-mode-label">Mode: ENFORCE</text>
+              <text x="65" y="68" fill="#64748b" font-size="11" font-weight="700" text-anchor="middle" id="pipe-action-label">PENDING</text>
+            </g>
+
+            <!-- Animated Evaluation Token -->
+            <circle id="pipe-token" cx="90" cy="147" r="7" fill="#38bdf8" filter="url(#glow-filter)" opacity="0"/>
+          </svg>
+        </div>
+
+        <div class="grid-2col">
+          <div class="card">
+            <h2>📜 커널 AppArmor 감사 로그 (auditd / dmesg)</h2>
+            <div class="terminal-box" id="term-log">
+              <div class="terminal-line info">[    0.145000] AppArmor: AppArmor Filesystem Enabled</div>
+              <div class="terminal-line info">[    0.145100] AppArmor: Loaded profile 'vuln_apparmor_service' (enforce)</div>
+              <div class="terminal-line">[Ready] 상단 툴바에서 요청 작업과 모드를 선택한 후 [단계별 실행] 또는 [자동 실행]을 클릭하십시오.</div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>📋 활성 프로필 선언 (`/etc/apparmor.d/vuln_service`)</h2>
+            <pre class="code-block">
+profile vuln_apparmor_service /bin/exploit_apparmor {
+    # 1. 파일시스템 규칙
+    /home/lab/** r,             # 일반 홈 디렉터리 읽기 허용
+    deny /tmp/secret_token rw,  # 비밀 토큰 접근 엄격 거부
+
+    # 2. 네트워크 규칙
+    deny network raw,           # Raw 패킷 스니핑/인젝션 차단
+    
+    # 3. 프로세스 추적 규칙
+    deny ptrace,                # 타 프로세스 메모리 조작 차단
+}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 2: Complain vs Enforce Modes -->
+    <div id="tab-modes" class="tab-pane">
+      <div class="card">
+        <h2>⚖️ Complain Mode (학습/감사) vs Enforce Mode (강제 차단)</h2>
+        <div class="grid-2col">
+          <div class="card" style="border-left: 4px solid var(--accent-yellow);">
+            <h3 style="color: var(--accent-yellow);">1. Complain / Learning Mode (Baseline)</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.45;">
+              새로운 애플리케이션 도입 시 필요한 권한을 파악하기 위한 학습 모드입니다.
+            </p>
+            <ul style="font-size: 0.84rem; padding-left: 18px; line-height: 1.6; color: var(--text-main);">
+              <li><strong>접근 제어 판정</strong>: 위반이 발생해도 동작을 차단하지 않고 <strong>허용(ALLOWED)</strong>함.</li>
+              <li><strong>로그 형식</strong>: <code>apparmor="AUDIT" ... (complain)</code> 태그와 함께 dmesg에 상세 출력.</li>
+              <li><strong>보안 수준</strong>: 공격 차단 불가능 (Baseline 취약 상태).</li>
+              <li><strong>주 용도</strong>: <code>aa-logprof</code> 도구를 사용한 프로필 자동 프로파일링 및 튜닝.</li>
+            </ul>
+          </div>
+          <div class="card" style="border-left: 4px solid var(--accent-green);">
+            <h3 style="color: var(--accent-green);">2. Enforce Mode (Hardened)</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.45;">
+              프로덕션 배포 시 인가되지 않은 모든 자원 접근을 즉각 격리/차단하는 방어 모드입니다.
+            </p>
+            <ul style="font-size: 0.84rem; padding-left: 18px; line-height: 1.6; color: var(--text-main);">
+              <li><strong>접근 제어 판정</strong>: 프로필에 명시되지 않은 작업에 대해 즉시 <strong>-EACCES / -EPERM 거부(DENIED)</strong>.</li>
+              <li><strong>로그 형식</strong>: <code>apparmor="DENIED" ... (enforce)</code> 태그와 함께 시스템 감사 이벤트 발생.</li>
+              <li><strong>보안 수준</strong>: 샌드박스 완벽 유지, 원격 RCE 페이로드의 호스트 장악 차단.</li>
+              <li><strong>주 용도</strong>: 컨테이너 런타임(Docker/K8s 기본 프로필) 및 엔터프라이즈 데몬 방어.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: Profile Lifecycle & SecurityFS -->
+    <div id="tab-lifecycle" class="tab-pane">
+      <div class="card">
+        <h2>🔄 Profile Compilation & SecurityFS Interface</h2>
+        <div class="svg-container">
+          <svg viewBox="0 0 950 260">
+            <!-- Source Profile -->
+            <rect x="30" y="40" width="180" height="180" rx="8" fill="#1e293b" stroke="#38bdf8" stroke-width="2"/>
+            <text x="120" y="70" fill="#38bdf8" font-size="13" font-weight="700" text-anchor="middle">Text Profile</text>
+            <text x="120" y="95" fill="#94a3b8" font-size="10" text-anchor="middle">/etc/apparmor.d/*</text>
+            <text x="50" y="130" fill="#f8fafc" font-size="10">profile test {</text>
+            <text x="60" y="150" fill="#f8fafc" font-size="10">  /bin/bash rix,</text>
+            <text x="60" y="170" fill="#ef4444" font-size="10">  deny /etc/**,</text>
+            <text x="50" y="190" fill="#f8fafc" font-size="10">}</text>
+
+            <!-- Arrow 1 -->
+            <line x1="210" y1="130" x2="280" y2="130" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow)"/>
+            <text x="245" y="120" fill="#94a3b8" font-size="9" text-anchor="middle">apparmor_parser</text>
+
+            <!-- Binary DFA -->
+            <rect x="280" y="40" width="180" height="180" rx="8" fill="#1e293b" stroke="#a855f7" stroke-width="2"/>
+            <text x="370" y="70" fill="#a855f7" font-size="13" font-weight="700" text-anchor="middle">Binary DFA</text>
+            <text x="370" y="95" fill="#94a3b8" font-size="10" text-anchor="middle">State Machine Bytecode</text>
+            <text x="300" y="130" fill="#22c55e" font-size="10">DFA Tables (Transitions)</text>
+            <text x="300" y="150" fill="#22c55e" font-size="10">Permission Masks</text>
+            <text x="300" y="170" fill="#22c55e" font-size="10">Fast O(1) Evaluation</text>
+
+            <!-- Arrow 2 -->
+            <line x1="460" y1="130" x2="530" y2="130" stroke="#a855f7" stroke-width="2" marker-end="url(#arrow)"/>
+            <text x="495" y="120" fill="#94a3b8" font-size="9" text-anchor="middle">write() to raw node</text>
+
+            <!-- SecurityFS Kernel Entry -->
+            <rect x="530" y="40" width="390" height="180" rx="8" fill="#0f172a" stroke="#22c55e" stroke-width="2"/>
+            <text x="725" y="70" fill="#22c55e" font-size="13" font-weight="700" text-anchor="middle">Kernel AppArmor SecurityFS (/sys/kernel/security/apparmor/)</text>
+            <text x="560" y="110" fill="#f8fafc" font-size="11">.load      : Raw bytecode upload entry point</text>
+            <text x="560" y="135" fill="#f8fafc" font-size="11">.replace   : Atomic hot-update of active profiles</text>
+            <text x="560" y="160" fill="#f8fafc" font-size="11">.remove    : Unloading active profile</text>
+            <text x="560" y="185" fill="#38bdf8" font-size="11">profiles   : Lists active profiles & modes (read-only)</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 4: MAC Matrix -->
+    <div id="tab-matrix" class="tab-pane">
+      <div class="card">
+        <h2>📊 Linux MAC 메커니즘 심층 비교: AppArmor vs SELinux</h2>
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>비교 항목</th>
+              <th>전통적 DAC</th>
+              <th>AppArmor (경로 기반 MAC)</th>
+              <th>SELinux (레이블 기반 MAC)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>접근 통제 기준</strong></td>
+              <td>소유자 UID/GID 및 파일 퍼미션 (rwxrwxrwx)</td>
+              <td><span class="tag tag-blue">정규화된 경로명 (Canonical Path)</span></td>
+              <td><span class="tag tag-yellow">확장 속성(xattr) 보안 컨텍스트 레이블</span></td>
+            </tr>
+            <tr>
+              <td><strong>관리 복잡도</strong></td>
+              <td>매우 낮음</td>
+              <td><span class="tag tag-green">낮음 ~ 보통 (직관적 와일드카드)</span></td>
+              <td><span class="tag tag-red">매우 높음 (수만 개의 Type & Rule)</span></td>
+            </tr>
+            <tr>
+              <td><strong>하드링크 / 파일 이동</strong></td>
+              <td>영향 없음</td>
+              <td>경로가 변경되면 새로운 규칙이 적용됨</td>
+              <td>아이노드(xattr)에 레이블이 보존되어 안전</td>
+            </tr>
+            <tr>
+              <td><strong>컨테이너 런타임 친화성</strong></td>
+              <td>미흡 (루트 권한 공유 취약)</td>
+              <td><span class="tag tag-green">매우 우수 (Docker/K8s 기본 탑재)</span></td>
+              <td>보통 (복잡한 MCS/MLS 레이블링 필요)</td>
+            </tr>
+            <tr>
+              <td><strong>커널 평가 엔진</strong></td>
+              <td>인라인 비트마스크 검사</td>
+              <td><strong>결정적 유한 오토마톤 (DFA)</strong></td>
+              <td><strong>액세스 벡터 캐시 (AVC)</strong></td>
+            </tr>
+            <tr>
+              <td><strong>주요 채택 배포판</strong></td>
+              <td>모든 유닉스/리눅스</td>
+              <td>Ubuntu, Debian, openSUSE</td>
+              <td>RHEL, Fedora, CentOS, Android</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tab switching
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const tabPanes = document.querySelectorAll('.tab-pane');
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        tabBtns.forEach(b => b.classList.remove('active'));
+        tabPanes.forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        const targetId = btn.getAttribute('data-tab');
+        document.getElementById(targetId).classList.add('active');
+      });
+    });
+
+    // Theme Toggle
+    const themeBtn = document.getElementById('theme-btn');
+    themeBtn.addEventListener('click', () => {
+      const isLight = document.body.getAttribute('data-theme') === 'light';
+      if (isLight) {
+        document.body.removeAttribute('data-theme');
+      } else {
+        document.body.setAttribute('data-theme', 'light');
+      }
+    });
+
+    // Pipeline Engine Elements
+    const scenarioSelect = document.getElementById('scenario-select');
+    const modeSelect = document.getElementById('mode-select');
+    const btnPlay = document.getElementById('btn-play');
+    const btnStep = document.getElementById('btn-step');
+    const btnReset = document.getElementById('btn-reset');
+    const speedSelect = document.getElementById('speed-select');
+    const statusLed = document.getElementById('status-led');
+    const statusText = document.getElementById('status-text');
+    const termLog = document.getElementById('term-log');
+
+    // SVG elements
+    const pipeToken = document.getElementById('pipe-token');
+    const svgOpName = document.getElementById('svg-op-name');
+    const pipePathLabel = document.getElementById('pipe-path-label');
+    const pipeDfaState = document.getElementById('pipe-dfa-state');
+    const pipeModeLabel = document.getElementById('pipe-mode-label');
+    const pipeActionLabel = document.getElementById('pipe-action-label');
+    const pipeRect1 = document.getElementById('pipe-rect-1');
+    const pipeRect2 = document.getElementById('pipe-rect-2');
+    const pipeRect3 = document.getElementById('pipe-rect-3');
+    const pipeRect4 = document.getElementById('pipe-rect-4');
+
+    const pipeSteps = [
+      { id: 1, x: 270, y: 147, rect: pipeRect1, title: 'Path Resolution' },
+      { id: 2, x: 460, y: 147, rect: pipeRect2, title: 'Profile Association' },
+      { id: 3, x: 650, y: 147, rect: pipeRect3, title: 'DFA State Traversal' },
+      { id: 4, x: 835, y: 147, rect: pipeRect4, title: 'Enforcement Evaluation' }
+    ];
+
+    let currentStep = 0;
+    let isPlaying = false;
+    let timerId = null;
+
+    function logMsg(text, type = '') {
+      const line = document.createElement('div');
+      line.className = 'terminal-line ' + type;
+      line.textContent = `[${new Date().toISOString().substring(11, 19)}] ${text}`;
+      termLog.appendChild(line);
+      termLog.scrollTop = termLog.scrollHeight;
+    }
+
+    function setStatus(state, text) {
+      statusLed.className = 'status-led ' + state;
+      statusText.textContent = text;
+    }
+
+    function resetSimulation() {
+      if (timerId) clearTimeout(timerId);
+      isPlaying = false;
+      currentStep = 0;
+      btnPlay.textContent = '▶ 자동 실행';
+      btnPlay.classList.remove('active');
+      setStatus('paused', '대기 중 (PAUSED)');
+
+      pipeSteps.forEach(s => {
+        s.rect.setAttribute('stroke', '#3a506b');
+        s.rect.setAttribute('fill', '#1e293b');
+      });
+
+      for (let i = 0; i <= 3; i++) {
+        const line = document.getElementById('pipe-line-' + i);
+        if (line) line.setAttribute('stroke', '#3a506b');
+      }
+
+      pipeToken.setAttribute('opacity', '0');
+      pipeToken.setAttribute('cx', '90');
+      pipeToken.setAttribute('cy', '147');
+      pipeToken.setAttribute('fill', '#38bdf8');
+
+      const scenario = scenarioSelect.value;
+      const mode = modeSelect.value;
+      pipeModeLabel.textContent = `Mode: ${mode.toUpperCase()}`;
+      pipeActionLabel.textContent = 'PENDING';
+      pipeActionLabel.setAttribute('fill', '#64748b');
+
+      if (scenario === 'normal') {
+        svgOpName.textContent = 'sys_openat()';
+        pipePathLabel.textContent = '/home/lab/notes.txt';
+        pipeDfaState.textContent = 'State: S0 -> S_ACCEPT';
+      } else if (scenario === 'secret') {
+        svgOpName.textContent = 'sys_openat()';
+        pipePathLabel.textContent = '/tmp/secret_token';
+        pipeDfaState.textContent = 'State: S0 -> S_DENY_PATH';
+      } else if (scenario === 'network') {
+        svgOpName.textContent = 'sys_socket(AF_INET, RAW)';
+        pipePathLabel.textContent = 'family=inet raw';
+        pipeDfaState.textContent = 'State: S0 -> S_DENY_NET';
+      } else if (scenario === 'ptrace') {
+        svgOpName.textContent = 'sys_ptrace(PTRACE_ATTACH)';
+        pipePathLabel.textContent = 'pid=1234 target';
+        pipeDfaState.textContent = 'State: S0 -> S_DENY_TRACE';
+      }
+    }
+
+    function evaluateStep() {
+      const scenario = scenarioSelect.value;
+      const mode = modeSelect.value;
+
+      if (currentStep >= pipeSteps.length) {
+        // Complete evaluation
+        const isViolation = (scenario !== 'normal');
+        if (!isViolation) {
+          pipeRect4.setAttribute('stroke', '#22c55e');
+          pipeRect4.setAttribute('fill', 'rgba(34, 197, 94, 0.15)');
+          pipeActionLabel.textContent = 'ALLOWED';
+          pipeActionLabel.setAttribute('fill', '#22c55e');
+          logMsg('[PASS] Policy matched allowed rule: /home/lab/** r. Access GRANTED (ret=0).', 'success');
+          setStatus('paused', '완료 (ALLOWED)');
+        } else {
+          if (mode === 'complain') {
+            pipeRect4.setAttribute('stroke', '#f59e0b');
+            pipeRect4.setAttribute('fill', 'rgba(245, 158, 11, 0.15)');
+            pipeActionLabel.textContent = 'AUDIT / ALLOW';
+            pipeActionLabel.setAttribute('fill', '#f59e0b');
+            logMsg(`[AUDIT] apparmor="AUDIT" profile="vuln_apparmor_service" (COMPLAIN_MODE: ALLOWED)`, 'warn');
+            setStatus('paused', '감사 기록 (COMPLAIN ALLOWED)');
+          } else {
+            pipeRect4.setAttribute('stroke', '#ef4444');
+            pipeRect4.setAttribute('fill', 'rgba(239, 68, 68, 0.2)');
+            pipeActionLabel.textContent = 'DENIED';
+            pipeActionLabel.setAttribute('fill', '#ef4444');
+            logMsg(`[DENIED] apparmor="DENIED" profile="vuln_apparmor_service" operation strictly BLOCKED (-EACCES/-EPERM)!`, 'error');
+            setStatus('paused', '접근 차단 (ENFORCE DENIED)');
+          }
+        }
+
+        isPlaying = false;
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+        return;
+      }
+
+      const s = pipeSteps[currentStep];
+      setStatus('stepping', `진행 단계: [${s.id}/4] ${s.title}`);
+
+      pipeToken.setAttribute('opacity', '1');
+      pipeToken.setAttribute('cx', s.x);
+      pipeToken.setAttribute('cy', s.y);
+
+      s.rect.setAttribute('stroke', '#38bdf8');
+      s.rect.setAttribute('fill', 'rgba(56, 189, 248, 0.1)');
+
+      const line = document.getElementById('pipe-line-' + currentStep);
+      if (line) line.setAttribute('stroke', '#38bdf8');
+
+      if (currentStep === 0) {
+        logMsg(`[1] Canonical path resolved: ${pipePathLabel.textContent}`);
+      } else if (currentStep === 1) {
+        logMsg(`[2] Task profile bound via cred->security: vuln_apparmor_service`);
+      } else if (currentStep === 2) {
+        const isViolation = (scenario !== 'normal');
+        logMsg(`[3] DFA byte-by-byte traversal complete: ${isViolation ? 'DENY transition hit!' : 'ACCEPT rule matched'}`);
+      }
+
+      currentStep++;
+
+      if (isPlaying) {
+        const delay = parseInt(speedSelect.value, 10);
+        timerId = setTimeout(evaluateStep, delay);
+      }
+    }
+
+    btnStep.addEventListener('click', () => {
+      if (isPlaying) {
+        isPlaying = false;
+        if (timerId) clearTimeout(timerId);
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+      }
+      evaluateStep();
+    });
+
+    btnPlay.addEventListener('click', () => {
+      if (isPlaying) {
+        isPlaying = false;
+        if (timerId) clearTimeout(timerId);
+        btnPlay.textContent = '▶ 자동 실행';
+        btnPlay.classList.remove('active');
+        setStatus('paused', '일시 중지됨 (PAUSED)');
+      } else {
+        if (currentStep >= pipeSteps.length) {
+          resetSimulation();
+        }
+        isPlaying = true;
+        btnPlay.textContent = '⏸ 일시 정지';
+        btnPlay.classList.add('active');
+        setStatus('active', '실행 중 (RUNNING)');
+        evaluateStep();
+      }
+    });
+
+    btnReset.addEventListener('click', () => {
+      resetSimulation();
+      logMsg('시뮬레이션 파이프라인이 초기화되었습니다.', 'info');
+    });
+
+    scenarioSelect.addEventListener('change', () => {
+      resetSimulation();
+      logMsg(`작업 시나리오 변경: ${scenarioSelect.options[scenarioSelect.selectedIndex].text}`, 'info');
+    });
+
+    modeSelect.addEventListener('change', () => {
+      resetSimulation();
+      logMsg(`모드 변경: ${modeSelect.options[modeSelect.selectedIndex].text}`, 'warn');
+    });
+
+    // Initialize
+    resetSimulation();
+  </script>
+</body>
+</html>

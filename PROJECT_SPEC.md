@@ -111,7 +111,7 @@
 ### [Phase 10] Category 8: Mandatory Access Control & LSM Framework
 
 - [x] **Task 10-1:** Stackable LSM 아키텍처 및 복수 LSM 활성화 (`lsm=...` 부팅 파라미터).
-- [ ] **Task 10-2:** AppArmor (프로필 기반 프로세스 격리 및 파일/네트워크 경로 통제 실습).
+- [x] **Task 10-2:** AppArmor (프로필 기반 프로세스 격리 및 파일/네트워크 경로 통제 실습).
 - [ ] **Task 10-3:** SELinux (Type Enforcement, 도메인 전이 및 MLS 보안 컨텍스트 실습).
 - [ ] **Task 10-4:** Landlock (비특권 유저스페이스 프로세스 자체 샌드박싱 실습).
 

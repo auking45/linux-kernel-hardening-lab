@@ -46,8 +46,8 @@ static unsigned long g_yama_blocks = 0;
 static unsigned long g_landlock_blocks = 0;
 static unsigned long g_lockdown_blocks = 0;
 
-/* External kernel symbol defined in security/security.c */
-extern char *lsm_names;
+/* External kernel symbol defined in security/security.c (weak symbol if CONFIG_SECURITY=n) */
+extern char *lsm_names __attribute__((weak));
 
 /* Simulated LSM identifiers matching Linux UAPI */
 enum simulated_lsm_id {
