@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Landlock Unprivileged Sandboxing Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 100vh;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* Header & Toolbar */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 12px 18px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+    }
+
+    .header-titles h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-titles p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .badge-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .sim-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    .btn-primary:hover {
+      background: #7dd3fc;
+    }
+
+    .btn-mode-toggle {
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+    }
+
+    .status-led {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--glow-green);
+      transition: all 0.3s;
+    }
+
+    .status-led.blocked {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--glow-red);
+    }
+
+    .status-led.warn {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--glow-yellow);
+    }
+
+    /* Main Container Grid */
+    .grid-container {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 16px;
+      flex: 1;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Stage Canvas Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .svg-canvas-wrapper {
+      position: relative;
+      width: 100%;
+      height: 480px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px dashed var(--card-border);
+      overflow: hidden;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Side Panel */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.8rem;
+    }
+
+    .info-card h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-label {
+      color: var(--text-muted);
+    }
+
+    .info-val {
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    .log-terminal {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.74rem;
+      height: 200px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: #94a3b8;
+    }
+
+    .log-entry {
+      line-height: 1.35;
+      word-break: break-all;
+    }
+
+    .log-success { color: var(--accent-green); }
+    .log-denied { color: var(--accent-red); font-weight: 600; }
+    .log-info { color: var(--accent-blue); }
+    .log-warn { color: var(--accent-yellow); }
+
+    /* SVG elements styling */
+    .node-box {
+      rx: 8;
+      stroke-width: 2;
+      transition: all 0.3s;
+    }
+
+    .token-particle {
+      r: 7;
+      fill: var(--accent-blue);
+      filter: drop-shadow(0 0 6px var(--accent-blue));
+    }
+
+    .pulse-effect {
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header & Interactive Toolbar -->
+  <div class="header">
+    <div class="header-titles">
+      <h1>
+        <span>🛡️ Landlock Unprivileged Sandboxing Simulator</span>
+        <span class="badge-pill">Linux 5.13+ UAPI</span>
+      </h1>
+      <p>비특권 유저스페이스 프로세스의 자체 파일시스템 접근 권한 격리 및 계층형 샌드박싱 메커니즘</p>
+    </div>
+    <div class="sim-toolbar">
+      <span class="status-led" id="led-indicator"></span>
+      <span id="mode-text" style="font-size: 0.82rem; font-weight: 600;">Hardened (Landlocked)</span>
+      <button class="btn btn-mode-toggle" id="btn-toggle-mode" onclick="toggleMode()">🔄 모드 전환</button>
+      <button class="btn btn-primary" onclick="triggerRequest('sandbox')">📁 샌드박스 내부 접근 (/tmp/sandbox)</button>
+      <button class="btn" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="triggerRequest('escape')">🚨 샌드박스 탈출 시도 (/tmp/host_secret)</button>
+      <button class="btn" onclick="resetSim()">↺ 초기화</button>
+    </div>
+  </div>
+
+  <!-- Main View Grid -->
+  <div class="grid-container">
+
+    <!-- Interactive Canvas Card -->
+    <div class="card">
+      <div class="card-title">
+        <span>⚡ 샌드박스 VFS 검증 파이프라인 및 권한 트리</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">클릭하여 시스템 콜 경로 추적</span>
+      </div>
+
+      <div class="svg-canvas-wrapper">
+        <svg id="landlock-svg" viewBox="0 0 820 460">
+          <defs>
+            <linearGradient id="procGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="lsmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a855f7" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="allowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22c55e" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="denyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 8 5 L 0 9 z" fill="var(--card-border)"/>
+            </marker>
+          </defs>
+
+          <!-- System Call Boundaries -->
+          <rect x="20" y="30" width="780" height="90" rx="10" fill="rgba(255,255,255,0.02)" stroke="var(--card-border)" stroke-dasharray="4,4"/>
+          <text x="35" y="55" fill="var(--text-muted)" font-size="12" font-weight="600">USERSPACE (Non-Root UID 1000: 'lab')</text>
+
+          <rect x="20" y="145" width="780" height="295" rx="10" fill="rgba(0,0,0,0.2)" stroke="var(--card-border)"/>
+          <text x="35" y="170" fill="var(--text-muted)" font-size="12" font-weight="600">KERNELSPACE (LSM Framework & VFS Layer)</text>
+
+          <!-- Userspace Process Node -->
+          <g id="node-process" transform="translate(60, 48)">
+            <rect class="node-box" width="220" height="56" fill="url(#procGrad)" stroke="var(--accent-blue)"/>
+            <text x="110" y="26" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">Client Task (PID 1042)</text>
+            <text x="110" y="44" text-anchor="middle" fill="var(--accent-blue)" font-size="10" font-family="monospace">NO_NEW_PRIVS = 1</text>
+          </g>
+
+          <!-- Landlock Ruleset Capsule -->
+          <g id="node-ruleset" transform="translate(330, 48)">
+            <rect class="node-box" width="200" height="56" fill="url(#procGrad)" stroke="var(--accent-yellow)"/>
+            <text x="100" y="24" text-anchor="middle" fill="var(--accent-yellow)" font-size="12" font-weight="700">Ruleset FD (Syscall 444)</text>
+            <text x="100" y="44" text-anchor="middle" fill="var(--text-muted)" font-size="10">PATH_BENEATH (/tmp/sandbox)</text>
+          </g>
+
+          <!-- Restrict Self Capsule -->
+          <g id="node-restrict" transform="translate(580, 48)">
+            <rect class="node-box" width="190" height="56" fill="url(#procGrad)" stroke="var(--accent-purple)"/>
+            <text x="95" y="24" text-anchor="middle" fill="var(--accent-purple)" font-size="12" font-weight="700">landlock_restrict_self()</text>
+            <text x="95" y="44" text-anchor="middle" fill="var(--text-muted)" font-size="10">Syscall 446 (Permanent)</text>
+          </g>
+
+          <!-- Connecting userspace flow lines -->
+          <path d="M 280 76 L 330 76" stroke="var(--card-border)" stroke-width="2" marker-end="url(#arrow)"/>
+          <path d="M 530 76 L 580 76" stroke="var(--card-border)" stroke-width="2" marker-end="url(#arrow)"/>
+
+          <!-- Kernel Hook Decision Node -->
+          <g id="node-lsm-hook" transform="translate(170, 200)">
+            <rect class="node-box" width="240" height="80" fill="url(#lsmGrad)" stroke="var(--accent-purple)"/>
+            <text x="120" y="30" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">LSM: security_file_open()</text>
+            <text x="120" y="50" text-anchor="middle" fill="var(--accent-purple)" font-size="11" font-family="monospace">landlock_file_open()</text>
+            <text x="120" y="68" text-anchor="middle" fill="var(--text-muted)" font-size="10">Hierarchy Layer Walk</text>
+          </g>
+
+          <!-- Connecting Process to Hook -->
+          <path id="path-invoke" d="M 170 104 L 290 200" stroke="var(--accent-blue)" stroke-width="2" stroke-dasharray="4,4" fill="none"/>
+
+          <!-- Path Branch 1: Allowed Sandbox Subtree -->
+          <g id="node-target-sandbox" transform="translate(530, 190)">
+            <rect class="node-box" width="240" height="74" fill="url(#allowGrad)" stroke="var(--accent-green)"/>
+            <text x="120" y="28" text-anchor="middle" fill="var(--accent-green)" font-size="13" font-weight="700">✅ /tmp/sandbox/</text>
+            <text x="120" y="48" text-anchor="middle" fill="var(--text-main)" font-size="11">allowed_file.txt (Read/Write)</text>
+            <text x="120" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="10">Within Layer Boundary (Granted)</text>
+          </g>
+
+          <!-- Path Branch 2: Host Secret (Restricted Outside) -->
+          <g id="node-target-secret" transform="translate(530, 310)">
+            <rect class="node-box" width="240" height="74" fill="url(#denyGrad)" stroke="var(--accent-red)"/>
+            <text x="120" y="28" text-anchor="middle" fill="var(--accent-red)" font-size="13" font-weight="700">🛑 /tmp/host_secret</text>
+            <text x="120" y="48" text-anchor="middle" fill="var(--text-main)" font-size="11">External Host Token</text>
+            <text x="120" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="10">Outside Sandbox (-EACCES)</text>
+          </g>
+
+          <!-- Decision Connecting Lines -->
+          <path id="path-allow" d="M 410 240 L 530 227" stroke="var(--accent-green)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+          <path id="path-deny" d="M 410 260 L 530 347" stroke="var(--accent-red)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+          <!-- Animated Token Packet -->
+          <circle id="anim-packet" class="token-particle" cx="170" cy="104" opacity="0"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Side Information & Log Panel -->
+    <div class="side-panel">
+      <!-- Status Box -->
+      <div class="info-card">
+        <h3>📊 샌드박스 상태 지표</h3>
+        <div class="info-row">
+          <span class="info-label">현재 격리 모드:</span>
+          <span class="info-val" id="disp-mode" style="color: var(--accent-green);">Hardened</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Landlock UAPI ABI:</span>
+          <span class="info-val" style="color: var(--accent-blue);">v5 (Linux 6.12)</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">NO_NEW_PRIVS:</span>
+          <span class="info-val" style="color: var(--accent-yellow);">Locked (1)</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">인가된 하위 디렉터리:</span>
+          <span class="info-val">/tmp/sandbox/</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">차단된 탈출 시도:</span>
+          <span class="info-val" id="stat-denied" style="color: var(--accent-red);">0 건</span>
+        </div>
+      </div>
+
+      <!-- Landlock Mechanism Summary -->
+      <div class="info-card">
+        <h3>🔒 핵심 원리 (Self-Restricting)</h3>
+        <p style="color: var(--text-muted); font-size: 0.78rem; line-height: 1.45;">
+          Landlock은 루트(Root) 권한 없이 프로세스가 스스로 자신의 파일/네트워크 접근 범위를 축소하는 샌드박스 LSM임. 규칙은 누적되어 중첩(Stacking)되며, 한번 제한된 권한은 하위 프로세스에서도 절대로 확장될 수 없음(Fail-Closed).
+        </p>
+      </div>
+
+      <!-- Real-time Event Terminal -->
+      <div class="card" style="padding: 12px; flex: 1;">
+        <div class="card-title" style="margin-bottom: 6px;">
+          <span>📋 시스템 콜 및 감사 이벤트</span>
+          <button class="btn" style="padding: 2px 8px; font-size: 0.7rem;" onclick="clearLogs()">비우기</button>
+        </div>
+        <div class="log-terminal" id="terminal-log">
+          <div class="log-entry log-info">[init] Landlock LSM initialized. Active stack: landlock,lockdown,yama,bpf</div>
+          <div class="log-entry log-warn">[setup] Process PID 1042 called prctl(PR_SET_NO_NEW_PRIVS, 1)</div>
+          <div class="log-entry log-info">[ruleset] Created ruleset FD 3 with PATH_BENEATH -> /tmp/sandbox</div>
+          <div class="log-entry log-success">[restrict] landlock_restrict_self(FD 3) applied. Sandbox active.</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentMode = 'hardened'; // 'baseline' or 'hardened'
+    let deniedCount = 0;
+    let isAnimating = false;
+
+    function toggleMode() {
+      if (currentMode === 'hardened') {
+        currentMode = 'baseline';
+        document.getElementById('disp-mode').textContent = 'Baseline (Unconfined)';
+        document.getElementById('disp-mode').style.color = 'var(--accent-yellow)';
+        document.getElementById('mode-text').textContent = 'Baseline (Unconfined)';
+        document.getElementById('led-indicator').className = 'status-led warn';
+        logMessage('[mode] Switched to Baseline (Unconfined / Standard DAC only)', 'log-warn');
+      } else {
+        currentMode = 'hardened';
+        document.getElementById('disp-mode').textContent = 'Hardened (Landlocked)';
+        document.getElementById('disp-mode').style.color = 'var(--accent-green)';
+        document.getElementById('mode-text').textContent = 'Hardened (Landlocked)';
+        document.getElementById('led-indicator').className = 'status-led';
+        logMessage('[mode] Switched to Hardened (Landlock Sandbox Enforced)', 'log-info');
+      }
+    }
+
+    function triggerRequest(target) {
+      if (isAnimating) return;
+      isAnimating = true;
+
+      const packet = document.getElementById('anim-packet');
+      const led = document.getElementById('led-indicator');
+
+      if (target === 'sandbox') {
+        logMessage('[syscall] openat(AT_FDCWD, "/tmp/sandbox/allowed_file.txt", O_RDWR)', 'log-info');
+        animatePath([
+          {x: 170, y: 104},
+          {x: 290, y: 240},
+          {x: 650, y: 227}
+        ], () => {
+          logMessage('[LSM] landlock_file_open: path within /tmp/sandbox/ -> GRANTED (0)', 'log-success');
+          isAnimating = false;
+        });
+      } else {
+        logMessage('[syscall] openat(AT_FDCWD, "/tmp/host_secret", O_RDONLY)', 'log-warn');
+        if (currentMode === 'hardened') {
+          animatePath([
+            {x: 170, y: 104},
+            {x: 290, y: 240},
+            {x: 650, y: 347}
+          ], () => {
+            deniedCount++;
+            document.getElementById('stat-denied').textContent = `${deniedCount} 건`;
+            led.className = 'status-led blocked';
+            setTimeout(() => { led.className = 'status-led'; }, 1200);
+            logMessage('[LSM] landlock_file_open: path outside sandbox -> DENIED (-EACCES: Permission denied)', 'log-denied');
+            isAnimating = false;
+          });
+        } else {
+          animatePath([
+            {x: 170, y: 104},
+            {x: 290, y: 240},
+            {x: 650, y: 347}
+          ], () => {
+            logMessage('[LSM] Unconfined mode: DAC permission check passed -> GRANTED (0)', 'log-success');
+            isAnimating = false;
+          });
+        }
+      }
+    }
+
+    function animatePath(points, callback) {
+      const packet = document.getElementById('anim-packet');
+      packet.setAttribute('opacity', '1');
+
+      let currentStep = 0;
+      const totalSteps = points.length - 1;
+      const stepDuration = 280;
+
+      function stepTo(startPt, endPt, onComplete) {
+        const startTime = performance.now();
+        function frame(time) {
+          const elapsed = time - startTime;
+          const progress = Math.min(elapsed / stepDuration, 1);
+          const cx = startPt.x + (endPt.x - startPt.x) * progress;
+          const cy = startPt.y + (endPt.y - startPt.y) * progress;
+          packet.setAttribute('cx', cx);
+          packet.setAttribute('cy', cy);
+
+          if (progress < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            onComplete();
+          }
+        }
+        requestAnimationFrame(frame);
+      }
+
+      function nextSegment() {
+        if (currentStep < totalSteps) {
+          stepTo(points[currentStep], points[currentStep + 1], () => {
+            currentStep++;
+            nextSegment();
+          });
+        } else {
+          setTimeout(() => {
+            packet.setAttribute('opacity', '0');
+            callback();
+          }, 150);
+        }
+      }
+
+      nextSegment();
+    }
+
+    function logMessage(text, className) {
+      const term = document.getElementById('terminal-log');
+      const div = document.createElement('div');
+      div.className = `log-entry ${className || ''}`;
+      div.textContent = text;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('terminal-log').innerHTML = '';
+      logMessage('[system] Event log cleared.', 'log-info');
+    }
+
+    function resetSim() {
+      currentMode = 'hardened';
+      deniedCount = 0;
+      document.getElementById('stat-denied').textContent = '0 건';
+      document.getElementById('disp-mode').textContent = 'Hardened (Landlocked)';
+      document.getElementById('disp-mode').style.color = 'var(--accent-green)';
+      document.getElementById('mode-text').textContent = 'Hardened (Landlocked)';
+      document.getElementById('led-indicator').className = 'status-led';
+      clearLogs();
+      logMessage('[reset] Simulator reset to Hardened Landlocked state.', 'log-info');
+    }
+  </script>
+</body>
+</html>
