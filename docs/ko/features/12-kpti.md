@@ -128,10 +128,10 @@ flowchart LR
 ---
 
 ## 3. 인터랙티브 아키텍처 다이어그램
+ 
+아래 시뮬레이터를 통해 듀얼 PGD 분리 구조, 트램펄린 전환 스텁, 비순차 투기적 Meltdown 공격 경로 및 물리 주소 변환 차단 동작을 대화형으로 확인할 수 있음:
 
-아래 링크를 브라우저에서 열어 KPTI의 4가지 동작 시나리오(통합 테이블 취약성, Meltdown 공격 경로, 분리 테이블 방어, CR3 전환 흐름)를 인터랙티브하게 확인할 수 있음:
-
-- [KPTI & Meltdown Mitigation Architecture Diagram](file:///home/auking45/repos/linux-kernel-hardening-lab/docs/assets/diagrams/kpti/architecture.html)
+<iframe src="../../assets/diagrams/kpti/architecture.html" width="100%" height="780" frameborder="0" style="border-radius: 8px; border: 1px solid var(--md-default-fg-color--lightest); margin: 20px 0;"></iframe>
 
 ---
 

@@ -129,9 +129,9 @@ flowchart LR
 
 ## 3. Interactive Architecture Diagram
 
-Open the link below in any modern browser to explore the 4 operational scenarios of KPTI:
+The interactive simulator below visualizes the Dual-PGD page table switching, trampoline stubs, out-of-order Meltdown transient window, and physical translation absence:
 
-- [KPTI & Meltdown Mitigation Architecture Diagram](file:///home/auking45/repos/linux-kernel-hardening-lab/docs/assets/diagrams/kpti/architecture.html)
+<iframe src="../../assets/diagrams/kpti/architecture.html" width="100%" height="780" frameborder="0" style="border-radius: 8px; border: 1px solid var(--md-default-fg-color--lightest); margin: 20px 0;"></iframe>
 
 ---
 
