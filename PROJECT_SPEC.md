@@ -117,7 +117,7 @@
 
 ### [Phase 11] Category 9: System & Binary Integrity Verification
 
-- [ ] **Task 11-1:** IMA (Integrity Measurement Architecture - 실행 파일 해시 측정 및 무결성 검증 실습).
+- [x] **Task 11-1:** IMA (Integrity Measurement Architecture - 실행 파일 해시 측정 및 무결성 검증 실습).
 - [ ] **Task 11-2:** EVM (Extended Verification Module - 파일 xattr 전자서명 및 무결성 보호).
 - [ ] **Task 11-3:** IPE (Integrity Policy Enforcement - dm-verity/fs-verity 기반 신규 정책 강제 LSM).
 - [ ] **Task 11-4:** Kernel Lockdown LSM (`integrity` vs `confidentiality` 모드 비교 및 실습).

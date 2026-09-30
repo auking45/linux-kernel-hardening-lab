@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IMA (Integrity Measurement Architecture) Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 100vh;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* Header & Toolbar */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 12px 18px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+    }
+
+    .header-titles h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-titles p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .badge-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .sim-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    .btn-primary:hover {
+      background: #7dd3fc;
+    }
+
+    .btn-mode-toggle {
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+    }
+
+    .status-led {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--glow-green);
+      transition: all 0.3s;
+    }
+
+    .status-led.blocked {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--glow-red);
+    }
+
+    .status-led.warn {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--glow-yellow);
+    }
+
+    /* Main Container Grid */
+    .grid-container {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 16px;
+      flex: 1;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Stage Canvas Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .svg-canvas-wrapper {
+      position: relative;
+      width: 100%;
+      height: 480px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px dashed var(--card-border);
+      overflow: hidden;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Side Panel */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.8rem;
+    }
+
+    .info-card h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-label {
+      color: var(--text-muted);
+    }
+
+    .info-val {
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    .log-terminal {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.74rem;
+      height: 200px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: #94a3b8;
+    }
+
+    .log-entry {
+      line-height: 1.35;
+      word-break: break-all;
+    }
+
+    .log-success { color: var(--accent-green); }
+    .log-denied { color: var(--accent-red); font-weight: 600; }
+    .log-info { color: var(--accent-blue); }
+    .log-warn { color: var(--accent-yellow); }
+
+    /* SVG elements styling */
+    .node-box {
+      rx: 8;
+      stroke-width: 2;
+      transition: all 0.3s;
+    }
+
+    .token-particle {
+      r: 7;
+      fill: var(--accent-blue);
+      filter: drop-shadow(0 0 6px var(--accent-blue));
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header & Interactive Toolbar -->
+  <div class="header">
+    <div class="header-titles">
+      <h1>
+        <span>🔐 IMA (Integrity Measurement Architecture) Simulator</span>
+        <span class="badge-pill">TPM PCR 10 & Appraisal</span>
+      </h1>
+      <p>실행 파일 해시 무결성 측정, TPM PCR 확장 및 미인가 변조 파일 실행 차단 메커니즘</p>
+    </div>
+    <div class="sim-toolbar">
+      <span class="status-led" id="led-indicator"></span>
+      <span id="mode-text" style="font-size: 0.82rem; font-weight: 600;">Enforce (ima_appraise=enforce)</span>
+      <button class="btn btn-mode-toggle" id="btn-toggle-mode" onclick="toggleMode()">🔄 모드 전환 (Log / Enforce)</button>
+      <button class="btn btn-primary" onclick="triggerMeasurement('valid')">✅ 정상 바이너리 실행 (무결성 검증)</button>
+      <button class="btn" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="triggerMeasurement('tampered')">⚠️ 변조 바이너리 실행 (1바이트 변조)</button>
+      <button class="btn" onclick="resetSim()">↺ 초기화</button>
+    </div>
+  </div>
+
+  <!-- Main View Grid -->
+  <div class="grid-container">
+
+    <!-- Interactive Canvas Card -->
+    <div class="card">
+      <div class="card-title">
+        <span>⚡ IMA 측정 및 감정(Appraisal) 아키텍처 파이프라인</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">실시간 암호화 해시 및 TPM PCR 연동 추적</span>
+      </div>
+
+      <div class="svg-canvas-wrapper">
+        <svg id="ima-svg" viewBox="0 0 820 460">
+          <defs>
+            <linearGradient id="fileGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="hashGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a855f7" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="tpmGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="grantGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22c55e" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="denyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 8 5 L 0 9 z" fill="var(--card-border)"/>
+            </marker>
+          </defs>
+
+          <!-- System Call Hook Stage -->
+          <g id="node-target" transform="translate(40, 60)">
+            <rect class="node-box" width="210" height="74" fill="url(#fileGrad)" stroke="var(--accent-blue)"/>
+            <text x="105" y="28" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">Target Executable</text>
+            <text id="target-label" x="105" y="48" text-anchor="middle" fill="var(--accent-blue)" font-size="11" font-family="monospace">/bin/trusted_app</text>
+            <text x="105" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="10">execve() / bprm_check</text>
+          </g>
+
+          <!-- IMA Measurement & Crypto Hash Node -->
+          <g id="node-measure" transform="translate(300, 60)">
+            <rect class="node-box" width="220" height="74" fill="url(#hashGrad)" stroke="var(--accent-purple)"/>
+            <text x="110" y="28" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">IMA Hash Calculator</text>
+            <text x="110" y="48" text-anchor="middle" fill="var(--accent-purple)" font-size="11" font-family="monospace">crypto_shash(SHA-256)</text>
+            <text id="computed-hash" x="110" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="monospace">sha256:e3b0c442...</text>
+          </g>
+
+          <!-- TPM PCR 10 Extension Node -->
+          <g id="node-tpm" transform="translate(570, 60)">
+            <rect class="node-box" width="210" height="74" fill="url(#tpmGrad)" stroke="var(--accent-yellow)"/>
+            <text x="105" y="28" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">TPM 2.0 PCR Engine</text>
+            <text x="105" y="48" text-anchor="middle" fill="var(--accent-yellow)" font-size="11" font-family="monospace">PCR 10 Extend</text>
+            <text x="105" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="10">PCR = SHA256(PCR || Hash)</text>
+          </g>
+
+          <!-- Flow arrows top row -->
+          <path d="M 250 97 L 300 97" stroke="var(--card-border)" stroke-width="2" marker-end="url(#arrow)"/>
+          <path d="M 520 97 L 570 97" stroke="var(--card-border)" stroke-width="2" marker-end="url(#arrow)"/>
+
+          <!-- Appraisal Engine Layer (Bottom Half) -->
+          <g id="node-appraisal" transform="translate(170, 220)">
+            <rect class="node-box" width="260" height="84" fill="url(#hashGrad)" stroke="var(--accent-blue)"/>
+            <text x="130" y="30" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">IMA Appraisal Engine</text>
+            <text x="130" y="52" text-anchor="middle" fill="var(--accent-blue)" font-size="11">Compare with security.ima xattr</text>
+            <text id="appraise-rule" x="130" y="70" text-anchor="middle" fill="var(--text-muted)" font-size="10">Policy: appraise func=BPRM_CHECK</text>
+          </g>
+
+          <!-- Connecting line from Hash to Appraisal -->
+          <path d="M 410 134 L 300 220" stroke="var(--accent-purple)" stroke-width="2" stroke-dasharray="4,4" fill="none"/>
+
+          <!-- Decision Branch 1: Integrity Match (Execution Granted) -->
+          <g id="node-granted" transform="translate(530, 200)">
+            <rect class="node-box" width="240" height="74" fill="url(#grantGrad)" stroke="var(--accent-green)"/>
+            <text x="120" y="28" text-anchor="middle" fill="var(--accent-green)" font-size="13" font-weight="700">✅ Execution GRANTED</text>
+            <text x="120" y="48" text-anchor="middle" fill="var(--text-main)" font-size="11">Hash Verification MATCH</text>
+            <text x="120" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="10">Process loads cleanly into memory</text>
+          </g>
+
+          <!-- Decision Branch 2: Integrity Tamper (Blocked or Logged) -->
+          <g id="node-denied" transform="translate(530, 310)">
+            <rect class="node-box" width="240" height="74" fill="url(#denyGrad)" stroke="var(--accent-red)"/>
+            <text id="deny-title" x="120" y="28" text-anchor="middle" fill="var(--accent-red)" font-size="13" font-weight="700">🛑 BLOCKED (-EACCES)</text>
+            <text x="120" y="48" text-anchor="middle" fill="var(--text-main)" font-size="11">Hash Mismatch (Tamper Detected)</text>
+            <text x="120" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="10">audit(ima): invalid-hash</text>
+          </g>
+
+          <!-- Connecting decision lines -->
+          <path id="path-grant" d="M 430 250 L 530 237" stroke="var(--accent-green)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+          <path id="path-deny" d="M 430 270 L 530 347" stroke="var(--accent-red)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+          <!-- Animated Token Packet -->
+          <circle id="anim-packet" class="token-particle" cx="145" cy="97" opacity="0"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Side Information & Log Panel -->
+    <div class="side-panel">
+      <!-- Status Box -->
+      <div class="info-card">
+        <h3>📊 IMA 런타임 지표</h3>
+        <div class="info-row">
+          <span class="info-label">감정(Appraisal) 모드:</span>
+          <span class="info-val" id="disp-mode" style="color: var(--accent-green);">Enforce</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">해시 알고리즘:</span>
+          <span class="info-val" style="color: var(--accent-blue);">SHA-256</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">TPM 하드웨어 레지스터:</span>
+          <span class="info-val" style="color: var(--accent-yellow);">PCR 10 (Active)</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">총 측정 횟수:</span>
+          <span class="info-val" id="stat-measurements">0 회</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">무결성 위반 탐지:</span>
+          <span class="info-val" id="stat-violations" style="color: var(--accent-red);">0 건</span>
+        </div>
+      </div>
+
+      <!-- IMA Concept Card -->
+      <div class="info-card">
+        <h3>🛡️ 핵심 3대 기능</h3>
+        <ul style="color: var(--text-muted); font-size: 0.76rem; line-height: 1.45; padding-left: 14px;">
+          <li><b>Measurement</b>: 실행 전 파일 해시를 계산하고 TPM PCR 10에 누적 기록.</li>
+          <li><b>Appraisal</b>: 파일의 확장 속성(security.ima)에 저장된 기준 해시와 대조하여 불일치 시 차단.</li>
+          <li><b>Audit</b>: 정책 위반 또는 측정 이벤트를 표준 auditd 로그로 보존.</li>
+        </ul>
+      </div>
+
+      <!-- Real-time Event Terminal -->
+      <div class="card" style="padding: 12px; flex: 1;">
+        <div class="card-title" style="margin-bottom: 6px;">
+          <span>📋 IMA 감사 및 무결성 이벤트</span>
+          <button class="btn" style="padding: 2px 8px; font-size: 0.7rem;" onclick="clearLogs()">비우기</button>
+        </div>
+        <div class="log-terminal" id="terminal-log">
+          <div class="log-entry log-info">[init] IMA measurement architecture initialized. Hash: sha256, PCR: 10</div>
+          <div class="log-entry log-info">[policy] Loaded default TCB policy: measure bprm, appraise bprm</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentMode = 'enforce'; // 'log' or 'enforce'
+    let measurementCount = 0;
+    let violationCount = 0;
+    let isAnimating = false;
+
+    function toggleMode() {
+      if (currentMode === 'enforce') {
+        currentMode = 'log';
+        document.getElementById('disp-mode').textContent = 'Log (Permissive)';
+        document.getElementById('disp-mode').style.color = 'var(--accent-yellow)';
+        document.getElementById('mode-text').textContent = 'Log (ima_appraise=log)';
+        document.getElementById('deny-title').textContent = '⚠️ LOGGED (Execution allowed)';
+        document.getElementById('deny-title').style.fill = 'var(--accent-yellow)';
+        document.getElementById('led-indicator').className = 'status-led warn';
+        logMessage('[mode] Switched to Log mode: Hash mismatches will be audited but execution allowed', 'log-warn');
+      } else {
+        currentMode = 'enforce';
+        document.getElementById('disp-mode').textContent = 'Enforce';
+        document.getElementById('disp-mode').style.color = 'var(--accent-green)';
+        document.getElementById('mode-text').textContent = 'Enforce (ima_appraise=enforce)';
+        document.getElementById('deny-title').textContent = '🛑 BLOCKED (-EACCES)';
+        document.getElementById('deny-title').style.fill = 'var(--accent-red)';
+        document.getElementById('led-indicator').className = 'status-led';
+        logMessage('[mode] Switched to Enforce mode: Hash mismatches strictly blocked with -EACCES', 'log-info');
+      }
+    }
+
+    function triggerMeasurement(type) {
+      if (isAnimating) return;
+      isAnimating = true;
+
+      const packet = document.getElementById('anim-packet');
+      const targetLabel = document.getElementById('target-label');
+      const hashLabel = document.getElementById('computed-hash');
+      const led = document.getElementById('led-indicator');
+
+      measurementCount++;
+      document.getElementById('stat-measurements').textContent = `${measurementCount} 회`;
+
+      if (type === 'valid') {
+        targetLabel.textContent = '/bin/trusted_app';
+        targetLabel.style.fill = 'var(--accent-blue)';
+        hashLabel.textContent = 'sha256:e3b0c442...';
+        logMessage('[exec] Requesting execution of /bin/trusted_app', 'log-info');
+
+        animatePath([
+          {x: 145, y: 97},
+          {x: 410, y: 97},
+          {x: 675, y: 97},
+          {x: 300, y: 260},
+          {x: 650, y: 237}
+        ], () => {
+          logMessage('[ima] [MEASURE] pcr=10 template=ima-ng hash=sha256:e3b0c442... file=/bin/trusted_app', 'log-info');
+          logMessage('[ima] [APPRAISE] Valid hash matches security.ima -> GRANTED (0)', 'log-success');
+          isAnimating = false;
+        });
+      } else {
+        targetLabel.textContent = '/bin/tampered_app';
+        targetLabel.style.fill = 'var(--accent-red)';
+        hashLabel.textContent = 'sha256:d41d8cd9...';
+        violationCount++;
+        document.getElementById('stat-violations').textContent = `${violationCount} 건`;
+
+        logMessage('[exec] Requesting execution of /bin/tampered_app (1-byte patched)', 'log-warn');
+
+        animatePath([
+          {x: 145, y: 97},
+          {x: 410, y: 97},
+          {x: 675, y: 97},
+          {x: 300, y: 260},
+          {x: 650, y: 347}
+        ], () => {
+          logMessage('[ima] [MEASURE] pcr=10 extended with tampered hash sha256:d41d8cd9...', 'log-warn');
+          logMessage('type=1800 audit(ima): action=appraise_data cause=invalid-hash name="/bin/tampered_app"', 'log-denied');
+
+          if (currentMode === 'enforce') {
+            led.className = 'status-led blocked';
+            setTimeout(() => { led.className = 'status-led'; }, 1200);
+            logMessage('[ima] [ENFORCE] INTEGRITY COMPROMISED: Execution BLOCKED (-EACCES: Permission denied)', 'log-denied');
+          } else {
+            logMessage('[ima] [LOG_MODE] Hash mismatch logged, but execution permitted by policy', 'log-warn');
+          }
+          isAnimating = false;
+        });
+      }
+    }
+
+    function animatePath(points, callback) {
+      const packet = document.getElementById('anim-packet');
+      packet.setAttribute('opacity', '1');
+
+      let currentStep = 0;
+      const totalSteps = points.length - 1;
+      const stepDuration = 240;
+
+      function stepTo(startPt, endPt, onComplete) {
+        const startTime = performance.now();
+        function frame(time) {
+          const elapsed = time - startTime;
+          const progress = Math.min(elapsed / stepDuration, 1);
+          const cx = startPt.x + (endPt.x - startPt.x) * progress;
+          const cy = startPt.y + (endPt.y - startPt.y) * progress;
+          packet.setAttribute('cx', cx);
+          packet.setAttribute('cy', cy);
+
+          if (progress < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            onComplete();
+          }
+        }
+        requestAnimationFrame(frame);
+      }
+
+      function nextSegment() {
+        if (currentStep < totalSteps) {
+          stepTo(points[currentStep], points[currentStep + 1], () => {
+            currentStep++;
+            nextSegment();
+          });
+        } else {
+          setTimeout(() => {
+            packet.setAttribute('opacity', '0');
+            callback();
+          }, 120);
+        }
+      }
+
+      nextSegment();
+    }
+
+    function logMessage(text, className) {
+      const term = document.getElementById('terminal-log');
+      const div = document.createElement('div');
+      div.className = `log-entry ${className || ''}`;
+      div.textContent = text;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('terminal-log').innerHTML = '';
+      logMessage('[system] Event log cleared.', 'log-info');
+    }
+
+    function resetSim() {
+      currentMode = 'enforce';
+      measurementCount = 0;
+      violationCount = 0;
+      document.getElementById('stat-measurements').textContent = '0 회';
+      document.getElementById('stat-violations').textContent = '0 건';
+      document.getElementById('disp-mode').textContent = 'Enforce';
+      document.getElementById('disp-mode').style.color = 'var(--accent-green)';
+      document.getElementById('mode-text').textContent = 'Enforce (ima_appraise=enforce)';
+      document.getElementById('deny-title').textContent = '🛑 BLOCKED (-EACCES)';
+      document.getElementById('deny-title').style.fill = 'var(--accent-red)';
+      document.getElementById('led-indicator').className = 'status-led';
+      clearLogs();
+      logMessage('[reset] Simulator reset to initial state.', 'log-info');
+    }
+  </script>
+</body>
+</html>
