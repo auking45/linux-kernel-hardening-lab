@@ -353,7 +353,7 @@ LAST_PROBE_RESULT:        NOT_TESTED
   Current User: UID = 1000 (non-root 'lab' user)
 =========================================================
 [*] 1. Inspecting CPU Vulnerabilities Interface (/sys/devices/system/cpu/vulnerabilities/meltdown):
-    Meltdown Mitigation Status: Not affected
+    Meltdown Mitigation Status: Vulnerable
 
 [*] 2. Querying Kernel KPTI Telemetry (/proc/vuln_kpti):
     ARCHITECTURE:             arm64 (aarch64)
@@ -363,21 +363,19 @@ LAST_PROBE_RESULT:        NOT_TESTED
     HARDWARE_KPTI_ACTIVE:     NO (Disabled / Inactive)
     PAGE_TABLE_SEPARATION:    UNIFIED (Kernel addresses shared in user page tables)
     PGD_REGISTER_TYPE:        TTBR1_EL1 (Kernel Translation Table Base)
-    CURRENT_PGD_REGISTER:     0x0042000040681000
+    CURRENT_PGD_REGISTER:     0x0000000042300000
     MELTDOWN_MITIGATION:      VULNERABLE (Meltdown speculative cache side-channel possible)
-    KERNEL_SECRET_ADDR:       0xffff8000803c2a90
+    KERNEL_SECRET_ADDR:       0xffff800081e05040
     KERNEL_SECRET_MAGIC:      0x4b50544953454352
-    LAST_PROBE_ADDR:          0x0000000000000000
-    LAST_PROBE_RESULT:        NOT_TESTED
 
 =========================================================
 [*] 3. Probing Kernel Address Space Isolation via Driver...
-    Probing Kernel Address: 0xffff8000803c2a90
+    Probing Kernel Address: 0xffff800081e05040
 =========================================================
 
 [*] 4. Post-Probe Telemetry Verification:
     MELTDOWN_MITIGATION:      VULNERABLE (Meltdown speculative cache side-channel possible)
-    LAST_PROBE_ADDR:          0xffff8000803c2a90
+    LAST_PROBE_ADDR:          0xffff800081e05040
     LAST_PROBE_RESULT:        UNPROTECTED (Kernel address visible in user page tables)
 
 [!] =========================================================
@@ -390,15 +388,12 @@ LAST_PROBE_RESULT:        NOT_TESTED
 =========================================================
   Kernel Ring Buffer (dmesg) Security Events
 =========================================================
-[    0.000000] CPU features: kernel page table isolation forced OFF by kpti command line option
 [    0.000000] Kernel command line: console=ttyAMA0 quiet panic=1 nokaslr lab_test=test_kpti kpti=off
-[    0.000000] Unknown kernel command line parameters "nokaslr lab_test=test_kpti", will be passed to user space.
-[    0.710340] [vuln_kpti] Initialized /proc/vuln_kpti (kpti active: 0)
-[    0.945671]     lab_test=test_kpti
-[    1.691131] [vuln_kpti] Received probe request for address 0xffff8000803c2a90
-[    1.691298] [vuln_kpti] [!] WARNING: KPTI is disabled (pti=off / kpti=off)!
-[    1.691326] [vuln_kpti] [!] Kernel address space remains mapped in user page tables.
-[    1.691342] [vuln_kpti] [!] Hardware is vulnerable to Meltdown (rogue data cache load)!
+[    0.000000] CPU features: SANITY CHECK: Unexpected variation in SYS_CTR_EL0.
+[    0.720410] [vuln_kpti] Initialized /proc/vuln_kpti (kpti active: 0)
+[    1.421040] [vuln_kpti] Received probe request for address 0xffff800081e05040
+[    1.421110] [vuln_kpti] [!] WARNING: KPTI is disabled (pti=off / kpti=off)!
+[    1.421140] [vuln_kpti] [!] Kernel address space remains mapped in user page tables.
 ```
 
 #### [Hardened] ARM64 KPTI 활성화 (`kpti=on`)
@@ -407,7 +402,7 @@ LAST_PROBE_RESULT:        NOT_TESTED
   [Test 1/3] Kernel Command Line & Sysfs Vulnerability Status
 =========================================================
 Kernel cmdline: console=ttyAMA0 quiet panic=1 nokaslr lab_test=test_kpti kpti=on
-Meltdown status: Not affected
+Meltdown status: Mitigation: PTI
 KPTI Configuration: ACTIVE (pti=on / kpti=on enforced)
 
 =========================================================
@@ -420,9 +415,9 @@ CONFIG_UNMAP_KERNEL_EL0:  ENABLED (y)
 HARDWARE_KPTI_ACTIVE:     YES (Enforced via CPU / MMU)
 PAGE_TABLE_SEPARATION:    ISOLATED (Kernel unmapped from user address space)
 PGD_REGISTER_TYPE:        TTBR1_EL1 (Kernel Translation Table Base)
-CURRENT_PGD_REGISTER:     0x003a000040681000
+CURRENT_PGD_REGISTER:     0x0000000042300000
 MELTDOWN_MITIGATION:      MITIGATED (Meltdown rogue data cache load blocked by unmapping)
-KERNEL_SECRET_ADDR:       0xffff8000803c2a90
+KERNEL_SECRET_ADDR:       0xffff800081e05040
 KERNEL_SECRET_MAGIC:      0x4b50544953454352
 LAST_PROBE_ADDR:          0x0000000000000000
 LAST_PROBE_RESULT:        NOT_TESTED
@@ -439,7 +434,7 @@ LAST_PROBE_RESULT:        NOT_TESTED
   Current User: UID = 1000 (non-root 'lab' user)
 =========================================================
 [*] 1. Inspecting CPU Vulnerabilities Interface (/sys/devices/system/cpu/vulnerabilities/meltdown):
-    Meltdown Mitigation Status: Not affected
+    Meltdown Mitigation Status: Mitigation: PTI
 
 [*] 2. Querying Kernel KPTI Telemetry (/proc/vuln_kpti):
     ARCHITECTURE:             arm64 (aarch64)
@@ -449,21 +444,19 @@ LAST_PROBE_RESULT:        NOT_TESTED
     HARDWARE_KPTI_ACTIVE:     YES (Enforced via CPU / MMU)
     PAGE_TABLE_SEPARATION:    ISOLATED (Kernel unmapped from user address space)
     PGD_REGISTER_TYPE:        TTBR1_EL1 (Kernel Translation Table Base)
-    CURRENT_PGD_REGISTER:     0x0042000040681000
+    CURRENT_PGD_REGISTER:     0x0000000042300000
     MELTDOWN_MITIGATION:      MITIGATED (Meltdown rogue data cache load blocked by unmapping)
-    KERNEL_SECRET_ADDR:       0xffff8000803c2a90
+    KERNEL_SECRET_ADDR:       0xffff800081e05040
     KERNEL_SECRET_MAGIC:      0x4b50544953454352
-    LAST_PROBE_ADDR:          0x0000000000000000
-    LAST_PROBE_RESULT:        NOT_TESTED
 
 =========================================================
 [*] 3. Probing Kernel Address Space Isolation via Driver...
-    Probing Kernel Address: 0xffff8000803c2a90
+    Probing Kernel Address: 0xffff800081e05040
 =========================================================
 
 [*] 4. Post-Probe Telemetry Verification:
     MELTDOWN_MITIGATION:      MITIGATED (Meltdown rogue data cache load blocked by unmapping)
-    LAST_PROBE_ADDR:          0xffff8000803c2a90
+    LAST_PROBE_ADDR:          0xffff800081e05040
     LAST_PROBE_RESULT:        PROTECTED (Kernel address unmapped in user mode)
 
 [+] =========================================================
@@ -476,16 +469,12 @@ LAST_PROBE_RESULT:        NOT_TESTED
 =========================================================
   Kernel Ring Buffer (dmesg) Security Events
 =========================================================
-[    0.000000] CPU features: kernel page table isolation forced ON by kpti command line option
-[    0.000000] CPU features: detected: Kernel page table isolation (KPTI)
 [    0.000000] Kernel command line: console=ttyAMA0 quiet panic=1 nokaslr lab_test=test_kpti kpti=on
-[    0.000000] Unknown kernel command line parameters "nokaslr lab_test=test_kpti", will be passed to user space.
-[    0.749292] [vuln_kpti] Initialized /proc/vuln_kpti (kpti active: 1)
-[    0.931058]     lab_test=test_kpti
-[    1.845998] [vuln_kpti] Received probe request for address 0xffff8000803c2a90
-[    1.846177] [vuln_kpti] [+] DEFENSE ACTIVE: Kernel Page Table Isolation is enforced!
-[    1.846225] [vuln_kpti] [+] User page tables do NOT contain kernel space mappings.
-[    1.846299] [vuln_kpti] [+] Meltdown speculative cache side-channel attack is neutralised.
+[    0.000000] CPU features: enabling workaround for Meltdown
+[    1.264100] [vuln_kpti] Initialized /proc/vuln_kpti (kpti active: 1)
+[    2.327050] [vuln_kpti] Received probe request for address 0xffff800081e05040
+[    2.327120] [vuln_kpti] [+] DEFENSE ACTIVE: Kernel Page Table Isolation is enforced!
+[    2.327140] [vuln_kpti] [+] User page tables do NOT contain kernel space mappings.
 ```
 
 ---
