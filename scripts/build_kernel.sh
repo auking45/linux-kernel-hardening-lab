@@ -6,9 +6,27 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/env.sh"
 
+calc_default_jobs() {
+    local total_cores
+    total_cores="$(nproc 2>/dev/null || echo 4)"
+    if [[ "${total_cores}" -gt 8 ]]; then
+        # Reserve 4 cores for host OS/WSL subsystem, cap at 14 for memory/socket stability
+        local safe_jobs=$(( total_cores - 4 ))
+        if [[ "${safe_jobs}" -gt 14 ]]; then
+            echo 14
+        else
+            echo "${safe_jobs}"
+        fi
+    elif [[ "${total_cores}" -gt 4 ]]; then
+        echo "$(( total_cores - 2 ))"
+    else
+        echo "${total_cores}"
+    fi
+}
+
 TARGET_ARCH="x86_64"
 FEATURE_NAME="base"
-BUILD_JOBS="$(nproc)"
+BUILD_JOBS="${BUILD_JOBS:-$(calc_default_jobs)}"
 CLEAN_BUILD=0
 USE_LLVM=0
 
@@ -18,7 +36,7 @@ usage() {
     echo "Options:"
     echo "  --arch <x86_64|arm64>      Target architecture (default: x86_64)"
     echo "  --feature <feature_name>   Hardening feature fragment from configs/features/ (default: base)"
-    echo "  --jobs <N>                 Parallel make jobs (default: $(nproc))"
+    echo "  --jobs <N>                 Parallel make jobs (default: smart-throttled $(calc_default_jobs))"
     echo "  --clean                    Clean build output directory before compiling"
     echo "  --llvm                     Build with Clang/LLVM toolchain (LLVM=1)"
     echo "  -h, --help                 Show this help message"
