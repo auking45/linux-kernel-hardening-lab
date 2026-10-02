@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux Seccomp-BPF Syscall Sandbox Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.permissive {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.violation {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .status-bar {
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .svg-box {
+    fill: var(--bg-primary);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    rx: 8;
+  }
+  .svg-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .svg-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+    font-family: monospace;
+  }
+
+  #token {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--accent-blue));
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div id="led" class="led-indicator"></div>
+      Linux Seccomp-BPF Syscall Sandbox Architecture Simulator
+    </div>
+    <div style="font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">
+      CONFIG_SECCOMP_FILTER=y
+    </div>
+  </div>
+
+  <div class="sim-toolbar">
+    <button id="btn-call-safe" class="btn active" onclick="selectScenario('safe')">Safe Syscall (read/write)</button>
+    <button id="btn-call-restricted" class="btn" onclick="selectScenario('restricted')">Restricted Syscall (ptrace)</button>
+    <button id="btn-call-lethal" class="btn" onclick="selectScenario('lethal')">Hostile Syscall (reboot/unshare)</button>
+    <div style="flex-grow:1;"></div>
+    <button id="btn-mode" class="btn" onclick="cycleMode()">Mode: BPF Filter (2)</button>
+    <button id="btn-step" class="btn" onclick="stepSimulation()">Next Step ⏭</button>
+    <button id="btn-play" class="btn" onclick="togglePlay()">Auto Play ▶</button>
+    <button id="btn-reset" class="btn" onclick="resetSimulation()">Reset ↺</button>
+    <button class="btn" onclick="toggleTheme()">Theme 🌓</button>
+  </div>
+
+  <svg viewBox="0 0 860 380" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--text-secondary)"/>
+      </marker>
+    </defs>
+
+    <!-- Column 1: Userspace Syscall Trap -->
+    <g id="col-user">
+      <rect x="20" y="20" width="220" height="340" fill="none" stroke="var(--border-color)" stroke-dasharray="4" rx="8"/>
+      <text class="svg-text-title" x="35" y="45">Userspace Application</text>
+
+      <!-- Safe Syscall -->
+      <g id="box-call-safe" transform="translate(30, 60)">
+        <rect class="svg-box" width="200" height="75"/>
+        <text class="svg-text-title" x="12" y="24">Safe Syscall</text>
+        <text class="svg-text-desc" x="12" y="44">write(1, buf, len)</text>
+        <text class="svg-text-desc" x="12" y="62" fill="var(--accent-green)">Standard I/O & computation</text>
+      </g>
+
+      <!-- Restricted Syscall -->
+      <g id="box-call-restricted" transform="translate(30, 155)">
+        <rect class="svg-box" width="200" height="85"/>
+        <text class="svg-text-title" x="12" y="24">Restricted Call (Privilege)</text>
+        <text class="svg-text-desc" x="12" y="44">ptrace(PTRACE_ATTACH, ...)</text>
+        <text class="svg-text-desc" x="12" y="60">Dangerous introspection</text>
+        <text class="svg-text-desc" x="12" y="76" fill="var(--accent-amber)">High exploit abuse risk</text>
+      </g>
+
+      <!-- Lethal Syscall -->
+      <g id="box-call-lethal" transform="translate(30, 260)">
+        <rect class="svg-box" width="200" height="85"/>
+        <text class="svg-text-title" x="12" y="24">Hostile Syscall</text>
+        <text class="svg-text-desc" x="12" y="44">reboot(LINUX_REBOOT_MAGIC)</text>
+        <text class="svg-text-desc" x="12" y="60">Kernel state mutation</text>
+        <text class="svg-text-desc" x="12" y="76" fill="var(--accent-red)">Container breakout attempt</text>
+      </g>
+    </g>
+
+    <!-- Column 2: Seccomp Kernel Evaluation Core -->
+    <g id="col-kernel" transform="translate(280, 20)">
+      <rect class="svg-box" width="300" height="340"/>
+      <text class="svg-text-title" x="20" y="32">Kernel Seccomp Engine</text>
+      <text id="svg-mode-text" class="svg-text-desc" x="20" y="52" fill="var(--accent-blue)">
+        SECCOMP_MODE_FILTER (seccomp.mode = 2)
+      </text>
+
+      <!-- BPF Filter Engine -->
+      <g transform="translate(15, 70)">
+        <rect width="270" height="110" fill="var(--bg-card)" stroke="var(--border-color)" rx="6"/>
+        <text class="svg-text-title" x="15" y="28">__secure_computing()</text>
+        <text class="svg-text-desc" x="15" y="50">Traps CPU syscall instruction</text>
+        <text class="svg-text-desc" x="15" y="70">struct seccomp_data { nr, arch, args }</text>
+        <text class="svg-text-desc" x="15" y="90" fill="var(--accent-purple)">Executes attached cBPF filter</text>
+      </g>
+
+      <!-- Filter Decision Rules -->
+      <g transform="translate(15, 200)">
+        <rect width="270" height="120" fill="var(--bg-card)" stroke="var(--border-color)" rx="6"/>
+        <text class="svg-text-title" x="15" y="26">BPF Filter Policy Matrix</text>
+        <text class="svg-text-desc" x="15" y="48">Rule 1: read/write/exit -> ALLOW</text>
+        <text class="svg-text-desc" x="15" y="70">Rule 2: ptrace/reboot -> ERRNO(EPERM)</text>
+        <text class="svg-text-desc" x="15" y="92">Rule 3: unshare/bpf -> KILL_PROCESS</text>
+        <text id="decision-text" class="svg-text-desc" x="15" y="112" fill="var(--accent-green)">Status: Sandbox filter active</text>
+      </g>
+    </g>
+
+    <!-- Column 3: Outcome -->
+    <g id="col-outcome" transform="translate(620, 20)">
+      <rect x="0" y="0" width="220" height="340" fill="none" stroke="var(--border-color)" stroke-dasharray="4" rx="8"/>
+      <text class="svg-text-title" x="20" y="32">Execution Outcome</text>
+
+      <!-- Allowed Box -->
+      <g id="box-outcome-allow" transform="translate(10, 60)">
+        <rect class="svg-box" width="200" height="110"/>
+        <text class="svg-text-title" x="15" y="28" fill="var(--accent-green)">SECCOMP_RET_ALLOW</text>
+        <text class="svg-text-desc" x="15" y="50">sys_call_table[nr]() executed</text>
+        <text class="svg-text-desc" x="15" y="72">Normal syscall path</text>
+        <text class="svg-text-desc" x="15" y="94" fill="var(--accent-green)">Returns syscall result</text>
+      </g>
+
+      <!-- Blocked Box -->
+      <g id="box-outcome-deny" transform="translate(10, 190)">
+        <rect class="svg-box" width="200" height="130"/>
+        <text id="deny-title" class="svg-text-title" x="15" y="28" fill="var(--accent-red)">SECCOMP_RET_ERRNO</text>
+        <text id="deny-desc1" class="svg-text-desc" x="15" y="50">Syscall handler bypassed</text>
+        <text id="deny-desc2" class="svg-text-desc" x="15" y="72">Return: -1 (errno: EPERM)</text>
+        <text id="deny-desc3" class="svg-text-desc" x="15" y="92" fill="var(--accent-red)">Attack surface neutralized</text>
+        <text class="svg-text-desc" x="15" y="112" fill="var(--text-secondary)">Process safely contained</text>
+      </g>
+    </g>
+
+    <!-- Connecting Pathways -->
+    <path d="M 230 100 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 230 200 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 230 300 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <path d="M 580 120 L 630 115" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 580 150 L 630 255" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- Animated Token -->
+    <circle id="token" cx="130" cy="100" r="10"/>
+  </svg>
+
+  <div class="status-bar">
+    <div id="status-text">Ready. Choose a scenario: Safe Syscall, Restricted Syscall, or Hostile Syscall.</div>
+    <div id="step-badge" style="font-weight:700; color:var(--accent-blue);">Step: 0/4</div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 'safe'; // 'safe', 'restricted', 'lethal'
+  let currentMode = 2;          // 0: Disabled, 1: Strict, 2: BPF Filter
+  let currentStep = 0;
+  let isPlaying = false;
+  let playInterval = null;
+
+  const positions = {
+    safe: [
+      { cx: 130, cy: 100, text: "Step 1: Application triggers safe syscall (write) via CPU instruction (syscall/svc)." },
+      { cx: 430, cy: 125, text: "Step 2: __secure_computing() intercepts call; populates struct seccomp_data." },
+      { cx: 430, cy: 260, text: "Step 3: BPF filter evaluates syscall nr: whitelisted across Strict & Filter modes." },
+      { cx: 730, cy: 115, text: "Step 4: Result: SECCOMP_RET_ALLOW (0x7fff0000). System call executes normally." }
+    ],
+    restricted: [
+      { cx: 130, cy: 200, text: "Step 1: Application invokes dangerous introspection call: ptrace(PTRACE_ATTACH)." },
+      { cx: 430, cy: 125, text: "Step 2: __secure_computing() inspects syscall nr against active policy." },
+      { cx: 430, cy: 260, text: "Step 3: Filter decision: Disallowed if Seccomp Mode >= 1." },
+      { cx: 730, cy: 255, text: "" } // Handled dynamically
+    ],
+    lethal: [
+      { cx: 130, cy: 300, text: "Step 1: Attacker attempts host evasion syscall: reboot() or unshare()." },
+      { cx: 430, cy: 125, text: "Step 2: __secure_computing() inspects syscall nr; matches forbidden rule." },
+      { cx: 430, cy: 260, text: "Step 3: Filter decision: Triggers critical termination action (SECCOMP_RET_KILL_PROCESS)." },
+      { cx: 730, cy: 255, text: "" } // Handled dynamically
+    ]
+  };
+
+  function selectScenario(scenario) {
+    currentScenario = scenario;
+    document.getElementById('btn-call-safe').classList.toggle('active', scenario === 'safe');
+    document.getElementById('btn-call-restricted').classList.toggle('active', scenario === 'restricted');
+    document.getElementById('btn-call-lethal').classList.toggle('active', scenario === 'lethal');
+    resetSimulation();
+  }
+
+  function cycleMode() {
+    currentMode = (currentMode + 1) % 3;
+    const btn = document.getElementById('btn-mode');
+    const svgText = document.getElementById('svg-mode-text');
+    const decText = document.getElementById('decision-text');
+
+    if (currentMode === 0) {
+      btn.innerText = "Mode: Disabled (0)";
+      svgText.textContent = "SECCOMP_MODE_DISABLED (seccomp.mode = 0)";
+      decText.textContent = "Status: No filtering (All calls allowed)";
+    } else if (currentMode === 1) {
+      btn.innerText = "Mode: Strict (1)";
+      svgText.textContent = "SECCOMP_MODE_STRICT (read/write/exit only)";
+      decText.textContent = "Status: Strict Mode (Kills non-whitelisted)";
+    } else {
+      btn.innerText = "Mode: BPF Filter (2)";
+      svgText.textContent = "SECCOMP_MODE_FILTER (seccomp.mode = 2)";
+      decText.textContent = "Status: Custom BPF filter rules active";
+    }
+    updateDisplay();
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  function updateDisplay() {
+    const token = document.getElementById('token');
+    const statusText = document.getElementById('status-text');
+    const stepBadge = document.getElementById('step-badge');
+    const led = document.getElementById('led');
+    const denyTitle = document.getElementById('deny-title');
+    const denyDesc1 = document.getElementById('deny-desc1');
+    const denyDesc2 = document.getElementById('deny-desc2');
+
+    const posList = positions[currentScenario];
+    const pos = posList[currentStep];
+
+    token.setAttribute('cx', pos.cx);
+    token.setAttribute('cy', pos.cy);
+    stepBadge.innerText = `Step: ${currentStep + 1}/4`;
+
+    const willBlock = (currentScenario !== 'safe' && currentMode >= 1);
+
+    if (currentStep === 3) {
+      if (willBlock) {
+        token.setAttribute('cx', 730);
+        token.setAttribute('cy', 255);
+        token.style.fill = "var(--accent-red)";
+        led.className = "led-indicator violation";
+
+        if (currentScenario === 'restricted') {
+          denyTitle.textContent = "SECCOMP_RET_ERRNO";
+          denyDesc1.textContent = "Handler intercepted by filter";
+          denyDesc2.textContent = "Return: -1 (errno: EPERM)";
+          statusText.innerText = "Step 4: [ERRNO] Syscall intercepted! Returns -1 with errno=EPERM.";
+        } else {
+          denyTitle.textContent = "SECCOMP_RET_KILL";
+          denyDesc1.textContent = "SIGSYS delivered to thread";
+          denyDesc2.textContent = "Process terminated immediately";
+          statusText.innerText = "Step 4: [KILL] Hostile syscall aborted! Kernel kills process via SIGSYS.";
+        }
+      } else {
+        token.setAttribute('cx', 730);
+        token.setAttribute('cy', 115);
+        token.style.fill = (currentScenario === 'safe') ? "var(--accent-green)" : "var(--accent-amber)";
+        led.className = (currentMode === 0) ? "led-indicator permissive" : "led-indicator";
+        statusText.innerText = "Step 4: [ALLOWED] Syscall proceeds to kernel handler (ret = 0).";
+      }
+    } else {
+      if (currentScenario === 'safe') {
+        token.style.fill = "var(--accent-green)";
+        led.className = "led-indicator";
+      } else if (currentScenario === 'restricted') {
+        token.style.fill = (currentMode >= 1) ? "var(--accent-red)" : "var(--accent-amber)";
+        led.className = (currentMode >= 1) ? "led-indicator violation" : "led-indicator permissive";
+      } else {
+        token.style.fill = (currentMode >= 1) ? "var(--accent-red)" : "var(--accent-amber)";
+        led.className = (currentMode >= 1) ? "led-indicator violation" : "led-indicator permissive";
+      }
+      statusText.innerText = pos.text;
+    }
+  }
+
+  function stepSimulation() {
+    currentStep = (currentStep + 1) % 4;
+    updateDisplay();
+  }
+
+  function togglePlay() {
+    const btn = document.getElementById('btn-play');
+    if (isPlaying) {
+      clearInterval(playInterval);
+      isPlaying = false;
+      btn.innerText = "Auto Play ▶";
+    } else {
+      isPlaying = true;
+      btn.innerText = "Pause ⏸";
+      playInterval = setInterval(() => {
+        stepSimulation();
+      }, 1400);
+    }
+  }
+
+  function resetSimulation() {
+    if (isPlaying) togglePlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>

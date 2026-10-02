@@ -146,6 +146,8 @@ nav:
           - IPE Policy Enforcement: features/32-ipe.md
           - Kernel Lockdown LSM: features/33-lockdown.md
           - Module Signature Verification: features/34-module-sig.md
+      - 10. Attack Surface Reduction & System Hardening:
+          - Seccomp-BPF Syscall Filtering: features/35-seccomp.md
 
 
 
