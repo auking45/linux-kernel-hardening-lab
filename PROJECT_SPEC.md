@@ -36,6 +36,9 @@
 6. **Roadmap Checklist Synchronization:**
    - Task가 완료되고 사용자의 승인을 받으면, 본 문서(`PROJECT_SPEC.md`)의 해당 Task 체크박스를 `[x]`로 업데이트함.
 
+7. **Resource-Aware Concurrency & Throttling (WSL2/호스트 자원 보호):**
+   - 커널 빌드 및 병렬 작업 시 `nproc`을 무제한(`-j$(nproc)`)으로 사용하지 않고, 호스트 시스템 및 WSL 서브프로세스의 안정성을 위해 스마트 병렬 스레드 제한(최소 2~4 코어 여유 확보 또는 가용 코어 75% 수준)을 적용함.
+
 ---
 
 ## 3. Kernel Hardening Feature Taxonomy & Master Roadmap
@@ -118,7 +121,7 @@
 ### [Phase 11] Category 9: System & Binary Integrity Verification
 
 - [x] **Task 11-1:** IMA (Integrity Measurement Architecture - 실행 파일 해시 측정 및 무결성 검증 실습).
-- [ ] **Task 11-2:** EVM (Extended Verification Module - 파일 xattr 전자서명 및 무결성 보호).
+- [x] **Task 11-2:** EVM (Extended Verification Module - 파일 xattr 전자서명 및 무결성 보호).
 - [ ] **Task 11-3:** IPE (Integrity Policy Enforcement - dm-verity/fs-verity 기반 신규 정책 강제 LSM).
 - [ ] **Task 11-4:** Kernel Lockdown LSM (`integrity` vs `confidentiality` 모드 비교 및 실습).
 - [ ] **Task 11-5:** Module Signature Verification (`CONFIG_MODULE_SIG_FORCE` 및 신뢰 키링 실습).

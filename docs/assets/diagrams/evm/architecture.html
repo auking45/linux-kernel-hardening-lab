@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EVM (Extended Verification Module) Architecture Simulator</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 100vh;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    /* Header & Toolbar */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 12px 18px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+    }
+
+    .header-titles h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .header-titles p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .badge-pill {
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .sim-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--card-border);
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      transition: all 0.2s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    .btn-primary:hover {
+      background: #7dd3fc;
+    }
+
+    .btn-mode-toggle {
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+    }
+
+    .status-led {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--glow-green);
+      transition: all 0.3s;
+    }
+
+    .status-led.blocked {
+      background: var(--accent-red);
+      box-shadow: 0 0 8px var(--glow-red);
+    }
+
+    .status-led.warn {
+      background: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--glow-yellow);
+    }
+
+    /* Main Container Grid */
+    .grid-container {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 16px;
+      flex: 1;
+    }
+
+    @media (max-width: 1024px) {
+      .grid-container {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Stage Canvas Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .svg-canvas-wrapper {
+      position: relative;
+      width: 100%;
+      height: 480px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px dashed var(--card-border);
+      overflow: hidden;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Side Panel */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.8rem;
+    }
+
+    .info-card h3 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .info-label {
+      color: var(--text-muted);
+    }
+
+    .info-val {
+      font-weight: 600;
+      font-family: monospace;
+    }
+
+    .log-terminal {
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.74rem;
+      height: 200px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      color: #94a3b8;
+    }
+
+    .log-entry {
+      line-height: 1.35;
+      word-break: break-all;
+    }
+
+    .log-success { color: var(--accent-green); }
+    .log-denied { color: var(--accent-red); font-weight: 600; }
+    .log-info { color: var(--accent-blue); }
+    .log-warn { color: var(--accent-yellow); }
+
+    /* SVG elements styling */
+    .node-box {
+      rx: 8;
+      stroke-width: 2;
+      transition: all 0.3s;
+    }
+
+    .token-particle {
+      r: 7;
+      fill: var(--accent-blue);
+      filter: drop-shadow(0 0 6px var(--accent-blue));
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header & Interactive Toolbar -->
+  <div class="header">
+    <div class="header-titles">
+      <h1>
+        <span>🛡️ EVM (Extended Verification Module) Simulator</span>
+        <span class="badge-pill">Metadata HMAC Protection</span>
+      </h1>
+      <p>확장 속성(xattr) 및 inode 메타데이터 위변조 방지, HMAC-SHA256 검증 및 권한 상승 차단</p>
+    </div>
+    <div class="sim-toolbar">
+      <span class="status-led" id="led-indicator"></span>
+      <span id="mode-text" style="font-size: 0.82rem; font-weight: 600;">Enforce (Hardened)</span>
+      <button class="btn btn-mode-toggle" id="btn-toggle-mode" onclick="toggleMode()">🔄 모드 전환 (Permissive / Enforce)</button>
+      <button class="btn btn-primary" onclick="triggerTest('valid')">✅ 정상 파일 검증 (Valid security.evm)</button>
+      <button class="btn" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="triggerTest('tampered_cap')">🚨 Capability 변조 (CAP_SETUID 주입)</button>
+      <button class="btn" style="border-color: var(--accent-yellow); color: var(--accent-yellow);" onclick="triggerTest('tampered_uid')">⚠️ Inode UID 변조 (UID 0 설정)</button>
+      <button class="btn" onclick="resetSim()">↺ 초기화</button>
+    </div>
+  </div>
+
+  <!-- Main View Grid -->
+  <div class="grid-container">
+
+    <!-- Interactive Canvas Card -->
+    <div class="card">
+      <div class="card-title">
+        <span>⚡ EVM 복합 메타데이터 해시 검증 파이프라인</span>
+        <span style="font-size: 0.75rem; color: var(--text-muted);">실시간 HMAC-SHA256 계산 및 거부 판정 추적</span>
+      </div>
+
+      <div class="svg-canvas-wrapper">
+        <svg id="evm-svg" viewBox="0 0 820 460">
+          <defs>
+            <linearGradient id="metaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="hmacGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#a855f7" stop-opacity="0.3"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="grantGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22c55e" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <linearGradient id="denyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#ef4444" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="#1c2541" stop-opacity="0.8"/>
+            </linearGradient>
+            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 1 L 8 5 L 0 9 z" fill="var(--card-border)"/>
+            </marker>
+          </defs>
+
+          <!-- Inode & XATTR Input Sources -->
+          <g id="node-inputs" transform="translate(40, 50)">
+            <rect class="node-box" width="220" height="96" fill="url(#metaGrad)" stroke="var(--accent-blue)"/>
+            <text x="110" y="24" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">File Inode & XATTRs</text>
+            <text id="xattr-cap" x="110" y="44" text-anchor="middle" fill="var(--accent-blue)" font-size="10" font-family="monospace">xattrs: security.ima, selinux</text>
+            <text id="meta-uid" x="110" y="62" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="monospace">inode: uid=1000 gid=1000</text>
+            <text x="110" y="80" text-anchor="middle" fill="var(--text-muted)" font-size="10">mode=0755 ino=2048</text>
+          </g>
+
+          <!-- EVM HMAC Calculator Node -->
+          <g id="node-hmac" transform="translate(310, 50)">
+            <rect class="node-box" width="220" height="96" fill="url(#hmacGrad)" stroke="var(--accent-purple)"/>
+            <text x="110" y="24" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">EVM Engine</text>
+            <text x="110" y="44" text-anchor="middle" fill="var(--accent-purple)" font-size="11" font-family="monospace">HMAC-SHA256(Key, Meta)</text>
+            <text id="computed-hmac" x="110" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="monospace">hmac: a1b2c3d4...</text>
+            <text x="110" y="82" text-anchor="middle" fill="var(--accent-yellow)" font-size="10">Key: Encrypted Keyring</text>
+          </g>
+
+          <!-- Stored security.evm Capsule -->
+          <g id="node-stored" transform="translate(570, 50)">
+            <rect class="node-box" width="210" height="96" fill="url(#metaGrad)" stroke="var(--accent-yellow)"/>
+            <text x="105" y="24" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">'security.evm' Signature</text>
+            <text x="105" y="44" text-anchor="middle" fill="var(--accent-yellow)" font-size="11" font-family="monospace">Stored Golden HMAC</text>
+            <text x="105" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="monospace">ref: a1b2c3d4...</text>
+            <text x="105" y="82" text-anchor="middle" fill="var(--text-muted)" font-size="10">Filesystem XATTR Record</text>
+          </g>
+
+          <!-- Flow arrows top row -->
+          <path d="M 260 98 L 310 98" stroke="var(--card-border)" stroke-width="2" marker-end="url(#arrow)"/>
+          <path d="M 530 98 L 570 98" stroke="var(--card-border)" stroke-width="2" marker-end="url(#arrow)"/>
+
+          <!-- EVM Integrity Verification Node (Bottom Half) -->
+          <g id="node-verify" transform="translate(170, 230)">
+            <rect class="node-box" width="260" height="84" fill="url(#hmacGrad)" stroke="var(--accent-blue)"/>
+            <text x="130" y="30" text-anchor="middle" fill="var(--text-main)" font-size="13" font-weight="700">evm_verify_current_integrity()</text>
+            <text x="130" y="52" text-anchor="middle" fill="var(--accent-blue)" font-size="11">Compare computed vs stored HMAC</text>
+            <text x="130" y="70" text-anchor="middle" fill="var(--text-muted)" font-size="10">LSM Hook: inode_permission()</text>
+          </g>
+
+          <!-- Connecting line from HMAC to Verification -->
+          <path d="M 420 146 L 300 230" stroke="var(--accent-purple)" stroke-width="2" stroke-dasharray="4,4" fill="none"/>
+
+          <!-- Decision Branch 1: Match (Integrity Verified) -->
+          <g id="node-granted" transform="translate(530, 205)">
+            <rect class="node-box" width="240" height="74" fill="url(#grantGrad)" stroke="var(--accent-green)"/>
+            <text x="120" y="28" text-anchor="middle" fill="var(--accent-green)" font-size="13" font-weight="700">✅ Metadata VALID</text>
+            <text x="120" y="48" text-anchor="middle" fill="var(--text-main)" font-size="11">HMAC Matches 'security.evm'</text>
+            <text x="120" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="10">Operation permitted (ret = 0)</text>
+          </g>
+
+          <!-- Decision Branch 2: Mismatch (Metadata Tamper Blocked) -->
+          <g id="node-denied" transform="translate(530, 315)">
+            <rect class="node-box" width="240" height="74" fill="url(#denyGrad)" stroke="var(--accent-red)"/>
+            <text id="deny-title" x="120" y="28" text-anchor="middle" fill="var(--accent-red)" font-size="13" font-weight="700">🛑 BLOCKED (-EPERM)</text>
+            <text x="120" y="48" text-anchor="middle" fill="var(--text-main)" font-size="11">Metadata / XATTR Tampered</text>
+            <text x="120" y="64" text-anchor="middle" fill="var(--text-muted)" font-size="10">audit(evm): invalid-HMAC</text>
+          </g>
+
+          <!-- Connecting decision lines -->
+          <path id="path-grant" d="M 430 260 L 530 242" stroke="var(--accent-green)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+          <path id="path-deny" d="M 430 280 L 530 352" stroke="var(--accent-red)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+          <!-- Animated Token Packet -->
+          <circle id="anim-packet" class="token-particle" cx="150" cy="98" opacity="0"/>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Side Information & Log Panel -->
+    <div class="side-panel">
+      <!-- Status Box -->
+      <div class="info-card">
+        <h3>📊 EVM 런타임 지표</h3>
+        <div class="info-row">
+          <span class="info-label">EVM 검증 모드:</span>
+          <span class="info-val" id="disp-mode" style="color: var(--accent-green);">Enforce</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">인증 알고리즘:</span>
+          <span class="info-val" style="color: var(--accent-blue);">HMAC-SHA256</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">보호 대상 XATTR:</span>
+          <span class="info-val" style="color: var(--accent-yellow);">ima, selinux, cap</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">총 검증 횟수:</span>
+          <span class="info-val" id="stat-checks">0 회</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">메타데이터 위반 차단:</span>
+          <span class="info-val" id="stat-denied" style="color: var(--accent-red);">0 건</span>
+        </div>
+      </div>
+
+      <!-- EVM Concept Card -->
+      <div class="info-card">
+        <h3>🔒 왜 IMA와 EVM이 함께 필요한가?</h3>
+        <p style="color: var(--text-muted); font-size: 0.77rem; line-height: 1.45;">
+          IMA는 파일 내용(Content)만 검사하므로, 공격자가 파일 본문을 건드리지 않고 <b>security.capability</b>를 조작(예: 일반 바이너리에 CAP_SETUID 부여)하거나 소유자(UID 0)를 바꾸면 루트 권한을 탈취당할 수 있음. EVM은 메타데이터 전체를 HMAC/전자서명으로 묶어 오프라인 변조를 원천 차단함.
+        </p>
+      </div>
+
+      <!-- Real-time Event Terminal -->
+      <div class="card" style="padding: 12px; flex: 1;">
+        <div class="card-title" style="margin-bottom: 6px;">
+          <span>📋 EVM 감사 및 무결성 이벤트</span>
+          <button class="btn" style="padding: 2px 8px; font-size: 0.7rem;" onclick="clearLogs()">비우기</button>
+        </div>
+        <div class="log-terminal" id="terminal-log">
+          <div class="log-entry log-info">[init] EVM subsystem active. Key: encrypted master keyring</div>
+          <div class="log-entry log-info">[policy] Protected xattrs: security.ima, security.selinux, security.capability</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentMode = 'enforce'; // 'permissive' or 'enforce'
+    let totalChecks = 0;
+    let deniedCount = 0;
+    let isAnimating = false;
+
+    function toggleMode() {
+      if (currentMode === 'enforce') {
+        currentMode = 'permissive';
+        document.getElementById('disp-mode').textContent = 'Permissive';
+        document.getElementById('disp-mode').style.color = 'var(--accent-yellow)';
+        document.getElementById('mode-text').textContent = 'Permissive (evm=permissive)';
+        document.getElementById('deny-title').textContent = '⚠️ LOGGED (Execution allowed)';
+        document.getElementById('deny-title').style.fill = 'var(--accent-yellow)';
+        document.getElementById('led-indicator').className = 'status-led warn';
+        logMessage('[mode] Switched to Permissive mode: Metadata tampering will be audited but allowed', 'log-warn');
+      } else {
+        currentMode = 'enforce';
+        document.getElementById('disp-mode').textContent = 'Enforce';
+        document.getElementById('disp-mode').style.color = 'var(--accent-green)';
+        document.getElementById('mode-text').textContent = 'Enforce (Hardened)';
+        document.getElementById('deny-title').textContent = '🛑 BLOCKED (-EPERM)';
+        document.getElementById('deny-title').style.fill = 'var(--accent-red)';
+        document.getElementById('led-indicator').className = 'status-led';
+        logMessage('[mode] Switched to Enforce mode: Metadata tampering strictly blocked with -EPERM', 'log-info');
+      }
+    }
+
+    function triggerTest(type) {
+      if (isAnimating) return;
+      isAnimating = true;
+
+      const packet = document.getElementById('anim-packet');
+      const capLabel = document.getElementById('xattr-cap');
+      const uidLabel = document.getElementById('meta-uid');
+      const hmacLabel = document.getElementById('computed-hmac');
+      const led = document.getElementById('led-indicator');
+
+      totalChecks++;
+      document.getElementById('stat-checks').textContent = `${totalChecks} 회`;
+
+      if (type === 'valid') {
+        capLabel.textContent = 'xattrs: security.ima, selinux';
+        capLabel.style.fill = 'var(--accent-blue)';
+        uidLabel.textContent = 'inode: uid=1000 gid=1000';
+        uidLabel.style.fill = 'var(--text-muted)';
+        hmacLabel.textContent = 'hmac: a1b2c3d4... (MATCH)';
+        hmacLabel.style.fill = 'var(--accent-green)';
+
+        logMessage('[evm] Verifying /bin/lab_tool metadata integrity...', 'log-info');
+
+        animatePath([
+          {x: 150, y: 98},
+          {x: 420, y: 98},
+          {x: 675, y: 98},
+          {x: 300, y: 270},
+          {x: 650, y: 242}
+        ], () => {
+          logMessage('[evm] Calculated HMAC-SHA256 matches security.evm -> VALID (ret = 0)', 'log-success');
+          isAnimating = false;
+        });
+      } else if (type === 'tampered_cap') {
+        capLabel.textContent = 'xattrs: security.capability [INJECTED]';
+        capLabel.style.fill = 'var(--accent-red)';
+        uidLabel.textContent = 'inode: uid=1000 gid=1000';
+        uidLabel.style.fill = 'var(--text-muted)';
+        hmacLabel.textContent = 'hmac: ffffffff... (MISMATCH)';
+        hmacLabel.style.fill = 'var(--accent-red)';
+
+        deniedCount++;
+        document.getElementById('stat-denied').textContent = `${deniedCount} 건`;
+
+        logMessage('[attack] Malicious injection of security.capability (CAP_SETUID) detected!', 'log-warn');
+
+        animatePath([
+          {x: 150, y: 98},
+          {x: 420, y: 98},
+          {x: 675, y: 98},
+          {x: 300, y: 270},
+          {x: 650, y: 352}
+        ], () => {
+          logMessage('type=1800 audit(evm): action=appraise_metadata cause=invalid-HMAC xattr=security.capability', 'log-denied');
+          if (currentMode === 'enforce') {
+            led.className = 'status-led blocked';
+            setTimeout(() => { led.className = 'status-led'; }, 1200);
+            logMessage('[evm] [ENFORCE] SECURITY VIOLATION: Unauthorized capability tampering BLOCKED (-EPERM)!', 'log-denied');
+          } else {
+            logMessage('[evm] [PERMISSIVE] Capability tamper logged, but execution permitted by policy', 'log-warn');
+          }
+          isAnimating = false;
+        });
+      } else if (type === 'tampered_uid') {
+        capLabel.textContent = 'xattrs: security.ima, selinux';
+        capLabel.style.fill = 'var(--accent-blue)';
+        uidLabel.textContent = 'inode: uid=0 (ROOT) [ALTERED]';
+        uidLabel.style.fill = 'var(--accent-red)';
+        hmacLabel.textContent = 'hmac: eeee0000... (MISMATCH)';
+        hmacLabel.style.fill = 'var(--accent-red)';
+
+        deniedCount++;
+        document.getElementById('stat-denied').textContent = `${deniedCount} 건`;
+
+        logMessage('[attack] Unauthorized inode UID alteration (uid=1000 -> uid=0) detected!', 'log-warn');
+
+        animatePath([
+          {x: 150, y: 98},
+          {x: 420, y: 98},
+          {x: 675, y: 98},
+          {x: 300, y: 270},
+          {x: 650, y: 352}
+        ], () => {
+          logMessage('type=1800 audit(evm): action=appraise_metadata cause=invalid-HMAC inode_uid_tamper=0', 'log-denied');
+          if (currentMode === 'enforce') {
+            led.className = 'status-led blocked';
+            setTimeout(() => { led.className = 'status-led'; }, 1200);
+            logMessage('[evm] [ENFORCE] SECURITY VIOLATION: Inode ownership tamper BLOCKED (-EPERM)!', 'log-denied');
+          } else {
+            logMessage('[evm] [PERMISSIVE] Inode tamper logged, but execution permitted by policy', 'log-warn');
+          }
+          isAnimating = false;
+        });
+      }
+    }
+
+    function animatePath(points, callback) {
+      const packet = document.getElementById('anim-packet');
+      packet.setAttribute('opacity', '1');
+
+      let currentStep = 0;
+      const totalSteps = points.length - 1;
+      const stepDuration = 240;
+
+      function stepTo(startPt, endPt, onComplete) {
+        const startTime = performance.now();
+        function frame(time) {
+          const elapsed = time - startTime;
+          const progress = Math.min(elapsed / stepDuration, 1);
+          const cx = startPt.x + (endPt.x - startPt.x) * progress;
+          const cy = startPt.y + (endPt.y - startPt.y) * progress;
+          packet.setAttribute('cx', cx);
+          packet.setAttribute('cy', cy);
+
+          if (progress < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            onComplete();
+          }
+        }
+        requestAnimationFrame(frame);
+      }
+
+      function nextSegment() {
+        if (currentStep < totalSteps) {
+          stepTo(points[currentStep], points[currentStep + 1], () => {
+            currentStep++;
+            nextSegment();
+          });
+        } else {
+          setTimeout(() => {
+            packet.setAttribute('opacity', '0');
+            callback();
+          }, 120);
+        }
+      }
+
+      nextSegment();
+    }
+
+    function logMessage(text, className) {
+      const term = document.getElementById('terminal-log');
+      const div = document.createElement('div');
+      div.className = `log-entry ${className || ''}`;
+      div.textContent = text;
+      term.appendChild(div);
+      term.scrollTop = term.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById('terminal-log').innerHTML = '';
+      logMessage('[system] Event log cleared.', 'log-info');
+    }
+
+    function resetSim() {
+      currentMode = 'enforce';
+      totalChecks = 0;
+      deniedCount = 0;
+      document.getElementById('stat-checks').textContent = '0 회';
+      document.getElementById('stat-denied').textContent = '0 건';
+      document.getElementById('disp-mode').textContent = 'Enforce';
+      document.getElementById('disp-mode').style.color = 'var(--accent-green)';
+      document.getElementById('mode-text').textContent = 'Enforce (Hardened)';
+      document.getElementById('deny-title').textContent = '🛑 BLOCKED (-EPERM)';
+      document.getElementById('deny-title').style.fill = 'var(--accent-red)';
+      document.getElementById('led-indicator').className = 'status-led';
+      document.getElementById('xattr-cap').textContent = 'xattrs: security.ima, selinux';
+      document.getElementById('xattr-cap').style.fill = 'var(--accent-blue)';
+      document.getElementById('meta-uid').textContent = 'inode: uid=1000 gid=1000';
+      document.getElementById('meta-uid').style.fill = 'var(--text-muted)';
+      document.getElementById('computed-hmac').textContent = 'hmac: a1b2c3d4...';
+      document.getElementById('computed-hmac').style.fill = 'var(--text-muted)';
+      clearLogs();
+      logMessage('[reset] Simulator reset to initial state.', 'log-info');
+    }
+  </script>
+</body>
+</html>

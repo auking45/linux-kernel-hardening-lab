@@ -142,6 +142,7 @@ nav:
           - Landlock Unprivileged Sandboxing: features/29-landlock.md
       - 09. System & Binary Integrity Verification:
           - IMA Integrity Measurement: features/30-ima.md
+          - EVM Metadata Protection: features/31-evm.md
 
 
 
