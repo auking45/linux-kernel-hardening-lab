@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPE (Integrity Policy Enforcement) Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.permissive {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.violation {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .status-bar {
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .svg-box {
+    fill: var(--bg-primary);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    rx: 8;
+  }
+  .svg-box-active {
+    stroke: var(--accent-blue);
+    stroke-width: 2.5;
+  }
+  .svg-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .svg-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+    font-family: monospace;
+  }
+
+  /* Animated elements */
+  #token {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--accent-blue));
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  #decision-glow {
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div id="led" class="led-indicator"></div>
+      <span>Linux 6.12 IPE (Integrity Policy Enforcement) LSM</span>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn" id="btn-theme" onclick="toggleTheme()">🌓 Theme</button>
+      <button class="btn" id="btn-mode" onclick="toggleMode()">Mode: Enforce (1)</button>
+    </div>
+  </div>
+
+  <div class="sim-toolbar">
+    <button class="btn active" id="btn-payload-boot" onclick="selectScenario('boot')">▶ Boot Verified Binary</button>
+    <button class="btn" id="btn-payload-untrusted" onclick="selectScenario('untrusted')">⚠️ /tmp Untrusted Script</button>
+    <div style="flex-grow:1;"></div>
+    <button class="btn" onclick="stepSimulation()">Step ⏭</button>
+    <button class="btn" id="btn-play" onclick="togglePlay()">Auto Play ▶</button>
+    <button class="btn" onclick="resetSimulation()">↺ Reset</button>
+  </div>
+
+  <!-- SVG Diagram -->
+  <svg viewBox="0 0 860 420" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--border-color)" />
+      </marker>
+      <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--accent-blue)" />
+      </marker>
+      <linearGradient id="grad-allow" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#34d399" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#059669" stop-opacity="0.1"/>
+      </linearGradient>
+      <linearGradient id="grad-deny" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#f87171" stop-opacity="0.3"/>
+        <stop offset="100%" stop-color="#dc2626" stop-opacity="0.1"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Column 1: Execution Request & Storage -->
+    <g transform="translate(20, 20)">
+      <rect class="svg-box" width="220" height="380"/>
+      <text class="svg-text-title" x="20" y="32">1. Origin & Storage Layer</text>
+
+      <!-- Boot Verified (dm-verity / initramfs) -->
+      <g id="box-boot" transform="translate(15, 55)">
+        <rect class="svg-box" width="190" height="135" fill="var(--bg-card)" stroke="var(--accent-green)"/>
+        <text class="svg-text-title" x="12" y="24" fill="var(--accent-green)">Trusted Provenance</text>
+        <text class="svg-text-desc" x="12" y="46">Source: initramfs / dm-verity</text>
+        <text class="svg-text-desc" x="12" y="66">Path: /bin/lab_tool</text>
+        <text class="svg-text-desc" x="12" y="86">Property: boot_verified=TRUE</text>
+        <text class="svg-text-desc" x="12" y="106" fill="var(--accent-green)">Hash: Immutable signed</text>
+      </g>
+
+      <!-- Untrusted Mutable Storage -->
+      <g id="box-untrusted" transform="translate(15, 215)">
+        <rect class="svg-box" width="190" height="135" fill="var(--bg-card)" stroke="var(--accent-red)"/>
+        <text class="svg-text-title" x="12" y="24" fill="var(--accent-red)">Mutable Storage (Untrusted)</text>
+        <text class="svg-text-desc" x="12" y="46">Source: ext4 /tmp /home</text>
+        <text class="svg-text-desc" x="12" y="66">Path: /tmp/untrusted_payload</text>
+        <text class="svg-text-desc" x="12" y="86">Property: boot_verified=FALSE</text>
+        <text class="svg-text-desc" x="12" y="106" fill="var(--accent-red)">Threat: Local Priv-Esc / RCE</text>
+      </g>
+    </g>
+
+    <!-- Column 2: LSM Hook & Policy Evaluator -->
+    <g transform="translate(280, 20)">
+      <rect class="svg-box" width="300" height="380"/>
+      <text class="svg-text-title" x="20" y="32">2. IPE LSM Policy Engine</text>
+
+      <!-- LSM Hook -->
+      <g transform="translate(15, 55)">
+        <rect class="svg-box" width="270" height="60" fill="var(--bg-card)"/>
+        <text class="svg-text-title" x="12" y="24">LSM Hook Interception</text>
+        <text class="svg-text-desc" x="12" y="44">security_bprm_check(bprm, op=EXECUTE)</text>
+      </g>
+
+      <!-- Active Policy Rules -->
+      <g transform="translate(15, 130)">
+        <rect class="svg-box" width="270" height="140" fill="var(--bg-card)"/>
+        <text class="svg-text-title" x="12" y="24">Active Policy (Lab_Hardened)</text>
+        <text class="svg-text-desc" x="12" y="48" fill="var(--accent-amber)">DEFAULT action=DENY</text>
+        <text class="svg-text-desc" x="12" y="70">Rule 1: op=EXEC boot_verified=TRUE</text>
+        <text class="svg-text-desc" x="12" y="90" fill="var(--accent-green)">       -&gt; action=ALLOW</text>
+        <text class="svg-text-desc" x="12" y="112">Fallback: Untrusted -&gt; DEFAULT DENY</text>
+      </g>
+
+      <!-- Enforce Switch -->
+      <g id="box-mode" transform="translate(15, 285)">
+        <rect class="svg-box" width="270" height="75" fill="var(--bg-card)"/>
+        <text class="svg-text-title" x="12" y="24">Kernel Enforcement Switch</text>
+        <text class="svg-text-desc" x="12" y="46" id="svg-mode-text">Mode: /sys/kernel/security/ipe/enforce = 1</text>
+      </g>
+    </g>
+
+    <!-- Column 3: Audit & Decision Output -->
+    <g transform="translate(620, 20)">
+      <rect class="svg-box" width="220" height="380"/>
+      <text class="svg-text-title" x="20" y="32">3. Audit & Outcome</text>
+
+      <!-- Decision Pass Box -->
+      <g id="box-allow" transform="translate(15, 55)">
+        <rect class="svg-box" width="190" height="135" fill="url(#grad-allow)" stroke="var(--accent-green)"/>
+        <text class="svg-text-title" x="12" y="26" fill="var(--accent-green)">✓ EXECUTION GRANTED</text>
+        <text class="svg-text-desc" x="12" y="52">LSM Hook: ret = 0</text>
+        <text class="svg-text-desc" x="12" y="72">Binary executed in userspace</text>
+        <text class="svg-text-desc" x="12" y="92">Integrity: VERIFIED</text>
+        <text class="svg-text-desc" x="12" y="112" fill="var(--accent-green)">Process alive</text>
+      </g>
+
+      <!-- Decision Block Box -->
+      <g id="box-deny" transform="translate(15, 215)">
+        <rect class="svg-box" width="190" height="135" fill="url(#grad-deny)" stroke="var(--accent-red)"/>
+        <text class="svg-text-title" x="12" y="26" fill="var(--accent-red)">✕ BLOCKED (-EACCES)</text>
+        <text class="svg-text-desc" x="12" y="52">LSM Hook: ret = -EACCES</text>
+        <text class="svg-text-desc" x="12" y="72">type=1420 audit(ipe)</text>
+        <text class="svg-text-desc" x="12" y="92">action=DENY res=0</text>
+        <text class="svg-text-desc" x="12" y="112" fill="var(--accent-red)">Unauthorized exec prevented</text>
+      </g>
+    </g>
+
+    <!-- Connecting Pathways -->
+    <path d="M 225 140 L 295 105" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 225 300 L 295 105" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <path d="M 565 200 L 635 140" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 565 200 L 635 300" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- Animated Token -->
+    <circle id="token" cx="130" cy="140" r="10"/>
+  </svg>
+
+  <div class="status-bar">
+    <div id="status-text">Ready. Choose a scenario: Boot Verified Binary or /tmp Untrusted Script.</div>
+    <div id="step-badge" style="font-weight:700; color:var(--accent-blue);">Step: 0/4</div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 'boot'; // 'boot' or 'untrusted'
+  let currentMode = 1;          // 1: Enforce, 0: Permissive
+  let currentStep = 0;
+  let isPlaying = false;
+  let playInterval = null;
+
+  const positions = {
+    boot: [
+      { cx: 130, cy: 140, text: "Step 1: Process calls execve('/bin/lab_tool') residing on boot-verified storage." },
+      { cx: 430, cy: 105, text: "Step 2: LSM security_bprm_check() traps execution request into IPE engine." },
+      { cx: 430, cy: 220, text: "Step 3: IPE evaluates properties: 'boot_verified=TRUE' matches 'action=ALLOW' rule!" },
+      { cx: 730, cy: 140, text: "Step 4: Result: EXECUTION GRANTED (ret = 0). Process safely starts." }
+    ],
+    untrusted: [
+      { cx: 130, cy: 300, text: "Step 1: Attacker drops script into /tmp/untrusted_payload and attempts execution." },
+      { cx: 430, cy: 105, text: "Step 2: LSM security_bprm_check() traps execution request into IPE engine." },
+      { cx: 430, cy: 220, text: "Step 3: IPE evaluation: 'boot_verified=FALSE'. No rule matched -> Falls back to DEFAULT DENY!" },
+      { cx: 730, cy: 300, text: "" } // Text set dynamically depending on mode
+    ]
+  };
+
+  function selectScenario(scenario) {
+    currentScenario = scenario;
+    document.getElementById('btn-payload-boot').classList.toggle('active', scenario === 'boot');
+    document.getElementById('btn-payload-untrusted').classList.toggle('active', scenario === 'untrusted');
+    resetSimulation();
+  }
+
+  function toggleMode() {
+    currentMode = currentMode === 1 ? 0 : 1;
+    const btn = document.getElementById('btn-mode');
+    const led = document.getElementById('led');
+    const svgText = document.getElementById('svg-mode-text');
+
+    if (currentMode === 1) {
+      btn.innerText = "Mode: Enforce (1)";
+      btn.classList.remove('permissive');
+      led.className = "led-indicator";
+      svgText.textContent = "Mode: /sys/kernel/security/ipe/enforce = 1";
+    } else {
+      btn.innerText = "Mode: Permissive (0)";
+      btn.classList.add('permissive');
+      led.className = "led-indicator permissive";
+      svgText.textContent = "Mode: /sys/kernel/security/ipe/enforce = 0";
+    }
+    updateDisplay();
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  function updateDisplay() {
+    const token = document.getElementById('token');
+    const statusText = document.getElementById('status-text');
+    const stepBadge = document.getElementById('step-badge');
+    const led = document.getElementById('led');
+
+    const posList = positions[currentScenario];
+    const pos = posList[currentStep];
+
+    token.setAttribute('cx', pos.cx);
+    token.setAttribute('cy', pos.cy);
+    stepBadge.innerText = `Step: ${currentStep + 1}/4`;
+
+    if (currentScenario === 'boot') {
+      token.style.fill = "var(--accent-green)";
+      statusText.innerText = pos.text;
+      led.className = currentMode === 1 ? "led-indicator" : "led-indicator permissive";
+    } else {
+      if (currentStep === 3) {
+        if (currentMode === 1) {
+          statusText.innerText = "Step 4: [ENFORCE] IPE blocks execution with -EACCES! type=1420 audit(ipe) logged.";
+          token.style.fill = "var(--accent-red)";
+          led.className = "led-indicator violation";
+        } else {
+          statusText.innerText = "Step 4: [PERMISSIVE] type=1420 audit(ipe) logged, but execution permitted (enforce=0).";
+          token.style.fill = "var(--accent-amber)";
+          led.className = "led-indicator permissive";
+        }
+      } else {
+        token.style.fill = "var(--accent-red)";
+        statusText.innerText = pos.text;
+        led.className = currentMode === 1 ? "led-indicator" : "led-indicator permissive";
+      }
+    }
+  }
+
+  function stepSimulation() {
+    currentStep = (currentStep + 1) % 4;
+    updateDisplay();
+  }
+
+  function togglePlay() {
+    const btn = document.getElementById('btn-play');
+    if (isPlaying) {
+      clearInterval(playInterval);
+      isPlaying = false;
+      btn.innerText = "Auto Play ▶";
+    } else {
+      isPlaying = true;
+      btn.innerText = "Pause ⏸";
+      playInterval = setInterval(() => {
+        stepSimulation();
+      }, 1400);
+    }
+  }
+
+  function resetSimulation() {
+    if (isPlaying) togglePlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>
