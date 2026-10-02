@@ -124,7 +124,7 @@
 - [x] **Task 11-2:** EVM (Extended Verification Module - 파일 xattr 전자서명 및 무결성 보호).
 - [x] **Task 11-3:** IPE (Integrity Policy Enforcement - dm-verity/fs-verity 기반 신규 정책 강제 LSM).
 - [x] **Task 11-4:** Kernel Lockdown LSM (`integrity` vs `confidentiality` 모드 비교 및 실습).
-- [ ] **Task 11-5:** Module Signature Verification (`CONFIG_MODULE_SIG_FORCE` 및 신뢰 키링 실습).
+- [x] **Task 11-5:** Module Signature Verification (`CONFIG_MODULE_SIG_FORCE` 및 신뢰 키링 실습).
 
 ### [Phase 12] Category 10: Attack Surface Reduction & System Hardening
 
