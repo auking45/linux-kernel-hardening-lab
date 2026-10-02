@@ -144,6 +144,7 @@ nav:
           - IMA Integrity Measurement: features/30-ima.md
           - EVM Metadata Protection: features/31-evm.md
           - IPE Policy Enforcement: features/32-ipe.md
+          - Kernel Lockdown LSM: features/33-lockdown.md
 
 
 

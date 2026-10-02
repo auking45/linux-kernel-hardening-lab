@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kernel Lockdown LSM Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.integrity {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.violation {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .status-bar {
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .svg-box {
+    fill: var(--bg-primary);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    rx: 8;
+  }
+  .svg-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .svg-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+    font-family: monospace;
+  }
+
+  #token {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--accent-blue));
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div id="led" class="led-indicator"></div>
+      Linux Kernel Lockdown LSM Interactive Simulator
+    </div>
+    <div style="font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">
+      CONFIG_SECURITY_LOCKDOWN_LSM=y
+    </div>
+  </div>
+
+  <div class="sim-toolbar">
+    <button id="btn-op-safe" class="btn active" onclick="selectScenario('safe')">Safe Process</button>
+    <button id="btn-op-tamper" class="btn" onclick="selectScenario('tamper')">Integrity Tamper (/dev/mem)</button>
+    <button id="btn-op-leak" class="btn" onclick="selectScenario('leak')">Confidentiality Leak (/proc/kcore)</button>
+    <div style="flex-grow:1;"></div>
+    <button id="btn-mode" class="btn" onclick="cycleMode()">Mode: Confidentiality (2)</button>
+    <button id="btn-step" class="btn" onclick="stepSimulation()">Next Step ⏭</button>
+    <button id="btn-play" class="btn" onclick="togglePlay()">Auto Play ▶</button>
+    <button id="btn-reset" class="btn" onclick="resetSimulation()">Reset ↺</button>
+    <button class="btn" onclick="toggleTheme()">Theme 🌓</button>
+  </div>
+
+  <svg viewBox="0 0 860 380" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--text-secondary)"/>
+      </marker>
+    </defs>
+
+    <!-- Column 1: Userspace Request / Attack Space -->
+    <g id="col-user">
+      <rect x="20" y="20" width="220" height="340" fill="none" stroke="var(--border-color)" stroke-dasharray="4" rx="8"/>
+      <text class="svg-text-title" x="35" y="45">Userspace / EUID=0</text>
+      
+      <!-- Safe App -->
+      <g id="box-user-safe" transform="translate(30, 60)">
+        <rect class="svg-box" width="200" height="75"/>
+        <text class="svg-text-title" x="12" y="24">Standard User App</text>
+        <text class="svg-text-desc" x="12" y="44">read() / write() / mmap()</text>
+        <text class="svg-text-desc" x="12" y="62" fill="var(--accent-green)">Normal unprivileged task</text>
+      </g>
+
+      <!-- Tamper App -->
+      <g id="box-user-tamper" transform="translate(30, 155)">
+        <rect class="svg-box" width="200" height="85"/>
+        <text class="svg-text-title" x="12" y="24">Integrity Attack (Root)</text>
+        <text class="svg-text-desc" x="12" y="44">open("/dev/mem", O_RDWR)</text>
+        <text class="svg-text-desc" x="12" y="60">init_module(unsigned_ko)</text>
+        <text class="svg-text-desc" x="12" y="76" fill="var(--accent-amber)">Kernel text modification</text>
+      </g>
+
+      <!-- Leak App -->
+      <g id="box-user-leak" transform="translate(30, 260)">
+        <rect class="svg-box" width="200" height="85"/>
+        <text class="svg-text-title" x="12" y="24">Confidentiality Leak (Root)</text>
+        <text class="svg-text-desc" x="12" y="44">open("/proc/kcore", O_RDONLY)</text>
+        <text class="svg-text-desc" x="12" y="60">bpf(BPF_PROG_LOAD, kprobe)</text>
+        <text class="svg-text-desc" x="12" y="76" fill="var(--accent-purple)">Secret data extraction</text>
+      </g>
+    </g>
+
+    <!-- Column 2: Kernel Boundary & Lockdown LSM Hook -->
+    <g id="col-kernel" transform="translate(280, 20)">
+      <rect class="svg-box" width="300" height="340"/>
+      <text class="svg-text-title" x="20" y="32">Kernel Lockdown LSM</text>
+      <text id="svg-mode-text" class="svg-text-desc" x="20" y="52" fill="var(--accent-blue)">
+        /sys/kernel/security/lockdown = [none] integrity [confidentiality]
+      </text>
+
+      <!-- LSM Hook Engine -->
+      <g transform="translate(15, 70)">
+        <rect width="270" height="110" fill="var(--bg-card)" stroke="var(--border-color)" rx="6"/>
+        <text class="svg-text-title" x="15" y="28">security_locked_down()</text>
+        <text class="svg-text-desc" x="15" y="50">Hook intercepts raw I/O & BPF</text>
+        <text class="svg-text-desc" x="15" y="70">Checks reason & severity level:</text>
+        <text class="svg-text-desc" x="15" y="90" fill="var(--accent-amber)">LOCKDOWN_INTEGRITY_MAX</text>
+        <text class="svg-text-desc" x="15" y="105" fill="var(--accent-purple)">LOCKDOWN_CONFIDENTIALITY_MAX</text>
+      </g>
+
+      <!-- Lockdown Level Table -->
+      <g transform="translate(15, 200)">
+        <rect width="270" height="120" fill="var(--bg-card)" stroke="var(--border-color)" rx="6"/>
+        <text class="svg-text-title" x="15" y="26">Policy Decision Matrix</text>
+        <text class="svg-text-desc" x="15" y="48">Level 0: None -> All permitted</text>
+        <text class="svg-text-desc" x="15" y="70">Level 1: Integrity -> Block tampered writes</text>
+        <text class="svg-text-desc" x="15" y="92">Level 2: Confidentiality -> Block reads & writes</text>
+        <text id="matrix-active" class="svg-text-desc" x="15" y="112" fill="var(--accent-green)">Active Level: 2 (Confidentiality)</text>
+      </g>
+    </g>
+
+    <!-- Column 3: Outcome & Enforcement -->
+    <g id="col-outcome" transform="translate(620, 20)">
+      <rect x="0" y="0" width="220" height="340" fill="none" stroke="var(--border-color)" stroke-dasharray="4" rx="8"/>
+      <text class="svg-text-title" x="20" y="32">Enforcement Outcome</text>
+
+      <!-- Allowed Box -->
+      <g id="box-outcome-allow" transform="translate(10, 60)">
+        <rect class="svg-box" width="200" height="110"/>
+        <text class="svg-text-title" x="15" y="28" fill="var(--accent-green)">OPERATION GRANTED</text>
+        <text class="svg-text-desc" x="15" y="50">Return: 0 (Success)</text>
+        <text class="svg-text-desc" x="15" y="72">Normal syscall path</text>
+        <text class="svg-text-desc" x="15" y="94" fill="var(--accent-green)">Execution completes safely</text>
+      </g>
+
+      <!-- Denied Box -->
+      <g id="box-outcome-deny" transform="translate(10, 190)">
+        <rect class="svg-box" width="200" height="130"/>
+        <text class="svg-text-title" x="15" y="28" fill="var(--accent-red)">BLOCKED: -EPERM</text>
+        <text class="svg-text-desc" x="15" y="50">Return: -1 (errno: EPERM)</text>
+        <text class="svg-text-desc" x="15" y="72">dmesg notice logged:</text>
+        <text class="svg-text-desc" x="15" y="92" fill="var(--accent-red)">"Lockdown: ... is restricted;"</text>
+        <text class="svg-text-desc" x="15" y="112" fill="var(--accent-red)">"see man kernel_lockdown.7"</text>
+      </g>
+    </g>
+
+    <!-- Connecting Pathways -->
+    <path d="M 230 100 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 230 200 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 230 300 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <path d="M 580 120 L 630 115" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 580 150 L 630 255" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- Animated Token -->
+    <circle id="token" cx="130" cy="100" r="10"/>
+  </svg>
+
+  <div class="status-bar">
+    <div id="status-text">Ready. Choose a scenario: Safe Process, Integrity Tamper, or Confidentiality Leak.</div>
+    <div id="step-badge" style="font-weight:700; color:var(--accent-blue);">Step: 0/4</div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 'safe'; // 'safe', 'tamper', 'leak'
+  let currentMode = 2;          // 0: None, 1: Integrity, 2: Confidentiality
+  let currentStep = 0;
+  let isPlaying = false;
+  let playInterval = null;
+
+  const positions = {
+    safe: [
+      { cx: 130, cy: 100, text: "Step 1: Standard process invokes normal read/write/mmap syscalls." },
+      { cx: 430, cy: 125, text: "Step 2: security_locked_down() hook called; operation does not tamper kernel state." },
+      { cx: 430, cy: 260, text: "Step 3: Lockdown evaluation: Permitted across all modes (None, Integrity, Confidentiality)." },
+      { cx: 730, cy: 115, text: "Step 4: Result: OPERATION GRANTED (ret = 0). Normal execution continues." }
+    ],
+    tamper: [
+      { cx: 130, cy: 200, text: "Step 1: Root attempts raw memory write via /dev/mem or loading unsigned module." },
+      { cx: 430, cy: 125, text: "Step 2: security_locked_down(LOCKDOWN_DEV_MEM) traps raw memory access." },
+      { cx: 430, cy: 260, text: "Step 3: Lockdown evaluation: Severity exceeds threshold if Mode >= 1 (Integrity)." },
+      { cx: 730, cy: 255, text: "" } // Handled dynamically
+    ],
+    leak: [
+      { cx: 130, cy: 300, text: "Step 1: Root attempts reading /proc/kcore or attaching BPF kprobe probes." },
+      { cx: 430, cy: 125, text: "Step 2: security_locked_down(LOCKDOWN_KCORE) traps secret inspection request." },
+      { cx: 430, cy: 260, text: "Step 3: Lockdown evaluation: Severity exceeds threshold only if Mode == 2 (Confidentiality)." },
+      { cx: 730, cy: 255, text: "" } // Handled dynamically
+    ]
+  };
+
+  function selectScenario(scenario) {
+    currentScenario = scenario;
+    document.getElementById('btn-op-safe').classList.toggle('active', scenario === 'safe');
+    document.getElementById('btn-op-tamper').classList.toggle('active', scenario === 'tamper');
+    document.getElementById('btn-op-leak').classList.toggle('active', scenario === 'leak');
+    resetSimulation();
+  }
+
+  function cycleMode() {
+    currentMode = (currentMode + 1) % 3;
+    const btn = document.getElementById('btn-mode');
+    const svgText = document.getElementById('svg-mode-text');
+    const matrixText = document.getElementById('matrix-active');
+
+    if (currentMode === 0) {
+      btn.innerText = "Mode: None (0)";
+      svgText.textContent = "/sys/kernel/security/lockdown = [none] integrity confidentiality";
+      matrixText.textContent = "Active Level: 0 (None - Permissive)";
+    } else if (currentMode === 1) {
+      btn.innerText = "Mode: Integrity (1)";
+      svgText.textContent = "/sys/kernel/security/lockdown = none [integrity] confidentiality";
+      matrixText.textContent = "Active Level: 1 (Integrity Enforced)";
+    } else {
+      btn.innerText = "Mode: Confidentiality (2)";
+      svgText.textContent = "/sys/kernel/security/lockdown = none integrity [confidentiality]";
+      matrixText.textContent = "Active Level: 2 (Confidentiality Enforced)";
+    }
+    updateDisplay();
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  function updateDisplay() {
+    const token = document.getElementById('token');
+    const statusText = document.getElementById('status-text');
+    const stepBadge = document.getElementById('step-badge');
+    const led = document.getElementById('led');
+
+    const posList = positions[currentScenario];
+    const pos = posList[currentStep];
+
+    token.setAttribute('cx', pos.cx);
+    token.setAttribute('cy', pos.cy);
+    stepBadge.innerText = `Step: ${currentStep + 1}/4`;
+
+    let willBlock = false;
+    if (currentScenario === 'tamper' && currentMode >= 1) willBlock = true;
+    if (currentScenario === 'leak' && currentMode === 2) willBlock = true;
+
+    if (currentStep === 3) {
+      if (willBlock) {
+        token.setAttribute('cx', 730);
+        token.setAttribute('cy', 255);
+        token.style.fill = "var(--accent-red)";
+        led.className = "led-indicator violation";
+        statusText.innerText = "Step 4: [BLOCKED] Kernel Lockdown denies operation with -EPERM! dmesg audit logged.";
+      } else {
+        token.setAttribute('cx', 730);
+        token.setAttribute('cy', 115);
+        token.style.fill = (currentScenario === 'safe') ? "var(--accent-green)" : "var(--accent-amber)";
+        led.className = (currentMode === 0) ? "led-indicator integrity" : "led-indicator";
+        statusText.innerText = "Step 4: [GRANTED] Operation permitted under current lockdown level (ret = 0).";
+      }
+    } else {
+      if (currentScenario === 'safe') {
+        token.style.fill = "var(--accent-green)";
+        led.className = "led-indicator";
+      } else if (currentScenario === 'tamper') {
+        token.style.fill = (currentMode >= 1) ? "var(--accent-red)" : "var(--accent-amber)";
+        led.className = (currentMode >= 1) ? "led-indicator violation" : "led-indicator integrity";
+      } else {
+        token.style.fill = (currentMode === 2) ? "var(--accent-purple)" : "var(--accent-amber)";
+        led.className = (currentMode === 2) ? "led-indicator violation" : "led-indicator integrity";
+      }
+      statusText.innerText = pos.text;
+    }
+  }
+
+  function stepSimulation() {
+    currentStep = (currentStep + 1) % 4;
+    updateDisplay();
+  }
+
+  function togglePlay() {
+    const btn = document.getElementById('btn-play');
+    if (isPlaying) {
+      clearInterval(playInterval);
+      isPlaying = false;
+      btn.innerText = "Auto Play ▶";
+    } else {
+      isPlaying = true;
+      btn.innerText = "Pause ⏸";
+      playInterval = setInterval(() => {
+        stepSimulation();
+      }, 1400);
+    }
+  }
+
+  function resetSimulation() {
+    if (isPlaying) togglePlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>
