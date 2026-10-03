@@ -132,7 +132,7 @@
 - [x] **Task 12-2:** BPF Hardening (`CONFIG_BPF_JIT_ALWAYS_ON`, `unprivileged_bpf_disabled`).
 - [x] **Task 12-3:** Strict Devmem (`CONFIG_STRICT_DEVMEM`, `CONFIG_IO_STRICT_DEVMEM`).
 - [x] **Task 12-4:** Kernel Information Leaks 방어 (`CONFIG_SECURITY_DMESG_RESTRICT`, `kptr_restrict`).
-- [ ] **Task 12-5:** Ptrace Restrictions (`CONFIG_SECURITY_YAMA`).
+- [x] **Task 12-5:** Ptrace Restrictions (`CONFIG_SECURITY_YAMA`).
 - [ ] **Task 12-6:** Kexec Restrictions (`kexec_load_disabled`).
 
 ### [Phase 13 (Roadmap)] Category 11: Modern ARMv8/ARMv9 & Mobile Security (MTE, AVF, CCA)

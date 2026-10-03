@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux Yama LSM Ptrace Scope Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.permissive {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.violation {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .status-bar {
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .svg-box {
+    fill: var(--bg-primary);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    rx: 8;
+  }
+  .svg-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .svg-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+    font-family: monospace;
+  }
+
+  #token {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--accent-blue));
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div id="led" class="led-indicator"></div>
+      Linux Yama LSM Ptrace Scope Restrictions Simulator
+    </div>
+    <div style="font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">
+      CONFIG_SECURITY_YAMA=y
+    </div>
+  </div>
+
+  <div class="sim-toolbar">
+    <button id="btn-scen-child" class="btn active" onclick="selectScenario('child')">Parent -> Child Trace</button>
+    <button id="btn-scen-sibling" class="btn" onclick="selectScenario('sibling')">Sibling -> Sibling Attack</button>
+    <button id="btn-scen-admin" class="btn" onclick="selectScenario('admin')">Admin (CAP_SYS_PTRACE)</button>
+    <div style="flex-grow:1;"></div>
+    <button id="btn-mode" class="btn" onclick="cycleMode()">Scope: 1 (Restricted Parent-Child)</button>
+    <button id="btn-step" class="btn" onclick="stepSimulation()">Next Step ⏭</button>
+    <button id="btn-play" class="btn" onclick="togglePlay()">Auto Play ▶</button>
+    <button id="btn-reset" class="btn" onclick="resetSimulation()">Reset ↺</button>
+    <button class="btn" onclick="toggleTheme()">Theme 🌓</button>
+  </div>
+
+  <svg viewBox="0 0 860 380" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--text-secondary)"/>
+      </marker>
+    </defs>
+
+    <!-- Column 1: Tracer Process & Request -->
+    <g id="col-user">
+      <rect x="20" y="20" width="220" height="340" fill="none" stroke="var(--border-color)" stroke-dasharray="4" rx="8"/>
+      <text class="svg-text-title" x="35" y="45">Tracer Process (UID 1000)</text>
+
+      <!-- Child Target -->
+      <g id="box-scen-child" transform="translate(30, 60)">
+        <rect class="svg-box" width="200" height="75"/>
+        <text class="svg-text-title" x="12" y="24">Target: Direct Child</text>
+        <text class="svg-text-desc" x="12" y="44">GDB debug session</text>
+        <text class="svg-text-desc" x="12" y="62" fill="var(--accent-green)">Parent spawned child process</text>
+      </g>
+
+      <!-- Sibling Target -->
+      <g id="box-scen-sibling" transform="translate(30, 155)">
+        <rect class="svg-box" width="200" height="85"/>
+        <text class="svg-text-title" x="12" y="24">Target: Sibling Process</text>
+        <text class="svg-text-desc" x="12" y="44">SSH Agent / Browser</text>
+        <text class="svg-text-desc" x="12" y="60">Same UID, separate parent</text>
+        <text class="svg-text-desc" x="12" y="76" fill="var(--accent-red)">Credential extraction attack</text>
+      </g>
+
+      <!-- Admin Target -->
+      <g id="box-scen-admin" transform="translate(30, 260)">
+        <rect class="svg-box" width="200" height="85"/>
+        <text class="svg-text-title" x="12" y="24">Target: System Task</text>
+        <text class="svg-text-desc" x="12" y="44">Admin / Strace tool</text>
+        <text class="svg-text-desc" x="12" y="60">Holds CAP_SYS_PTRACE</text>
+        <text class="svg-text-desc" x="12" y="76" fill="var(--accent-purple)">Privileged system tracing</text>
+      </g>
+    </g>
+
+    <!-- Column 2: Yama LSM Decision Engine -->
+    <g id="col-kernel" transform="translate(280, 20)">
+      <rect class="svg-box" width="300" height="340"/>
+      <text class="svg-text-title" x="20" y="32">Kernel Yama LSM Engine</text>
+      <text id="svg-mode-text" class="svg-text-desc" x="20" y="52" fill="var(--accent-blue)">
+        kernel.yama.ptrace_scope = 1 (Restricted)
+      </text>
+
+      <!-- Hook Check -->
+      <g transform="translate(15, 70)">
+        <rect width="270" height="110" fill="var(--bg-card)" stroke="var(--border-color)" rx="6"/>
+        <text class="svg-text-title" x="15" y="28">security_ptrace_access_check()</text>
+        <text class="svg-text-desc" x="15" y="50">Traps ptrace(PTRACE_ATTACH)</text>
+        <text class="svg-text-desc" x="15" y="70">Evaluates lineage: parent_or_child?</text>
+        <text class="svg-text-desc" x="15" y="90" fill="var(--accent-amber)">Checks prctl(PR_SET_PTRACER)</text>
+      </g>
+
+      <!-- Scope Table -->
+      <g transform="translate(15, 200)">
+        <rect width="270" height="120" fill="var(--bg-card)" stroke="var(--border-color)" rx="6"/>
+        <text class="svg-text-title" x="15" y="26">Yama Ptrace Scopes</text>
+        <text class="svg-text-desc" x="15" y="48">Scope 0: Classic DAC (Same-UID allowed)</text>
+        <text class="svg-text-desc" x="15" y="70">Scope 1: Restricted (Parent-child only)</text>
+        <text class="svg-text-desc" x="15" y="92">Scope 2: Admin only (CAP_SYS_PTRACE)</text>
+        <text id="decision-text" class="svg-text-desc" x="15" y="112" fill="var(--accent-green)">Status: Sibling ptrace blocked</text>
+      </g>
+    </g>
+
+    <!-- Column 3: Outcome -->
+    <g id="col-outcome" transform="translate(620, 20)">
+      <rect x="0" y="0" width="220" height="340" fill="none" stroke="var(--border-color)" stroke-dasharray="4" rx="8"/>
+      <text class="svg-text-title" x="20" y="32">Tracing Outcome</text>
+
+      <!-- Allowed Box -->
+      <g id="box-outcome-allow" transform="translate(10, 60)">
+        <rect class="svg-box" width="200" height="110"/>
+        <text id="allow-title" class="svg-text-title" x="15" y="28" fill="var(--accent-green)">PTRACE GRANTED</text>
+        <text class="svg-text-desc" x="15" y="50">Return: 0 (Success)</text>
+        <text class="svg-text-desc" x="15" y="72">Target paused for debug</text>
+        <text class="svg-text-desc" x="15" y="94" fill="var(--accent-green)">Normal GDB/tracing active</text>
+      </g>
+
+      <!-- Denied Box -->
+      <g id="box-outcome-deny" transform="translate(10, 190)">
+        <rect class="svg-box" width="200" height="130"/>
+        <text id="deny-title" class="svg-text-title" x="15" y="28" fill="var(--accent-red)">BLOCKED: -EPERM</text>
+        <text class="svg-text-desc" x="15" y="50">ptrace() -> -1 (EPERM)</text>
+        <text class="svg-text-desc" x="15" y="72">Lineage check failed</text>
+        <text class="svg-text-desc" x="15" y="92" fill="var(--accent-red)">Sibling attack thwarted</text>
+        <text class="svg-text-desc" x="15" y="112" fill="var(--text-secondary)">Process memory protected</text>
+      </g>
+    </g>
+
+    <!-- Connecting Pathways -->
+    <path d="M 230 100 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 230 200 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 230 300 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <path d="M 580 120 L 630 115" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 580 150 L 630 255" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- Animated Token -->
+    <circle id="token" cx="130" cy="100" r="10"/>
+  </svg>
+
+  <div class="status-bar">
+    <div id="status-text">Ready. Choose a scenario: Parent -> Child Trace, Sibling Attack, or Admin.</div>
+    <div id="step-badge" style="font-weight:700; color:var(--accent-blue);">Step: 0/4</div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 'child'; // 'child', 'sibling', 'admin'
+  let currentScope = 1;          // 0: Classic, 1: Restricted, 2: Admin, 3: Disabled
+  let currentStep = 0;
+  let isPlaying = false;
+  let playInterval = null;
+
+  const positions = {
+    child: [
+      { cx: 130, cy: 100, text: "Step 1: GDB debugger attaches to direct child process spawned via fork()." },
+      { cx: 430, cy: 125, text: "Step 2: security_ptrace_access_check() evaluates process hierarchy." },
+      { cx: 430, cy: 260, text: "Step 3: Lineage check: tracer is direct ancestor of tracee." },
+      { cx: 730, cy: 115, text: "" } // Handled dynamically
+    ],
+    sibling: [
+      { cx: 130, cy: 200, text: "Step 1: Attacker attempts ptrace(PTRACE_ATTACH) on sibling SSH-agent under same UID." },
+      { cx: 430, cy: 125, text: "Step 2: security_ptrace_access_check() evaluates process hierarchy." },
+      { cx: 430, cy: 260, text: "Step 3: Lineage check: tracer is NOT parent of tracee; PR_SET_PTRACER not set." },
+      { cx: 730, cy: 255, text: "" } // Handled dynamically
+    ],
+    admin: [
+      { cx: 130, cy: 300, text: "Step 1: System administrator attaches to target using root or CAP_SYS_PTRACE." },
+      { cx: 430, cy: 125, text: "Step 2: security_ptrace_access_check() checks credentials." },
+      { cx: 430, cy: 260, text: "Step 3: Privilege verified: CAP_SYS_PTRACE held by caller." },
+      { cx: 730, cy: 115, text: "" } // Handled dynamically
+    ]
+  };
+
+  function selectScenario(scenario) {
+    currentScenario = scenario;
+    document.getElementById('btn-scen-child').classList.toggle('active', scenario === 'child');
+    document.getElementById('btn-scen-sibling').classList.toggle('active', scenario === 'sibling');
+    document.getElementById('btn-scen-admin').classList.toggle('active', scenario === 'admin');
+    resetSimulation();
+  }
+
+  function cycleMode() {
+    currentScope = (currentScope + 1) % 4;
+    const btn = document.getElementById('btn-mode');
+    const svgText = document.getElementById('svg-mode-text');
+    const decText = document.getElementById('decision-text');
+
+    if (currentScope === 0) {
+      btn.innerText = "Scope: 0 (Classic DAC)";
+      svgText.textContent = "kernel.yama.ptrace_scope = 0 (Classic DAC)";
+      decText.textContent = "Status: Warning: Same-UID sibling ptrace allowed";
+    } else if (currentScope === 1) {
+      btn.innerText = "Scope: 1 (Restricted Parent-Child)";
+      svgText.textContent = "kernel.yama.ptrace_scope = 1 (Restricted)";
+      decText.textContent = "Status: Sibling ptrace blocked";
+    } else if (currentScope === 2) {
+      btn.innerText = "Scope: 2 (Admin Only)";
+      svgText.textContent = "kernel.yama.ptrace_scope = 2 (Admin Only)";
+      decText.textContent = "Status: Only CAP_SYS_PTRACE permitted";
+    } else {
+      btn.innerText = "Scope: 3 (No Ptrace)";
+      svgText.textContent = "kernel.yama.ptrace_scope = 3 (No Ptrace)";
+      decText.textContent = "Status: Ptrace permanently disabled";
+    }
+    updateDisplay();
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  function updateDisplay() {
+    const token = document.getElementById('token');
+    const statusText = document.getElementById('status-text');
+    const stepBadge = document.getElementById('step-badge');
+    const led = document.getElementById('led');
+
+    const posList = positions[currentScenario];
+    const pos = posList[currentStep];
+
+    token.setAttribute('cx', pos.cx);
+    token.setAttribute('cy', pos.cy);
+    stepBadge.innerText = `Step: ${currentStep + 1}/4`;
+
+    let willBlock = false;
+    if (currentScope === 3) willBlock = true;
+    else if (currentScope === 2 && currentScenario !== 'admin') willBlock = true;
+    else if (currentScope === 1 && currentScenario === 'sibling') willBlock = true;
+
+    if (currentStep === 3) {
+      if (willBlock) {
+        token.setAttribute('cx', 730);
+        token.setAttribute('cy', 255);
+        token.style.fill = "var(--accent-red)";
+        led.className = "led-indicator violation";
+        statusText.innerText = "Step 4: [BLOCKED] Yama LSM rejected ptrace with -EPERM! Sibling injection defeated.";
+      } else {
+        token.setAttribute('cx', 730);
+        token.setAttribute('cy', 115);
+        token.style.fill = (currentScenario === 'sibling') ? "var(--accent-amber)" : "var(--accent-green)";
+        led.className = (currentScope === 0 && currentScenario === 'sibling') ? "led-indicator permissive" : "led-indicator";
+        statusText.innerText = "Step 4: [GRANTED] Ptrace attach succeeded (ret = 0). Process paused for tracing.";
+      }
+    } else {
+      if (currentScenario === 'child') {
+        token.style.fill = (currentScope >= 2) ? "var(--accent-red)" : "var(--accent-green)";
+        led.className = (currentScope >= 2) ? "led-indicator violation" : "led-indicator";
+      } else if (currentScenario === 'sibling') {
+        token.style.fill = (currentScope >= 1) ? "var(--accent-red)" : "var(--accent-amber)";
+        led.className = (currentScope >= 1) ? "led-indicator violation" : "led-indicator permissive";
+      } else {
+        token.style.fill = (currentScope === 3) ? "var(--accent-red)" : "var(--accent-purple)";
+        led.className = (currentScope === 3) ? "led-indicator violation" : "led-indicator";
+      }
+      statusText.innerText = pos.text;
+    }
+  }
+
+  function stepSimulation() {
+    currentStep = (currentStep + 1) % 4;
+    updateDisplay();
+  }
+
+  function togglePlay() {
+    const btn = document.getElementById('btn-play');
+    if (isPlaying) {
+      clearInterval(playInterval);
+      isPlaying = false;
+      btn.innerText = "Auto Play ▶";
+    } else {
+      isPlaying = true;
+      btn.innerText = "Pause ⏸";
+      playInterval = setInterval(() => {
+        stepSimulation();
+      }, 1400);
+    }
+  }
+
+  function resetSimulation() {
+    if (isPlaying) togglePlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>
