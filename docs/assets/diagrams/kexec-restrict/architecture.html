@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux Kexec Restrictions & Hardening Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 920px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.warning {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.blocked {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .svg-canvas {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: block;
+  }
+
+  .status-panel {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .status-badge {
+    font-weight: 700;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .badge-allowed { background: rgba(52, 211, 153, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+  .badge-vulnerable { background: rgba(251, 191, 36, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+  .badge-blocked { background: rgba(248, 113, 113, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+  .node-box {
+    fill: var(--bg-card);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .node-box.highlight {
+    stroke: var(--accent-blue);
+    stroke-width: 2.5;
+  }
+  .node-box.active-block {
+    stroke: var(--accent-red);
+    stroke-width: 2.5;
+    fill: rgba(248, 113, 113, 0.1);
+  }
+  .node-box.active-allow {
+    stroke: var(--accent-green);
+    stroke-width: 2.5;
+    fill: rgba(52, 211, 153, 0.1);
+  }
+
+  .node-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .node-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+  }
+
+  .path-line {
+    stroke: var(--border-color);
+    stroke-width: 2;
+    stroke-dasharray: 4,4;
+    fill: none;
+    transition: stroke 0.3s;
+  }
+  .path-line.active {
+    stroke: var(--accent-blue);
+    stroke-width: 3;
+    stroke-dasharray: none;
+  }
+
+  .token-pulse {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--token-fill));
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div class="led-indicator" id="ledStatus"></div>
+      <span>Linux Kexec Restrictions & Hardening Architecture</span>
+    </div>
+    <button class="btn" id="themeToggle" onclick="toggleTheme()">Toggle Theme</button>
+  </div>
+
+  <div class="sim-toolbar">
+    <button class="btn active" id="btnS1" onclick="selectScenario(1)">1. Raw kexec_load (Unrestricted)</button>
+    <button class="btn" id="btnS2" onclick="selectScenario(2)">2. Raw kexec_load + Lockdown</button>
+    <button class="btn" id="btnS3" onclick="selectScenario(3)">3. Unsigned kexec_file_load</button>
+    <button class="btn" id="btnS4" onclick="selectScenario(4)">4. Signed kexec_file_load</button>
+    <button class="btn" id="btnS5" onclick="selectScenario(5)">5. One-Way Latch Disabled</button>
+    <div style="flex-grow: 1;"></div>
+    <button class="btn" id="btnPlay" onclick="togglePlay()">Play / Pause</button>
+    <button class="btn" id="btnStep" onclick="stepForward()">Step</button>
+    <button class="btn" id="btnReset" onclick="resetSim()">Reset</button>
+  </div>
+
+  <svg class="svg-canvas" viewBox="0 0 880 380" id="mainSvg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--border-color)" id="arrowHead" />
+      </marker>
+    </defs>
+
+    <!-- 1. Userspace Caller -->
+    <rect id="boxUser" class="node-box" x="20" y="140" width="150" height="90" rx="8" />
+    <text class="node-text-title" x="35" y="170">Userspace / Root</text>
+    <text class="node-text-desc" x="35" y="190">CAP_SYS_BOOT</text>
+    <text class="node-text-desc" x="35" y="208" id="lblCallerAction">kexec_load syscall</text>
+
+    <!-- Connectors from User to Syscall Gates -->
+    <path id="pathSyscall" class="path-line" d="M 170 185 L 230 185" marker-end="url(#arrow)" />
+
+    <!-- 2. Syscall Entry Dispatcher -->
+    <rect id="boxSyscall" class="node-box" x="230" y="140" width="160" height="90" rx="8" />
+    <text class="node-text-title" x="245" y="168">Syscall Dispatcher</text>
+    <text class="node-text-desc" x="245" y="188">sys_kexec_load (raw)</text>
+    <text class="node-text-desc" x="245" y="206">sys_kexec_file_load</text>
+
+    <!-- Path to Latch Check -->
+    <path id="pathLatch" class="path-line" d="M 390 185 L 440 185" marker-end="url(#arrow)" />
+
+    <!-- 3. One-way Latch Gate: kexec_load_disabled -->
+    <rect id="boxLatch" class="node-box" x="440" y="140" width="160" height="90" rx="8" />
+    <text class="node-text-title" x="455" y="168">Security Latch</text>
+    <text class="node-text-desc" x="455" y="188">kexec_load_disabled</text>
+    <text class="node-text-desc" x="455" y="206" id="lblLatchStatus">State: 0 (Enabled)</text>
+
+    <!-- Path from Latch to Lockdown / Sig Engine -->
+    <path id="pathFilter" class="path-line" d="M 600 185 L 650 185" marker-end="url(#arrow)" />
+
+    <!-- Path for Block / Reject (Dropping down) -->
+    <path id="pathBlock" class="path-line" d="M 520 230 L 520 290 L 520 320" />
+    <rect id="boxReject" class="node-box" x="430" y="310" width="180" height="50" rx="6" />
+    <text class="node-text-title" x="460" y="332" fill="var(--accent-red)">BLOCKED (-EPERM)</text>
+    <text class="node-text-desc" x="450" y="348" id="lblRejectReason">Execution halted</text>
+
+    <!-- 4. Security Verification Engine (Lockdown & Crypto) -->
+    <rect id="boxVerify" class="node-box" x="650" y="140" width="190" height="90" rx="8" />
+    <text class="node-text-title" x="665" y="168">Verification Engine</text>
+    <text class="node-text-desc" x="665" y="188">Kernel Lockdown LSM</text>
+    <text class="node-text-desc" x="665" y="206">PKCS#7 System Keyring</text>
+
+    <!-- Path from Verify to Target Execution -->
+    <path id="pathBoot" class="path-line" d="M 745 140 L 745 80 L 745 50" />
+
+    <!-- 5. Kernel Reboot / Execution -->
+    <rect id="boxTarget" class="node-box" x="650" y="10" width="190" height="50" rx="6" />
+    <text class="node-text-title" x="675" y="32">Kexec Kernel Boot</text>
+    <text class="node-text-desc" x="675" y="48">machine_kexec() handover</text>
+
+    <!-- Animated Token -->
+    <circle id="animToken" class="token-pulse" cx="95" cy="185" r="7" style="display:none;" />
+  </svg>
+
+  <div class="status-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span id="badgeOutcome" class="status-badge badge-vulnerable">VULNERABLE</span>
+      <span id="stepCounter" style="color: var(--text-secondary); font-size: 0.8rem;">Step: 0 / 4</span>
+    </div>
+    <div id="statusDetails" style="color: var(--text-primary); font-weight: 500;">
+      Select a scenario above to observe kexec restriction and verification flow.
+    </div>
+    <div id="securityInsight" style="color: var(--text-secondary); font-size: 0.82rem;">
+      Security Insight: Raw kexec_load enables an attacker with CAP_SYS_BOOT to overwrite kernel code memory without signature validation.
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 1;
+  let currentStep = 0;
+  let isPlaying = false;
+  let timer = null;
+
+  const scenarios = {
+    1: {
+      name: "1. Raw kexec_load (Unrestricted)",
+      callerAction: "sys_kexec_load (raw)",
+      latchState: "State: 0 (Enabled)",
+      badgeClass: "badge-vulnerable",
+      badgeText: "VULNERABLE (UNSIGNED BOOT)",
+      ledClass: "warning",
+      rejectReason: "Not blocked",
+      steps: [
+        { desc: "Attacker prepares arbitrary unverified kernel memory segments in userspace.", insight: "Raw kexec_load passes memory pointers directly to kernel without hash or signature checks." },
+        { desc: "Invoking sys_kexec_load(entry, nr_segments, segments). Syscall dispatcher receives segments.", insight: "CAP_SYS_BOOT check passes." },
+        { desc: "Evaluating kernel.kexec_load_disabled: currently 0 (unrestricted). Latch allows traversal.", insight: "Sysctl latch is inactive." },
+        { desc: "Lockdown LSM is disabled (LOCK_DOWN_NONE). Verification skipped! Kernel boots arbitrary code.", insight: "CRITICAL DANGER: Root of trust completely subverted; malicious kernel executes with hardware control." }
+      ]
+    },
+    2: {
+      name: "2. Raw kexec_load + Kernel Lockdown",
+      callerAction: "sys_kexec_load (raw)",
+      latchState: "State: 0 (Enabled)",
+      badgeClass: "badge-blocked",
+      badgeText: "BLOCKED (-EPERM)",
+      ledClass: "blocked",
+      rejectReason: "Lockdown: raw kexec forbidden",
+      steps: [
+        { desc: "Attacker attempts raw sys_kexec_load with userspace segment list.", insight: "Trying to bypass cryptographic signature verification." },
+        { desc: "Syscall dispatcher forwards request to security subsystems.", insight: "kexec_load_permitted() is invoked." },
+        { desc: "Security latch passes (latch=0). Reaching Verification Engine.", insight: "Lockdown LSM inspects operation type (LOCKDOWN_KEXEC)." },
+        { desc: "Kernel Lockdown LSM detects raw kexec_load and blocks execution with -EPERM!", insight: "DEFENSE SUCCESS: Lockdown integrity/confidentiality mandates file-based authenticated loading only." }
+      ]
+    },
+    3: {
+      name: "3. Unsigned kexec_file_load",
+      callerAction: "sys_kexec_file_load",
+      latchState: "State: 0 (Enabled)",
+      badgeClass: "badge-blocked",
+      badgeText: "BLOCKED (-EKEYREJECTED)",
+      ledClass: "blocked",
+      rejectReason: "Missing / Invalid PKCS#7 Sig",
+      steps: [
+        { desc: "Attacker invokes sys_kexec_file_load() with an unsigned or tampered kernel image.", insight: "kexec_file_load loads image via kernel VFS instead of raw memory segments." },
+        { desc: "Syscall dispatcher reads kernel image buffer and forwards to verification.", insight: "kexec_file_load() enforces in-kernel signature validation." },
+        { desc: "Security latch is open. Forwarding image to cryptographic verification engine.", insight: "CONFIG_KEXEC_SIG_FORCE is enabled." },
+        { desc: "Signature verification fails! Image lacks trusted PE/PKCS#7 signature. Returns -EKEYREJECTED.", insight: "DEFENSE SUCCESS: Only kernels signed by system trusted keyring can be booted." }
+      ]
+    },
+    4: {
+      name: "4. Signed kexec_file_load",
+      callerAction: "sys_kexec_file_load",
+      latchState: "State: 0 (Enabled)",
+      badgeClass: "badge-allowed",
+      badgeText: "ALLOWED (AUTHENTICATED)",
+      ledClass: "",
+      rejectReason: "Not blocked",
+      steps: [
+        { desc: "Legitimate administrator executes kexec_file_load with an authenticated, signed kernel.", insight: "Kernel image contains valid PKCS#7 signature signed by trusted OEM/organization key." },
+        { desc: "Syscall dispatcher receives file descriptor and reads kernel PE/bzImage header.", insight: "Kernel extracts embedded signature block." },
+        { desc: "One-way latch allows execution (latch=0). Forwarding to keyring validator.", insight: "Verifying signature against .builtin_trusted_keys." },
+        { desc: "Signature mathematically verified! machine_kexec() safely transfers execution to new kernel.", insight: "SAFE HANDOVER: Chain of trust remains unbroken from initial boot through kexec reboot." }
+      ]
+    },
+    5: {
+      name: "5. One-Way Latch Disabled",
+      callerAction: "kexec_load_disabled = 1",
+      latchState: "State: 1 (LATCHED PERMANENT)",
+      badgeClass: "badge-blocked",
+      badgeText: "BLOCKED (-EPERM ONE-WAY LATCH)",
+      ledClass: "blocked",
+      rejectReason: "kexec_load_disabled = 1",
+      steps: [
+        { desc: "Administrator writes '1' to /proc/sys/kernel/kexec_load_disabled at boot.", insight: "One-way latch is activated. Writing '0' back is strictly rejected with -EPERM." },
+        { desc: "Any process (even root with CAP_SYS_BOOT) attempts sys_kexec_load or sys_kexec_file_load.", insight: "kexec_load_permitted() checks kexec_load_disabled flag." },
+        { desc: "Security Latch immediately intercepts request! Returns -EPERM before reaching any driver.", insight: "Hardware reboot required to re-enable kexec functionality." },
+        { desc: "System-wide kexec attack surface completely eliminated!", insight: "PERMANENT HARDENING: Eliminates kernel substitution risks across production environments." }
+      ]
+    }
+  };
+
+  function selectScenario(num) {
+    currentScenario = num;
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById(`btnS${i}`).classList.toggle('active', i === num);
+    }
+    resetSim();
+  }
+
+  function resetSim() {
+    stopPlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  function stepForward() {
+    const sc = scenarios[currentScenario];
+    if (currentStep < sc.steps.length) {
+      currentStep++;
+      updateDisplay();
+    } else {
+      resetSim();
+    }
+  }
+
+  function togglePlay() {
+    if (isPlaying) {
+      stopPlay();
+    } else {
+      isPlaying = true;
+      document.getElementById('btnPlay').textContent = "Pause";
+      timer = setInterval(() => {
+        const sc = scenarios[currentScenario];
+        if (currentStep < sc.steps.length) {
+          currentStep++;
+          updateDisplay();
+        } else {
+          stopPlay();
+        }
+      }, 1800);
+    }
+  }
+
+  function stopPlay() {
+    isPlaying = false;
+    document.getElementById('btnPlay').textContent = "Play";
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function updateDisplay() {
+    const sc = scenarios[currentScenario];
+    const led = document.getElementById('ledStatus');
+    led.className = 'led-indicator';
+    if (sc.ledClass) led.classList.add(sc.ledClass);
+
+    document.getElementById('lblCallerAction').textContent = sc.callerAction;
+    document.getElementById('lblLatchStatus').textContent = sc.latchState;
+    document.getElementById('lblRejectReason').textContent = sc.rejectReason;
+
+    const badge = document.getElementById('badgeOutcome');
+    badge.className = `status-badge ${sc.badgeClass}`;
+    badge.textContent = sc.badgeText;
+
+    document.getElementById('stepCounter').textContent = `Step: ${currentStep} / ${sc.steps.length}`;
+
+    if (currentStep === 0) {
+      document.getElementById('statusDetails').textContent = `Scenario: ${sc.name}. Click 'Step' or 'Play' to begin.`;
+      document.getElementById('securityInsight').textContent = "Observe how syscall dispatcher, security latch, and signature engine evaluate kexec requests.";
+      hideAllHighlights();
+      document.getElementById('animToken').style.display = 'none';
+      return;
+    }
+
+    const stepInfo = sc.steps[currentStep - 1];
+    document.getElementById('statusDetails').textContent = stepInfo.desc;
+    document.getElementById('securityInsight').textContent = "Security Insight: " + stepInfo.insight;
+
+    // Visual highlights based on step and scenario
+    applyStepVisuals(currentScenario, currentStep);
+  }
+
+  function hideAllHighlights() {
+    ['boxUser', 'boxSyscall', 'boxLatch', 'boxVerify', 'boxReject', 'boxTarget'].forEach(id => {
+      const el = document.getElementById(id);
+      el.className.baseVal = 'node-box';
+    });
+    ['pathSyscall', 'pathLatch', 'pathFilter', 'pathBlock', 'pathBoot'].forEach(id => {
+      const el = document.getElementById(id);
+      el.className.baseVal = 'path-line';
+    });
+  }
+
+  function applyStepVisuals(scNum, step) {
+    hideAllHighlights();
+    const token = document.getElementById('animToken');
+    token.style.display = 'block';
+
+    if (step === 1) {
+      document.getElementById('boxUser').classList.add('highlight');
+      token.setAttribute('cx', 95);
+      token.setAttribute('cy', 185);
+    } else if (step === 2) {
+      document.getElementById('boxSyscall').classList.add('highlight');
+      document.getElementById('pathSyscall').classList.add('active');
+      token.setAttribute('cx', 310);
+      token.setAttribute('cy', 185);
+    } else if (step === 3) {
+      if (scNum === 5) {
+        // Latch blocked
+        document.getElementById('boxLatch').classList.add('active-block');
+        document.getElementById('pathLatch').classList.add('active');
+        document.getElementById('pathBlock').classList.add('active');
+        document.getElementById('boxReject').classList.add('active-block');
+        token.setAttribute('cx', 520);
+        token.setAttribute('cy', 335);
+      } else {
+        document.getElementById('boxLatch').classList.add('highlight');
+        document.getElementById('pathLatch').classList.add('active');
+        token.setAttribute('cx', 520);
+        token.setAttribute('cy', 185);
+      }
+    } else if (step === 4) {
+      if (scNum === 1) {
+        // Vulnerable execution
+        document.getElementById('boxVerify').classList.add('highlight');
+        document.getElementById('boxTarget').classList.add('active-allow');
+        document.getElementById('pathBoot').classList.add('active');
+        token.setAttribute('cx', 745);
+        token.setAttribute('cy', 35);
+      } else if (scNum === 2 || scNum === 3) {
+        // Blocked at verify
+        document.getElementById('boxVerify').classList.add('active-block');
+        document.getElementById('pathFilter').classList.add('active');
+        document.getElementById('boxReject').classList.add('active-block');
+        token.setAttribute('cx', 520);
+        token.setAttribute('cy', 335);
+      } else if (scNum === 4) {
+        // Signed accepted
+        document.getElementById('boxVerify').classList.add('active-allow');
+        document.getElementById('boxTarget').classList.add('active-allow');
+        document.getElementById('pathBoot').classList.add('active');
+        token.setAttribute('cx', 745);
+        token.setAttribute('cy', 35);
+      } else if (scNum === 5) {
+        document.getElementById('boxReject').classList.add('active-block');
+        token.setAttribute('cx', 520);
+        token.setAttribute('cy', 335);
+      }
+    }
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>
