@@ -28,8 +28,8 @@ graph TD
 
 ---
 
-## 2. 10 Core Hardening Categories
-
+## 2. 11 Core Hardening Categories
+ 
 | Category                         | Key Mechanism                                                   | Key Kconfig & Technologies                                                 |
 | :------------------------------- | :-------------------------------------------------------------- | :------------------------------------------------------------------------- |
 | **1. Stack & Buffer**            | Stack frame integrity and buffer boundary verification          | `CONFIG_STACKPROTECTOR_STRONG`, `CONFIG_FORTIFY_SOURCE`                    |
@@ -42,6 +42,7 @@ graph TD
 | **8. Access Control (LSM)**      | Process-level mandatory access control and isolation            | AppArmor, SELinux, Landlock                                                |
 | **9. Integrity Verification**    | Measurement, xattr signing, and policy enforcement              | IMA, EVM, IPE, Kernel Lockdown                                             |
 | **10. Attack Surface Reduction** | Syscall filtering, memory device restrictions, info leak limits | Seccomp-BPF, `CONFIG_STRICT_DEVMEM`, Yama ptrace                           |
+| **11. Modern ARM & Mobile**      | Hardware memory tagging, permission overlays, pKVM & CCA        | ARM64 MTE, ARMv9 POE, AVF / pKVM, Arm CCA                                  |
 
 ---
 

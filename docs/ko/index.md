@@ -28,7 +28,7 @@ graph TD
 
 ---
 
-## 2. 10대 핵심 하드닝 카테고리 로드맵
+## 2. 11대 핵심 하드닝 카테고리 로드맵
 
 | 카테고리                         | 핵심 메커니즘                                           | 주요 Kconfig 및 기술                                                       |
 | :------------------------------- | :------------------------------------------------------ | :------------------------------------------------------------------------- |
@@ -42,6 +42,7 @@ graph TD
 | **8. Access Control (LSM)**      | 프로세스 단위 강제적 접근 통제 및 샌드박싱              | AppArmor, SELinux, Landlock                                                |
 | **9. Integrity Verification**    | 파일 실행 무결성 해시 측정, xattr 서명, 정책 집행       | IMA, EVM, IPE, Kernel Lockdown                                             |
 | **10. Attack Surface Reduction** | 시스템 콜 필터링, 임의 메모리 접근 및 정보 누출 차단    | Seccomp-BPF, `CONFIG_STRICT_DEVMEM`, Yama ptrace                           |
+| **11. Modern ARM & Mobile**      | 하드웨어 메모리 태깅, 권한 오버레이, pKVM 및 기밀 컴퓨팅 | ARM64 MTE, ARMv9 POE, AVF / pKVM, Arm CCA                                  |
 
 ---
 
