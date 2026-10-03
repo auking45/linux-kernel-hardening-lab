@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARMv9 Permission Overlay Extension (POE) Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 920px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.warning {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.blocked {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .svg-canvas {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: block;
+  }
+
+  .status-panel {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .status-badge {
+    font-weight: 700;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .badge-allowed { background: rgba(52, 211, 153, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+  .badge-vulnerable { background: rgba(251, 191, 36, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+  .badge-blocked { background: rgba(248, 113, 113, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+  .node-box {
+    fill: var(--bg-card);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .node-box.highlight {
+    stroke: var(--accent-blue);
+    stroke-width: 2.5;
+  }
+  .node-box.active-block {
+    stroke: var(--accent-red);
+    stroke-width: 2.5;
+    fill: rgba(248, 113, 113, 0.1);
+  }
+  .node-box.active-allow {
+    stroke: var(--accent-green);
+    stroke-width: 2.5;
+    fill: rgba(52, 211, 153, 0.1);
+  }
+
+  .node-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .node-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+  }
+
+  .path-line {
+    stroke: var(--border-color);
+    stroke-width: 2;
+    stroke-dasharray: 4,4;
+    fill: none;
+    transition: stroke 0.3s;
+  }
+  .path-line.active {
+    stroke: var(--accent-blue);
+    stroke-width: 3;
+    stroke-dasharray: none;
+  }
+
+  .token-pulse {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--token-fill));
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div class="led-indicator" id="ledStatus"></div>
+      <span>ARMv9 Permission Overlay Extension (POE / S1POE) Architecture</span>
+    </div>
+    <button class="btn" id="themeToggle" onclick="toggleTheme()">Toggle Theme</button>
+  </div>
+
+  <div class="sim-toolbar">
+    <button class="btn active" id="btnS1" onclick="selectScenario(1)">1. Unlocked Vault (Exposed)</button>
+    <button class="btn" id="btnS2" onclick="selectScenario(2)">2. In-Register 1-Cycle Lockdown</button>
+    <button class="btn" id="btnS3" onclick="selectScenario(3)">3. Exploit Exfiltration Trapped</button>
+    <button class="btn" id="btnS4" onclick="selectScenario(4)">4. Memory Tampering Trapped</button>
+    <button class="btn" id="btnS5" onclick="selectScenario(5)">5. Authorized Fast Access</button>
+    <div style="flex-grow: 1;"></div>
+    <button class="btn" id="btnPlay" onclick="togglePlay()">Play / Pause</button>
+    <button class="btn" id="btnStep" onclick="stepForward()">Step</button>
+    <button class="btn" id="btnReset" onclick="resetSim()">Reset</button>
+  </div>
+
+  <svg class="svg-canvas" viewBox="0 0 880 380" id="mainSvg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--border-color)" id="arrowHead" />
+      </marker>
+    </defs>
+
+    <!-- 1. CPU Execution Context / Thread -->
+    <rect id="boxThread" class="node-box" x="20" y="140" width="160" height="90" rx="8" />
+    <text class="node-text-title" x="35" y="168">Execution Thread</text>
+    <text class="node-text-desc" x="35" y="188" id="lblOpType">Op: LDR [VaultAddr]</text>
+    <text class="node-text-desc" x="35" y="206" id="lblActor">Actor: Untrusted Module</text>
+
+    <!-- Path from Thread to PTE Check -->
+    <path id="pathThreadToPTE" class="path-line" d="M 180 185 L 240 185" marker-end="url(#arrow)" />
+
+    <!-- 2. Page Table Entry (PTE) with Key Index -->
+    <rect id="boxPTE" class="node-box" x="240" y="140" width="160" height="90" rx="8" />
+    <text class="node-text-title" x="255" y="168">Page Table Entry (PTE)</text>
+    <text class="node-text-desc" x="255" y="188">Assigned Protection Key:</text>
+    <rect x="255" y="194" width="75" height="20" rx="3" fill="var(--accent-purple)" opacity="0.3" stroke="var(--accent-purple)" />
+    <text x="260" y="208" font-size="11" fill="var(--text-primary)" id="lblPkeyIndex">PKEY = 1</text>
+
+    <!-- Path from PTE to POR_EL0 Overlay Unit -->
+    <path id="pathPTEToPOR" class="path-line" d="M 400 185 L 460 185" marker-end="url(#arrow)" />
+
+    <!-- 3. POR_EL0 Permission Overlay Register (CPU Hardware) -->
+    <rect id="boxPOR" class="node-box" x="460" y="140" width="190" height="90" rx="8" />
+    <text class="node-text-title" x="475" y="168">POR_EL0 Register</text>
+    <text class="node-text-desc" x="475" y="188" id="lblKey0Perm">Key 0: RW (0x3) [Default]</text>
+    <text class="node-text-desc" x="475" y="206" id="lblKey1Perm" fill="var(--accent-amber)">Key 1: RW (0x3) [Vault]</text>
+
+    <!-- Path to Memory Region (Allow) -->
+    <path id="pathPORToMem" class="path-line" d="M 650 185 L 710 185" marker-end="url(#arrow)" />
+
+    <!-- Path to Fault Trap (Drop Down) -->
+    <path id="pathPORToTrap" class="path-line" d="M 555 230 L 555 280 L 555 310" />
+
+    <!-- 4. Trap Handling Box -->
+    <rect id="boxTrap" class="node-box" x="460" y="300" width="190" height="60" rx="6" />
+    <text class="node-text-title" x="480" y="324" fill="var(--accent-red)" id="lblTrapTitle">HARDWARE OVERLAY FAULT</text>
+    <text class="node-text-desc" x="480" y="342" id="lblTrapDesc">SIGSEGV (SEGV_PKUERR)</text>
+
+    <!-- 5. Protected Memory Compartment (Key 1 Vault) -->
+    <rect id="boxMem" class="node-box" x="710" y="130" width="150" height="110" rx="8" />
+    <text class="node-text-title" x="725" y="156">Protected Vault</text>
+    <text class="node-text-desc" x="725" y="174">Domain: Key 1</text>
+    <rect x="720" y="182" width="130" height="46" rx="4" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text class="node-text-desc" x="726" y="198" font-size="10" fill="var(--accent-purple)">AES-256 Private Key</text>
+    <text class="node-text-desc" x="726" y="214" font-size="10" fill="var(--text-secondary)">0xCAFEBABE...</text>
+
+    <!-- Animated Token -->
+    <circle id="animToken" class="token-pulse" cx="100" cy="185" r="7" style="display:none;" />
+  </svg>
+
+  <div class="status-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span id="badgeOutcome" class="status-badge badge-vulnerable">EXPOSED</span>
+      <span id="stepCounter" style="color: var(--text-secondary); font-size: 0.8rem;">Step: 0 / 4</span>
+    </div>
+    <div id="statusDetails" style="color: var(--text-primary); font-weight: 500;">
+      Select an ARMv9 POE scenario above to observe zero-syscall memory compartmentalization.
+    </div>
+    <div id="securityInsight" style="color: var(--text-secondary); font-size: 0.82rem;">
+      Security Insight: ARMv9 POE decouples memory domain permissions from Page Tables into the POR_EL0 CPU register.
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 1;
+  let currentStep = 0;
+  let isPlaying = false;
+  let timer = null;
+
+  const scenarios = {
+    1: {
+      name: "1. Unlocked Vault (Exposed State)",
+      opType: "Op: LDR [VaultAddr]",
+      actor: "Actor: Untrusted Module",
+      key1Perm: "Key 1: RW (0x3) [UNLOCKED]",
+      trapTitle: "NO TRAP",
+      trapDesc: "Access Granted",
+      badgeClass: "badge-vulnerable",
+      badgeText: "VULNERABLE (SECRET EXPOSED)",
+      ledClass: "warning",
+      steps: [
+        { desc: "Untrusted code executes LDR instruction targeting private key vault.", insight: "Process has not engaged POE compartment isolation." },
+        { desc: "MMU translates virtual address. PTE indicates memory belongs to Protection Key 1.", insight: "PTE assignment is static and set during mprotect/mmap." },
+        { desc: "Hardware consults POR_EL0 register: Key 1 permission is set to 0x3 (Read-Write).", insight: "Overlay check confirms read permission is granted." },
+        { desc: "Data returned to untrusted module! Secret AES key exfiltrated without restriction.", insight: "CRITICAL RISK: Memory safety bugs allow direct theft of credentials and cryptographic keys." }
+      ]
+    },
+    2: {
+      name: "2. In-Register 1-Cycle Lockdown",
+      opType: "Op: MSR POR_EL0, X0",
+      actor: "Actor: Security Manager",
+      key1Perm: "Key 1: NONE (0x0) [LOCKED]",
+      trapTitle: "LOCKDOWN COMPLETE",
+      trapDesc: "0-Syscall In-Register",
+      badgeClass: "badge-allowed",
+      badgeText: "SECURE (COMPARTMENT LOCKED)",
+      ledClass: "",
+      steps: [
+        { desc: "Security manager prepares new permission mask: Key 1 set to POE_PERM_NONE (0x0).", insight: "Zero system calls needed. No context switch to kernel, no TLB shootdown." },
+        { desc: "Executing 'MSR POR_EL0, X0' instruction.", insight: "Single CPU instruction updates thread-local hardware permissions in 1 clock cycle." },
+        { desc: "POR_EL0 register updated in silicon: Key 1 is now completely inaccessible.", insight: "Any subsequent read, write, or execute access to Key 1 will fault immediately." },
+        { desc: "Private key vault locked down! Thread continues executing untrusted code in total safety.", insight: "HIGH PERFORMANCE: Intra-process isolation achieved with zero IPC or page table overhead." }
+      ]
+    },
+    3: {
+      name: "3. Exploit Exfiltration Trapped",
+      opType: "Op: LDR [VaultAddr]",
+      actor: "Actor: Injected ROP / Exploit",
+      key1Perm: "Key 1: NONE (0x0) [LOCKED]",
+      trapTitle: "HARDWARE OVERLAY FAULT",
+      trapDesc: "SIGSEGV (SEGV_PKUERR)",
+      badgeClass: "badge-blocked",
+      badgeText: "TRAPPED (SEGV_PKUERR)",
+      ledClass: "blocked",
+      steps: [
+        { desc: "Injected exploit or vulnerable library executes read instruction on Vault address.", insight: "Attacker attempts to dump private keys from memory." },
+        { desc: "MMU translates address. Page Table indicates memory page is mapped under Key 1.", insight: "Page Table walk proceeds normally." },
+        { desc: "Hardware Overlay unit queries POR_EL0: Key 1 is 0x0 (NONE)! Read denied in silicon!", insight: "Hardware halts load instruction before data can be fetched from cache/DRAM." },
+        { desc: "CPU raises architectural exception: SIGSEGV with SEGV_PKUERR! Exploit aborted!", insight: "DEFENSE SUCCESS: Even with full arbitrary read primitives, protected compartments cannot be exfiltrated." }
+      ]
+    },
+    4: {
+      name: "4. Memory Tampering Trapped",
+      opType: "Op: STR X1, [VaultAddr]",
+      actor: "Actor: Rogue Thread",
+      key1Perm: "Key 1: NONE (0x0) [LOCKED]",
+      trapTitle: "HARDWARE OVERLAY FAULT",
+      trapDesc: "SIGSEGV (SEGV_PKUERR)",
+      badgeClass: "badge-blocked",
+      badgeText: "TRAPPED (WRITE BLOCKED)",
+      ledClass: "blocked",
+      steps: [
+        { desc: "Rogue code or malicious plugin attempts to overwrite secret vault with corrupt data.", insight: "Attacker aims to hijack cryptography or bypass security checks." },
+        { desc: "MMU identifies memory target as Protection Key 1.", insight: "Target is governed by POR_EL0 overlay permissions." },
+        { desc: "Hardware checks POR_EL0: Key 1 does not have write permission (0x0 != 0x3)!", insight: "Single-cycle permission gate blocks pipeline write-back." },
+        { desc: "Store instruction aborted! Hardware raises SEGV_PKUERR; memory data remains pristine.", insight: "DEFENSE SUCCESS: Critical metadata and keys immune to in-memory corruption attacks." }
+      ]
+    },
+    5: {
+      name: "5. Authorized Fast Access Cycle",
+      opType: "Op: Fast Unlock -> Sign -> Relock",
+      actor: "Actor: Trusted Crypto Routine",
+      key1Perm: "Key 1: Fast Dynamic Switch",
+      trapTitle: "NO TRAP",
+      trapDesc: "Safe Dynamic Handover",
+      badgeClass: "badge-allowed",
+      badgeText: "AUTHENTICATED ACCESS",
+      ledClass: "",
+      steps: [
+        { desc: "Authorized cryptographic worker invokes MSR POR_EL0, briefly setting Key 1 = RW.", insight: "Takes 1 CPU cycle to open the vault door." },
+        { desc: "Worker signs transaction or decrypts payload using private key.", insight: "Access permitted only while POR_EL0 holds active permission." },
+        { desc: "Worker immediately executes MSR POR_EL0, restoring Key 1 = NONE.", insight: "Vault re-locked in 1 clock cycle before control returns to application." },
+        { desc: "Transaction completed safely! Attack window eliminated entirely.", insight: "BEST PRACTICE: Compartmentalized defense in depth with microsecond-level exposure window." }
+      ]
+    }
+  };
+
+  function selectScenario(num) {
+    currentScenario = num;
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById(`btnS${i}`).classList.toggle('active', i === num);
+    }
+    resetSim();
+  }
+
+  function resetSim() {
+    stopPlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  function stepForward() {
+    const sc = scenarios[currentScenario];
+    if (currentStep < sc.steps.length) {
+      currentStep++;
+      updateDisplay();
+    } else {
+      resetSim();
+    }
+  }
+
+  function togglePlay() {
+    if (isPlaying) {
+      stopPlay();
+    } else {
+      isPlaying = true;
+      document.getElementById('btnPlay').textContent = "Pause";
+      timer = setInterval(() => {
+        const sc = scenarios[currentScenario];
+        if (currentStep < sc.steps.length) {
+          currentStep++;
+          updateDisplay();
+        } else {
+          stopPlay();
+        }
+      }, 1800);
+    }
+  }
+
+  function stopPlay() {
+    isPlaying = false;
+    document.getElementById('btnPlay').textContent = "Play";
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function updateDisplay() {
+    const sc = scenarios[currentScenario];
+    const led = document.getElementById('ledStatus');
+    led.className = 'led-indicator';
+    if (sc.ledClass) led.classList.add(sc.ledClass);
+
+    document.getElementById('lblOpType').textContent = sc.opType;
+    document.getElementById('lblActor').textContent = sc.actor;
+    document.getElementById('lblKey1Perm').textContent = sc.key1Perm;
+    document.getElementById('lblTrapTitle').textContent = sc.trapTitle;
+    document.getElementById('lblTrapDesc').textContent = sc.trapDesc;
+
+    const badge = document.getElementById('badgeOutcome');
+    badge.className = `status-badge ${sc.badgeClass}`;
+    badge.textContent = sc.badgeText;
+
+    document.getElementById('stepCounter').textContent = `Step: ${currentStep} / ${sc.steps.length}`;
+
+    if (currentStep === 0) {
+      document.getElementById('statusDetails').textContent = `Scenario: ${sc.name}. Click 'Step' or 'Play' to begin.`;
+      document.getElementById('securityInsight').textContent = "Observe how ARMv9 POE checks POR_EL0 in hardware without altering page tables.";
+      hideAllHighlights();
+      document.getElementById('animToken').style.display = 'none';
+      return;
+    }
+
+    const stepInfo = sc.steps[currentStep - 1];
+    document.getElementById('statusDetails').textContent = stepInfo.desc;
+    document.getElementById('securityInsight').textContent = "Security Insight: " + stepInfo.insight;
+
+    applyStepVisuals(currentScenario, currentStep);
+  }
+
+  function hideAllHighlights() {
+    ['boxThread', 'boxPTE', 'boxPOR', 'boxTrap', 'boxMem'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className.baseVal = 'node-box';
+    });
+    ['pathThreadToPTE', 'pathPTEToPOR', 'pathPORToMem', 'pathPORToTrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className.baseVal = 'path-line';
+    });
+  }
+
+  function applyStepVisuals(scNum, step) {
+    hideAllHighlights();
+    const token = document.getElementById('animToken');
+    token.style.display = 'block';
+
+    if (step === 1) {
+      document.getElementById('boxThread').classList.add('highlight');
+      token.setAttribute('cx', 100);
+      token.setAttribute('cy', 185);
+    } else if (step === 2) {
+      document.getElementById('boxPTE').classList.add('highlight');
+      document.getElementById('pathThreadToPTE').classList.add('active');
+      token.setAttribute('cx', 320);
+      token.setAttribute('cy', 185);
+    } else if (step === 3) {
+      document.getElementById('boxPOR').classList.add('highlight');
+      document.getElementById('pathPTEToPOR').classList.add('active');
+      token.setAttribute('cx', 555);
+      token.setAttribute('cy', 185);
+    } else if (step === 4) {
+      if (scNum === 1 || scNum === 5) {
+        document.getElementById('boxPOR').classList.add('active-allow');
+        document.getElementById('pathPORToMem').classList.add('active');
+        document.getElementById('boxMem').classList.add('active-allow');
+        token.setAttribute('cx', 785);
+        token.setAttribute('cy', 185);
+      } else if (scNum === 2) {
+        document.getElementById('boxPOR').classList.add('active-allow');
+        token.setAttribute('cx', 555);
+        token.setAttribute('cy', 185);
+      } else if (scNum === 3 || scNum === 4) {
+        document.getElementById('boxPOR').classList.add('active-block');
+        document.getElementById('pathPORToTrap').classList.add('active');
+        document.getElementById('boxTrap').classList.add('active-block');
+        token.setAttribute('cx', 555);
+        token.setAttribute('cy', 330);
+      }
+    }
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>

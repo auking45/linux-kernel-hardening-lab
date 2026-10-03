@@ -155,6 +155,7 @@ nav:
           - Kexec Restrictions: features/40-kexec-restrict.md
       - 11. Modern ARMv8/ARMv9 & Mobile Security:
           - ARM64 Memory Tagging (MTE): features/41-arm64-mte.md
+          - ARMv9 Permission Overlay (POE): features/42-armv9-poe.md
 
 
 
