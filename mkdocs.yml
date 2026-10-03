@@ -153,6 +153,8 @@ nav:
           - Kernel Info Leaks & Dmesg Restrict: features/38-info-leaks.md
           - Yama LSM Ptrace Scope: features/39-yama-ptrace.md
           - Kexec Restrictions: features/40-kexec-restrict.md
+      - 11. Modern ARMv8/ARMv9 & Mobile Security:
+          - ARM64 Memory Tagging (MTE): features/41-arm64-mte.md
 
 
 

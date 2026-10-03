@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARM64 Memory Tagging Extension (MTE) Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 920px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.warning {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.blocked {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .svg-canvas {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: block;
+  }
+
+  .status-panel {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .status-badge {
+    font-weight: 700;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .badge-allowed { background: rgba(52, 211, 153, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+  .badge-vulnerable { background: rgba(251, 191, 36, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+  .badge-blocked { background: rgba(248, 113, 113, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+  .node-box {
+    fill: var(--bg-card);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .node-box.highlight {
+    stroke: var(--accent-blue);
+    stroke-width: 2.5;
+  }
+  .node-box.active-block {
+    stroke: var(--accent-red);
+    stroke-width: 2.5;
+    fill: rgba(248, 113, 113, 0.1);
+  }
+  .node-box.active-allow {
+    stroke: var(--accent-green);
+    stroke-width: 2.5;
+    fill: rgba(52, 211, 153, 0.1);
+  }
+
+  .node-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .node-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+  }
+
+  .path-line {
+    stroke: var(--border-color);
+    stroke-width: 2;
+    stroke-dasharray: 4,4;
+    fill: none;
+    transition: stroke 0.3s;
+  }
+  .path-line.active {
+    stroke: var(--accent-blue);
+    stroke-width: 3;
+    stroke-dasharray: none;
+  }
+
+  .token-pulse {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--token-fill));
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div class="led-indicator" id="ledStatus"></div>
+      <span>ARM64 Memory Tagging Extension (MTE) Architecture</span>
+    </div>
+    <button class="btn" id="themeToggle" onclick="toggleTheme()">Toggle Theme</button>
+  </div>
+
+  <div class="sim-toolbar">
+    <button class="btn active" id="btnS1" onclick="selectScenario(1)">1. Valid Tagged Access</button>
+    <button class="btn" id="btnS2" onclick="selectScenario(2)">2. Heap Use-After-Free (UAF)</button>
+    <button class="btn" id="btnS3" onclick="selectScenario(3)">3. Heap Out-of-Bounds (OOB)</button>
+    <button class="btn" id="btnS4" onclick="selectScenario(4)">4. Asynchronous Trap Mode</button>
+    <button class="btn" id="btnS5" onclick="selectScenario(5)">5. Unprotected Legacy</button>
+    <div style="flex-grow: 1;"></div>
+    <button class="btn" id="btnPlay" onclick="togglePlay()">Play / Pause</button>
+    <button class="btn" id="btnStep" onclick="stepForward()">Step</button>
+    <button class="btn" id="btnReset" onclick="resetSim()">Reset</button>
+  </div>
+
+  <svg class="svg-canvas" viewBox="0 0 880 380" id="mainSvg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--border-color)" id="arrowHead" />
+      </marker>
+    </defs>
+
+    <!-- 1. CPU Register / Tagged Pointer -->
+    <rect id="boxPtr" class="node-box" x="20" y="140" width="180" height="90" rx="8" />
+    <text class="node-text-title" x="35" y="166">64-bit Pointer (Register)</text>
+    <rect x="35" y="176" width="45" height="22" rx="3" fill="var(--accent-purple)" opacity="0.3" stroke="var(--accent-purple)" />
+    <text x="40" y="191" font-size="11" fill="var(--text-primary)" id="lblLogicalTag">Tag: 0xA</text>
+    <rect x="85" y="176" width="100" height="22" rx="3" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text x="92" y="191" font-size="11" fill="var(--text-secondary)">Address: [47:0]</text>
+    <text class="node-text-desc" x="35" y="218">TBI (Top-Byte-Ignore)</text>
+
+    <!-- Path from Pointer to Comparator -->
+    <path id="pathPtrToComp" class="path-line" d="M 200 185 L 260 185" marker-end="url(#arrow)" />
+
+    <!-- 2. Hardware Tag Comparator (MMU / Execution Unit) -->
+    <rect id="boxComp" class="node-box" x="260" y="140" width="170" height="90" rx="8" />
+    <text class="node-text-title" x="275" y="168">Hardware Tag Check</text>
+    <text class="node-text-desc" x="275" y="188" id="lblCompareText">Compare: 0xA == 0xA ?</text>
+    <text class="node-text-desc" x="275" y="206" id="lblModeText">Mode: PR_MTE_TCF_SYNC</text>
+
+    <!-- 3. Physical Tag Storage (Dedicated SRAM/DRAM) -->
+    <rect id="boxTagStore" class="node-box" x="260" y="20" width="170" height="70" rx="8" />
+    <text class="node-text-title" x="275" y="44">MTE Tag Storage</text>
+    <text class="node-text-desc" x="275" y="62">4-bit tag per 16B granule</text>
+    <text class="node-text-desc" x="275" y="78" id="lblAllocTag">Alloc Tag: 0xA</text>
+
+    <!-- Connect TagStore to Comparator -->
+    <path id="pathTagFetch" class="path-line" d="M 345 90 L 345 140" marker-end="url(#arrow)" />
+
+    <!-- Path from Comparator to Memory (Allow) -->
+    <path id="pathCompToMem" class="path-line" d="M 430 185 L 500 185" marker-end="url(#arrow)" />
+
+    <!-- Path from Comparator to Exception/Trap (Reject) -->
+    <path id="pathCompToTrap" class="path-line" d="M 345 230 L 345 280 L 345 310" />
+
+    <!-- 4. Trap Handling Box -->
+    <rect id="boxTrap" class="node-box" x="260" y="300" width="170" height="60" rx="6" />
+    <text class="node-text-title" x="275" y="324" fill="var(--accent-red)" id="lblTrapTitle">HARDWARE TRAP</text>
+    <text class="node-text-desc" x="275" y="342" id="lblTrapDesc">SIGSEGV (SEGV_MTESERR)</text>
+
+    <!-- 5. Physical Memory Granules (16 Bytes each) -->
+    <rect id="boxMem" class="node-box" x="500" y="120" width="350" height="130" rx="8" />
+    <text class="node-text-title" x="520" y="145">Physical Memory (16-Byte Granules)</text>
+
+    <!-- Granule 0 -->
+    <rect id="boxG0" x="520" y="160" width="95" height="70" rx="4" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text class="node-text-title" x="530" y="180" font-size="11">Granule #0</text>
+    <text class="node-text-desc" x="530" y="196">Offset +0x00</text>
+    <rect x="530" y="202" width="75" height="18" rx="2" fill="var(--accent-purple)" opacity="0.3" stroke="var(--accent-purple)" />
+    <text x="535" y="215" font-size="10" fill="var(--text-primary)" id="lblG0Tag">Tag: 0xA</text>
+
+    <!-- Granule 1 -->
+    <rect id="boxG1" x="625" y="160" width="95" height="70" rx="4" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text class="node-text-title" x="635" y="180" font-size="11">Granule #1</text>
+    <text class="node-text-desc" x="635" y="196">Offset +0x10</text>
+    <rect x="635" y="202" width="75" height="18" rx="2" fill="var(--accent-purple)" opacity="0.3" stroke="var(--accent-purple)" />
+    <text x="640" y="215" font-size="10" fill="var(--text-primary)" id="lblG1Tag">Tag: 0xA</text>
+
+    <!-- Granule 2 (Adjacent Object) -->
+    <rect id="boxG2" x="730" y="160" width="105" height="70" rx="4" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text class="node-text-title" x="740" y="180" font-size="11">Adjacent Object</text>
+    <text class="node-text-desc" x="740" y="196">Offset +0x20</text>
+    <rect x="740" y="202" width="85" height="18" rx="2" fill="var(--accent-amber)" opacity="0.3" stroke="var(--accent-amber)" />
+    <text x="745" y="215" font-size="10" fill="var(--text-primary)" id="lblG2Tag">Tag: 0x7</text>
+
+    <!-- Animated Token -->
+    <circle id="animToken" class="token-pulse" cx="110" cy="185" r="7" style="display:none;" />
+  </svg>
+
+  <div class="status-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span id="badgeOutcome" class="status-badge badge-allowed">ALLOWED</span>
+      <span id="stepCounter" style="color: var(--text-secondary); font-size: 0.8rem;">Step: 0 / 4</span>
+    </div>
+    <div id="statusDetails" style="color: var(--text-primary); font-weight: 500;">
+      Select an MTE scenario above to explore hardware memory safety in action.
+    </div>
+    <div id="securityInsight" style="color: var(--text-secondary); font-size: 0.82rem;">
+      Security Insight: ARM64 MTE introduces 4-bit hardware color tags per 16-byte granule, validating pointer validity in silicon.
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 1;
+  let currentStep = 0;
+  let isPlaying = false;
+  let timer = null;
+
+  const scenarios = {
+    1: {
+      name: "1. Valid Tagged Access",
+      logicalTag: "Tag: 0xA",
+      allocTag: "Alloc Tag: 0xA",
+      compareText: "Compare: 0xA == 0xA",
+      modeText: "Mode: SYNC",
+      trapTitle: "NO TRAP",
+      trapDesc: "Access Verified",
+      g0Tag: "Tag: 0xA",
+      g1Tag: "Tag: 0xA",
+      badgeClass: "badge-allowed",
+      badgeText: "ALLOWED (TAG MATCH)",
+      ledClass: "",
+      steps: [
+        { desc: "CPU prepares 64-bit pointer with Logical Tag 0xA in upper bits [59:56].", insight: "Top-Byte-Ignore (TBI) allows storing 4-bit metadata directly inside pointer registers." },
+        { desc: "Load/Store instruction issued. Hardware fetches physical 4-bit Allocation Tag (0xA) from tag storage.", insight: "Allocation tag represents the color assigned when malloc/mmap carved out this memory." },
+        { desc: "Hardware Tag Check unit performs single-cycle comparison: 0xA == 0xA (Match!).", insight: "Because tags match, the hardware confirms pointer provenance and validity." },
+        { desc: "Memory read/write committed to Physical Granule #0. Normal execution proceeds without overhead.", insight: "Zero software checks, zero pointer sanitization slowdowns." }
+      ]
+    },
+    2: {
+      name: "2. Heap Use-After-Free (UAF)",
+      logicalTag: "Tag: 0xA (Stale)",
+      allocTag: "Alloc Tag: 0x3 (Freed)",
+      compareText: "Compare: 0xA != 0x3 (MISMATCH!)",
+      modeText: "Mode: SYNC",
+      trapTitle: "HARDWARE TRAP",
+      trapDesc: "SIGSEGV (SEGV_MTESERR)",
+      g0Tag: "Tag: 0x3",
+      g1Tag: "Tag: 0x3",
+      badgeClass: "badge-blocked",
+      badgeText: "TRAPPED (UAF PREVENTED)",
+      ledClass: "blocked",
+      steps: [
+        { desc: "Object is freed. Allocator re-tags memory granules with new random color 0x3 (or tombstone).", insight: "Any existing dangling pointers still carry the old tag 0xA." },
+        { desc: "Attacker dereferences dangling pointer (Tag 0xA) attempting Use-After-Free corruption.", insight: "TBI preserves 0xA in the stale pointer register." },
+        { desc: "Hardware fetches current allocation tag 0x3 and compares with pointer tag 0xA: MISMATCH DETECTED!", insight: "Tag mismatch triggers immediate architectural exception before memory is altered." },
+        { desc: "Kernel raises synchronous SIGSEGV with SEGV_MTESERR and exact faulting address. Attack thwarted!", insight: "DEFENSE SUCCESS: Silent heap reuse or control-flow hijacking completely neutralized." }
+      ]
+    },
+    3: {
+      name: "3. Heap Out-of-Bounds (OOB)",
+      logicalTag: "Tag: 0x5 (Buffer 1)",
+      allocTag: "Alloc Tag: 0x7 (Adjacent)",
+      compareText: "Compare: 0x5 != 0x7 (MISMATCH!)",
+      modeText: "Mode: SYNC",
+      trapTitle: "HARDWARE TRAP",
+      trapDesc: "SIGSEGV (SEGV_MTESERR)",
+      g0Tag: "Tag: 0x5",
+      g1Tag: "Tag: 0x5",
+      badgeClass: "badge-blocked",
+      badgeText: "TRAPPED (OOB OVERFLOW)",
+      ledClass: "blocked",
+      steps: [
+        { desc: "Attacker allocates Buffer 1 (tagged 0x5). Adjacent object is allocated with color 0x7.", insight: "Memory allocators assign distinct random tags to neighboring allocations." },
+        { desc: "Attacker writes past Buffer 1 boundary into offset +0x20 using Buffer 1 pointer (Tag 0x5).", insight: "Pointer arithmetic retains the original tag 0x5 across address increments." },
+        { desc: "Access hits Granule #2 (Adjacent Object, Allocation Tag 0x7). Tag comparison: 0x5 != 0x7!", insight: "Hardware detects cross-boundary trespass across the 16-byte granule edge." },
+        { desc: "Synchronous tag check fault halts CPU! Adjacent object remains untouched.", insight: "DEFENSE SUCCESS: Heap buffer overflows and metadata tampering prevented in silicon." }
+      ]
+    },
+    4: {
+      name: "4. Asynchronous Trap Mode",
+      logicalTag: "Tag: 0xA",
+      allocTag: "Alloc Tag: 0x2",
+      compareText: "Compare: 0xA != 0x2 (LOG TO TFSR)",
+      modeText: "Mode: ASYNC (PR_MTE_TCF_ASYNC)",
+      trapTitle: "ASYNC ACCUMULATOR",
+      trapDesc: "TFSR_EL1 Set (SEGV_MTEAERR)",
+      g0Tag: "Tag: 0x2",
+      g1Tag: "Tag: 0x2",
+      badgeClass: "badge-blocked",
+      badgeText: "ASYNC LOGGED (TFSR_EL1)",
+      ledClass: "warning",
+      steps: [
+        { desc: "Production mobile OS (e.g. Android) runs in Asynchronous Mode (PR_MTE_TCF_ASYNC).", insight: "Provides high-performance memory safety without stalling superscalar CPU execution pipelines." },
+        { desc: "A memory corruption or tag mismatch occurs during heap access (Tag 0xA != 0x2).", insight: "Instead of halting the instruction immediately, the CPU writes a bit into TFSR_EL1." },
+        { desc: "Instruction pipeline continues executing without pipeline flush or performance penalty.", insight: "Ideal for production battery-sensitive mobile and IoT devices." },
+        { desc: "At the next context switch or kernel tick, kernel inspects TFSR_EL1 and delivers SEGV_MTEAERR.", insight: "Allows automated crash telemetry collection and exploit containment with <2% overhead." }
+      ]
+    },
+    5: {
+      name: "5. Unprotected Legacy System",
+      logicalTag: "No Tags (0x0)",
+      allocTag: "No Tags",
+      compareText: "No Hardware Tag Checks",
+      modeText: "Legacy / Non-MTE",
+      trapTitle: "NO TRAP (VULNERABLE)",
+      trapDesc: "Silent Corruption",
+      g0Tag: "No Tag",
+      g1Tag: "No Tag",
+      badgeClass: "badge-vulnerable",
+      badgeText: "VULNERABLE (SILENT EXPLOIT)",
+      ledClass: "warning",
+      steps: [
+        { desc: "Legacy CPU or kernel without CONFIG_ARM64_MTE. Pointers contain raw uncolored addresses.", insight: "No metadata is embedded in pointer registers." },
+        { desc: "Attacker triggers Use-After-Free or Out-of-Bounds overflow in heap memory.", insight: "No tag store exists to validate whether the chunk is active or has been reallocated." },
+        { desc: "CPU executes write blindly into freed or neighboring memory without any verification.", insight: "Silent heap memory corruption occurs undetected." },
+        { desc: "Attacker successfully overwrites function pointers or heap headers and hijacks control flow.", insight: "CRITICAL RISK: Memory safety bugs remain exploitable without hardware tagging enforcement." }
+      ]
+    }
+  };
+
+  function selectScenario(num) {
+    currentScenario = num;
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById(`btnS${i}`).classList.toggle('active', i === num);
+    }
+    resetSim();
+  }
+
+  function resetSim() {
+    stopPlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  function stepForward() {
+    const sc = scenarios[currentScenario];
+    if (currentStep < sc.steps.length) {
+      currentStep++;
+      updateDisplay();
+    } else {
+      resetSim();
+    }
+  }
+
+  function togglePlay() {
+    if (isPlaying) {
+      stopPlay();
+    } else {
+      isPlaying = true;
+      document.getElementById('btnPlay').textContent = "Pause";
+      timer = setInterval(() => {
+        const sc = scenarios[currentScenario];
+        if (currentStep < sc.steps.length) {
+          currentStep++;
+          updateDisplay();
+        } else {
+          stopPlay();
+        }
+      }, 1800);
+    }
+  }
+
+  function stopPlay() {
+    isPlaying = false;
+    document.getElementById('btnPlay').textContent = "Play";
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function updateDisplay() {
+    const sc = scenarios[currentScenario];
+    const led = document.getElementById('ledStatus');
+    led.className = 'led-indicator';
+    if (sc.ledClass) led.classList.add(sc.ledClass);
+
+    document.getElementById('lblLogicalTag').textContent = sc.logicalTag;
+    document.getElementById('lblAllocTag').textContent = sc.allocTag;
+    document.getElementById('lblCompareText').textContent = sc.compareText;
+    document.getElementById('lblModeText').textContent = sc.modeText;
+    document.getElementById('lblTrapTitle').textContent = sc.trapTitle;
+    document.getElementById('lblTrapDesc').textContent = sc.trapDesc;
+    document.getElementById('lblG0Tag').textContent = sc.g0Tag;
+    document.getElementById('lblG1Tag').textContent = sc.g1Tag;
+
+    const badge = document.getElementById('badgeOutcome');
+    badge.className = `status-badge ${sc.badgeClass}`;
+    badge.textContent = sc.badgeText;
+
+    document.getElementById('stepCounter').textContent = `Step: ${currentStep} / ${sc.steps.length}`;
+
+    if (currentStep === 0) {
+      document.getElementById('statusDetails').textContent = `Scenario: ${sc.name}. Click 'Step' or 'Play' to begin.`;
+      document.getElementById('securityInsight').textContent = "Observe how ARM64 MTE checks 4-bit logical tags against 16-byte physical memory tags.";
+      hideAllHighlights();
+      document.getElementById('animToken').style.display = 'none';
+      return;
+    }
+
+    const stepInfo = sc.steps[currentStep - 1];
+    document.getElementById('statusDetails').textContent = stepInfo.desc;
+    document.getElementById('securityInsight').textContent = "Security Insight: " + stepInfo.insight;
+
+    applyStepVisuals(currentScenario, currentStep);
+  }
+
+  function hideAllHighlights() {
+    ['boxPtr', 'boxComp', 'boxTagStore', 'boxTrap', 'boxMem', 'boxG0', 'boxG1', 'boxG2'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className.baseVal = el.tagName === 'rect' ? 'node-box' : '';
+    });
+    ['pathPtrToComp', 'pathTagFetch', 'pathCompToMem', 'pathCompToTrap'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className.baseVal = 'path-line';
+    });
+  }
+
+  function applyStepVisuals(scNum, step) {
+    hideAllHighlights();
+    const token = document.getElementById('animToken');
+    token.style.display = 'block';
+
+    if (step === 1) {
+      document.getElementById('boxPtr').classList.add('highlight');
+      token.setAttribute('cx', 110);
+      token.setAttribute('cy', 185);
+    } else if (step === 2) {
+      document.getElementById('boxTagStore').classList.add('highlight');
+      document.getElementById('pathTagFetch').classList.add('active');
+      token.setAttribute('cx', 345);
+      token.setAttribute('cy', 90);
+    } else if (step === 3) {
+      document.getElementById('boxComp').classList.add('highlight');
+      document.getElementById('pathPtrToComp').classList.add('active');
+      token.setAttribute('cx', 345);
+      token.setAttribute('cy', 185);
+    } else if (step === 4) {
+      if (scNum === 1) {
+        document.getElementById('boxComp').classList.add('active-allow');
+        document.getElementById('pathCompToMem').classList.add('active');
+        document.getElementById('boxG0').classList.add('highlight');
+        token.setAttribute('cx', 567);
+        token.setAttribute('cy', 195);
+      } else if (scNum === 2 || scNum === 3) {
+        document.getElementById('boxComp').classList.add('active-block');
+        document.getElementById('pathCompToTrap').classList.add('active');
+        document.getElementById('boxTrap').classList.add('active-block');
+        token.setAttribute('cx', 345);
+        token.setAttribute('cy', 330);
+      } else if (scNum === 4) {
+        document.getElementById('boxComp').classList.add('highlight');
+        document.getElementById('pathCompToTrap').classList.add('active');
+        document.getElementById('boxTrap').classList.add('highlight');
+        token.setAttribute('cx', 345);
+        token.setAttribute('cy', 330);
+      } else if (scNum === 5) {
+        document.getElementById('boxMem').classList.add('active-block');
+        document.getElementById('pathCompToMem').classList.add('active');
+        token.setAttribute('cx', 567);
+        token.setAttribute('cy', 195);
+      }
+    }
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>
