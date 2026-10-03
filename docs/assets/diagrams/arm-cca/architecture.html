@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arm Confidential Compute Architecture (Arm CCA) Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 920px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.warning {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.blocked {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .svg-canvas {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: block;
+  }
+
+  .status-panel {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .status-badge {
+    font-weight: 700;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .badge-allowed { background: rgba(52, 211, 153, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+  .badge-vulnerable { background: rgba(251, 191, 36, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+  .badge-blocked { background: rgba(248, 113, 113, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+  .node-box {
+    fill: var(--bg-card);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .node-box.highlight {
+    stroke: var(--accent-blue);
+    stroke-width: 2.5;
+  }
+  .node-box.active-block {
+    stroke: var(--accent-red);
+    stroke-width: 2.5;
+    fill: rgba(248, 113, 113, 0.1);
+  }
+  .node-box.active-allow {
+    stroke: var(--accent-green);
+    stroke-width: 2.5;
+    fill: rgba(52, 211, 153, 0.1);
+  }
+
+  .node-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .node-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+  }
+
+  .path-line {
+    stroke: var(--border-color);
+    stroke-width: 2;
+    stroke-dasharray: 4,4;
+    fill: none;
+    transition: stroke 0.3s;
+  }
+  .path-line.active {
+    stroke: var(--accent-blue);
+    stroke-width: 3;
+    stroke-dasharray: none;
+  }
+
+  .token-pulse {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--token-fill));
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div class="led-indicator" id="ledStatus"></div>
+      <span>Arm Confidential Compute Architecture (Arm CCA) Architecture</span>
+    </div>
+    <button class="btn" id="themeToggle" onclick="toggleTheme()">Toggle Theme</button>
+  </div>
+
+  <div class="sim-toolbar">
+    <button class="btn active" id="btnS1" onclick="selectScenario(1)">1. Legacy Cloud (Exposed)</button>
+    <button class="btn" id="btnS2" onclick="selectScenario(2)">2. Realm Granule Delegation</button>
+    <button class="btn" id="btnS3" onclick="selectScenario(3)">3. Hypervisor Read Intercepted</button>
+    <button class="btn" id="btnS4" onclick="selectScenario(4)">4. Code Tampering Blocked</button>
+    <button class="btn" id="btnS5" onclick="selectScenario(5)">5. Cryptographic Attestation</button>
+    <div style="flex-grow: 1;"></div>
+    <button class="btn" id="btnPlay" onclick="togglePlay()">Play / Pause</button>
+    <button class="btn" id="btnStep" onclick="stepForward()">Step</button>
+    <button class="btn" id="btnReset" onclick="resetSim()">Reset</button>
+  </div>
+
+  <svg class="svg-canvas" viewBox="0 0 880 380" id="mainSvg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--border-color)" id="arrowHead" />
+      </marker>
+    </defs>
+
+    <!-- 1. Non-Secure World: Cloud Hypervisor / Host OS -->
+    <rect id="boxHost" class="node-box" x="20" y="130" width="180" height="110" rx="8" />
+    <text class="node-text-title" x="35" y="156">Non-Secure World</text>
+    <text class="node-text-desc" x="35" y="174">Host / Cloud Hypervisor</text>
+    <rect x="30" y="184" width="160" height="44" rx="4" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text class="node-text-desc" x="38" y="200" id="lblHostStatus">State: Untrusted Hypervisor</text>
+    <text class="node-text-desc" x="38" y="216" id="lblHostAction">Action: Snooping Realm RAM</text>
+
+    <!-- Path from Host to Granule Protection Unit -->
+    <path id="pathHostToGPC" class="path-line" d="M 200 185 L 260 185" marker-end="url(#arrow)" />
+
+    <!-- 2. Root World (EL3) & RMM (R-EL2) Management Unit -->
+    <rect id="boxRMM" class="node-box" x="260" y="20" width="230" height="85" rx="8" />
+    <text class="node-text-title" x="275" y="44">Realm Management Monitor</text>
+    <text class="node-text-desc" x="275" y="62">Execution Level: R-EL2 (RMM)</text>
+    <text class="node-text-desc" x="275" y="80" id="lblRMMStatus">Root EL3 Monitor Active</text>
+
+    <!-- 3. Hardware Granule Protection Check (GPC) Engine -->
+    <rect id="boxGPC" class="node-box" x="260" y="130" width="230" height="110" rx="8" />
+    <text class="node-text-title" x="275" y="156">Granule Protection Check</text>
+    <text class="node-text-desc" x="275" y="174" id="lblGPTState">GPT State: GPT_REALM</text>
+    <text class="node-text-desc" x="275" y="192">Requester: Non-Secure World</text>
+    <rect x="275" y="202" width="200" height="26" rx="4" fill="var(--accent-purple)" opacity="0.2" stroke="var(--accent-purple)" />
+    <text x="285" y="219" font-size="11" fill="var(--text-primary)">Hardware GPC Filter Active</text>
+
+    <!-- Connect RMM to GPC -->
+    <path id="pathRMMToGPC" class="path-line" d="M 375 105 L 375 130" marker-end="url(#arrow)" />
+
+    <!-- Path from GPC to Realm Memory (Allow) -->
+    <path id="pathGPCToRealm" class="path-line" d="M 490 185 L 560 185" marker-end="url(#arrow)" />
+
+    <!-- Path from GPC to Granule Protection Fault (Drop Down) -->
+    <path id="pathGPCToFault" class="path-line" d="M 375 240 L 375 290 L 375 320" />
+
+    <!-- 4. Granule Protection Fault Box -->
+    <rect id="boxFault" class="node-box" x="260" y="300" width="230" height="60" rx="6" />
+    <text class="node-text-title" x="275" y="324" fill="var(--accent-red)" id="lblFaultTitle">GRANULE PROTECTION FAULT</text>
+    <text class="node-text-desc" x="275" y="342" id="lblFaultDesc">Silicon MMU Blocked Access</text>
+
+    <!-- 5. Realm World: Confidential Realm VM (R-EL1) -->
+    <rect id="boxRealm" class="node-box" x="560" y="120" width="300" height="130" rx="8" />
+    <text class="node-text-title" x="580" y="146">Realm World (Confidential VM)</text>
+    <text class="node-text-desc" x="580" y="164">Execution Level: R-EL1 (Realm)</text>
+    <rect x="575" y="174" width="270" height="64" rx="4" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text class="node-text-desc" x="585" y="194" fill="var(--accent-green)">Isolated Tenant Workload</text>
+    <text class="node-text-desc" x="585" y="210" font-size="10" fill="var(--accent-purple)">Private AI Weights: 0xSECRET_TENSORS</text>
+    <text class="node-text-desc" x="585" y="226" font-size="10" fill="var(--text-secondary)">SHA-256 Attestation Measurement</text>
+
+    <!-- 6. Remote Attestation Verification Banner (Top Right) -->
+    <rect id="boxAttest" class="node-box" x="560" y="20" width="300" height="85" rx="8" style="display:none;" />
+    <text id="lblAttestTitle" class="node-text-title" x="575" y="44" fill="var(--accent-blue)" style="display:none;">Remote Attestation Engine</text>
+    <text id="lblAttestDesc1" class="node-text-desc" x="575" y="62" style="display:none;">Hash: a3f5b721e89b4317...</text>
+    <text id="lblAttestDesc2" class="node-text-desc" x="575" y="80" fill="var(--accent-green)" style="display:none;">Status: Authenticated Realm Identity</text>
+
+    <!-- Animated Token -->
+    <circle id="animToken" class="token-pulse" cx="110" cy="185" r="7" style="display:none;" />
+  </svg>
+
+  <div class="status-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span id="badgeOutcome" class="status-badge badge-vulnerable">VULNERABLE</span>
+      <span id="stepCounter" style="color: var(--text-secondary); font-size: 0.8rem;">Step: 0 / 4</span>
+    </div>
+    <div id="statusDetails" style="color: var(--text-primary); font-weight: 500;">
+      Select an Arm CCA scenario above to observe hardware Realm confidential computing.
+    </div>
+    <div id="securityInsight" style="color: var(--text-secondary); font-size: 0.82rem;">
+      Security Insight: Arm CCA establishes a 4-World model with hardware Granule Protection Checks (GPC).
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 1;
+  let currentStep = 0;
+  let isPlaying = false;
+  let timer = null;
+
+  const scenarios = {
+    1: {
+      name: "1. Legacy Cloud (Host Hypervisor Snooping)",
+      hostStatus: "State: Rogue Hypervisor Root",
+      hostAction: "Action: Dumping Tenant RAM",
+      gptState: "GPT State: GPT_NON_SECURE",
+      faultTitle: "NO FAULT",
+      faultDesc: "Hypervisor Snooping Allowed",
+      badgeClass: "badge-vulnerable",
+      badgeText: "VULNERABLE (HOST SNOOP)",
+      ledClass: "warning",
+      steps: [
+        { desc: "Malicious cloud provider or hypervisor root user targets customer VM memory.", insight: "In standard virtualization, the cloud hypervisor has unrestricted physical RAM access." },
+        { desc: "Hypervisor executes physical memory read instruction targeting guest memory.", insight: "Legacy hardware lacks world-level physical memory segregation." },
+        { desc: "Memory controller executes read blindly. Data returned to cloud host.", insight: "No hardware check intercepts the read." },
+        { desc: "Confidential database keys and AI weights stolen by hypervisor! Zero tenant confidentiality.", insight: "CRITICAL RISK: Traditional cloud requires blind trust in cloud infrastructure operators." }
+      ]
+    },
+    2: {
+      name: "2. Realm Granule Delegation (RMI & GPT Transition)",
+      hostStatus: "State: Standard KVM Hypervisor",
+      hostAction: "Action: Calling RMI_GRANULE_DELEGATE",
+      gptState: "GPT State: GPT_REALM (DELEGATED)",
+      faultTitle: "DELEGATION COMPLETE",
+      faultDesc: "Memory Protected by RMM",
+      badgeClass: "badge-allowed",
+      badgeText: "SECURE (REALM DELEGATED)",
+      ledClass: "",
+      steps: [
+        { desc: "Cloud Hypervisor invokes RMI_GRANULE_DELEGATE SMC call into Realm Management Monitor (RMM).", insight: "Host KVM requests physical memory assignment for a new Realm VM." },
+        { desc: "RMM at Realm EL2 commands hardware Granule Protection Table (GPT) to update.", insight: "Root EL3 Monitor validates the architectural transition." },
+        { desc: "Target 4KB physical granule is transitioned in hardware from GPT_NON_SECURE to GPT_REALM!", insight: "Silicon registers enforce exclusive Realm ownership." },
+        { desc: "Granule is zeroed and mapped into Realm VM (R-EL1). Non-Secure access is permanently revoked.", insight: "ISOLATION ACTIVE: Physical memory is now cryptographically and hardware-locked." }
+      ]
+    },
+    3: {
+      name: "3. Untrusted Hypervisor Read Intercepted (GPC Fault)",
+      hostStatus: "State: Untrusted Cloud Host",
+      hostAction: "Action: Attempting Realm Read",
+      gptState: "GPT State: GPT_REALM (ACCESS DENIED)",
+      faultTitle: "GRANULE PROTECTION FAULT",
+      faultDesc: "GPC Trapped Non-Secure Read (-EPERM)",
+      badgeClass: "badge-blocked",
+      badgeText: "INTERCEPTED (GPC FAULT)",
+      ledClass: "blocked",
+      steps: [
+        { desc: "Untrusted cloud hypervisor attempts to read delegated Realm memory page directly.", insight: "Attacker attempts to dump customer AI model weights or encryption keys." },
+        { desc: "Address translation completes in Host MMU; physical bus transaction initiated.", insight: "Request carries Non-Secure World identity attributes." },
+        { desc: "Hardware Granule Protection Check (GPC) unit compares requester World vs GPT entry: REJECT!", insight: "Non-Secure CPU cores are architecturally forbidden from reading GPT_REALM granules." },
+        { desc: "Hardware raises synchronous Granule Protection Fault (GPF)! Hypervisor receives -EPERM.", insight: "DEFENSE SUCCESS: Tenant memory remains completely confidential against host infrastructure!" }
+      ]
+    },
+    4: {
+      name: "4. Code Tampering & Injection Blocked",
+      hostStatus: "State: Rogue Hypervisor Admin",
+      hostAction: "Action: Writing Malicious Code",
+      gptState: "GPT State: GPT_REALM (WRITE PROTECTED)",
+      faultTitle: "GRANULE PROTECTION FAULT",
+      faultDesc: "GPC Trapped Write Tamper (-EPERM)",
+      badgeClass: "badge-blocked",
+      badgeText: "INTERCEPTED (WRITE BLOCKED)",
+      ledClass: "blocked",
+      steps: [
+        { desc: "Cloud hypervisor attempts to overwrite Realm VM memory with injected backdoor code.", insight: "Attacker attempts to compromise tenant execution integrity." },
+        { desc: "Store instruction dispatched across CPU interconnect.", insight: "GPC hardware filter monitors every cache line write." },
+        { desc: "GPC unit detects illegal write targeting GPT_REALM from Non-Secure world!", insight: "Write-back transaction aborted at the hardware boundary." },
+        { desc: "Silicon halts execution with Granule Protection Fault; Realm code remains untouched.", insight: "INTEGRITY GUARANTEE: Neither code nor execution state can be altered by hypervisors." }
+      ]
+    },
+    5: {
+      name: "5. Cryptographic Remote Attestation",
+      hostStatus: "State: Hypervisor Proxy",
+      hostAction: "Action: RMI_ATTESTATION_TOKEN",
+      gptState: "GPT State: GPT_REALM (VERIFIED)",
+      faultTitle: "ATTESTATION VERIFIED",
+      faultDesc: "Cryptographic Proof Valid",
+      badgeClass: "badge-allowed",
+      badgeText: "ATTESTED (CONFIDENTIAL VM)",
+      ledClass: "",
+      steps: [
+        { desc: "Remote client requests architectural proof of Realm VM identity and security state.", insight: "Client will not deploy sensitive workloads until cryptographic proof is verified." },
+        { desc: "RMM at R-EL2 measures Realm initial code, configuration, and data using SHA-256.", insight: "Measurement is signed by hardware root of trust private keys." },
+        { desc: "Attestation Token returned through hypervisor to remote client.", insight: "Signature cannot be forged or tampered by cloud hypervisors." },
+        { desc: "Remote client validates measurement hash: Realm identity confirmed! Data sent securely.", insight: "CONFIDENTIAL CLOUD: End-to-end mathematical trust from silicon to cloud client." }
+      ]
+    }
+  };
+
+  function selectScenario(num) {
+    currentScenario = num;
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById(`btnS${i}`).classList.toggle('active', i === num);
+    }
+    resetSim();
+  }
+
+  function resetSim() {
+    stopPlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  function stepForward() {
+    const sc = scenarios[currentScenario];
+    if (currentStep < sc.steps.length) {
+      currentStep++;
+      updateDisplay();
+    } else {
+      resetSim();
+    }
+  }
+
+  function togglePlay() {
+    if (isPlaying) {
+      stopPlay();
+    } else {
+      isPlaying = true;
+      document.getElementById('btnPlay').textContent = "Pause";
+      timer = setInterval(() => {
+        const sc = scenarios[currentScenario];
+        if (currentStep < sc.steps.length) {
+          currentStep++;
+          updateDisplay();
+        } else {
+          stopPlay();
+        }
+      }, 1800);
+    }
+  }
+
+  function stopPlay() {
+    isPlaying = false;
+    document.getElementById('btnPlay').textContent = "Play";
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function updateDisplay() {
+    const sc = scenarios[currentScenario];
+    const led = document.getElementById('ledStatus');
+    led.className = 'led-indicator';
+    if (sc.ledClass) led.classList.add(sc.ledClass);
+
+    document.getElementById('lblHostStatus').textContent = sc.hostStatus;
+    document.getElementById('lblHostAction').textContent = sc.hostAction;
+    document.getElementById('lblGPTState').textContent = sc.gptState;
+    document.getElementById('lblFaultTitle').textContent = sc.faultTitle;
+    document.getElementById('lblFaultDesc').textContent = sc.faultDesc;
+
+    const badge = document.getElementById('badgeOutcome');
+    badge.className = `status-badge ${sc.badgeClass}`;
+    badge.textContent = sc.badgeText;
+
+    document.getElementById('stepCounter').textContent = `Step: ${currentStep} / ${sc.steps.length}`;
+
+    if (sc.name.includes("Attestation")) {
+      document.getElementById('boxAttest').style.display = 'block';
+      document.getElementById('lblAttestTitle').style.display = 'block';
+      document.getElementById('lblAttestDesc1').style.display = 'block';
+      document.getElementById('lblAttestDesc2').style.display = 'block';
+    } else {
+      document.getElementById('boxAttest').style.display = 'none';
+      document.getElementById('lblAttestTitle').style.display = 'none';
+      document.getElementById('lblAttestDesc1').style.display = 'none';
+      document.getElementById('lblAttestDesc2').style.display = 'none';
+    }
+
+    if (currentStep === 0) {
+      document.getElementById('statusDetails').textContent = `Scenario: ${sc.name}. Click 'Step' or 'Play' to begin.`;
+      document.getElementById('securityInsight').textContent = "Observe how Arm CCA prevents untrusted cloud hypervisors from snooping Realm VMs.";
+      hideAllHighlights();
+      document.getElementById('animToken').style.display = 'none';
+      return;
+    }
+
+    const stepInfo = sc.steps[currentStep - 1];
+    document.getElementById('statusDetails').textContent = stepInfo.desc;
+    document.getElementById('securityInsight').textContent = "Security Insight: " + stepInfo.insight;
+
+    applyStepVisuals(currentScenario, currentStep);
+  }
+
+  function hideAllHighlights() {
+    ['boxHost', 'boxRMM', 'boxGPC', 'boxFault', 'boxRealm'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className.baseVal = 'node-box';
+    });
+    ['pathHostToGPC', 'pathRMMToGPC', 'pathGPCToRealm', 'pathGPCToFault'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className.baseVal = 'path-line';
+    });
+  }
+
+  function applyStepVisuals(scNum, step) {
+    hideAllHighlights();
+    const token = document.getElementById('animToken');
+    token.style.display = 'block';
+
+    if (step === 1) {
+      document.getElementById('boxHost').classList.add('highlight');
+      token.setAttribute('cx', 110);
+      token.setAttribute('cy', 185);
+    } else if (step === 2) {
+      if (scNum === 2 || scNum === 5) {
+        document.getElementById('boxRMM').classList.add('highlight');
+        document.getElementById('pathRMMToGPC').classList.add('active');
+        token.setAttribute('cx', 375);
+        token.setAttribute('cy', 60);
+      } else {
+        document.getElementById('boxGPC').classList.add('highlight');
+        document.getElementById('pathHostToGPC').classList.add('active');
+        token.setAttribute('cx', 260);
+        token.setAttribute('cy', 185);
+      }
+    } else if (step === 3) {
+      document.getElementById('boxGPC').classList.add('highlight');
+      token.setAttribute('cx', 375);
+      token.setAttribute('cy', 185);
+    } else if (step === 4) {
+      if (scNum === 1) {
+        document.getElementById('boxGPC').classList.add('active-allow');
+        document.getElementById('pathGPCToRealm').classList.add('active');
+        document.getElementById('boxRealm').classList.add('active-allow');
+        token.setAttribute('cx', 710);
+        token.setAttribute('cy', 185);
+      } else if (scNum === 2 || scNum === 5) {
+        document.getElementById('boxRealm').classList.add('active-allow');
+        token.setAttribute('cx', 710);
+        token.setAttribute('cy', 185);
+      } else if (scNum === 3 || scNum === 4) {
+        document.getElementById('boxGPC').classList.add('active-block');
+        document.getElementById('pathGPCToFault').classList.add('active');
+        document.getElementById('boxFault').classList.add('active-block');
+        token.setAttribute('cx', 375);
+        token.setAttribute('cy', 330);
+      }
+    }
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>

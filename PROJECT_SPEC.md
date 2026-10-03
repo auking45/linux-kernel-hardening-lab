@@ -140,4 +140,4 @@
 - [x] **Task 13-1:** ARM64 MTE (Memory Tagging Extension - ARMv8.5/v9 하드웨어 4비트 컬러 태깅, 동기/비동기 트랩, 힙 UAF/OOB 탐지 데모).
 - [x] **Task 13-2:** ARMv9 POE / S1POE (Permission Overlay Extension - ARMv8.9/v9.4 하드웨어 메모리 권한 오버레이 키 실습).
 - [x] **Task 13-3:** AVF (Android Virtualization Framework - pKVM 기반 마이크로 pVM 게스트 격리 및 통신 실습).
-- [ ] **Task 13-4:** Arm CCA (Confidential Compute Architecture - RMM 기반 Realm 기밀 가상머신 메모리 암호화 및 무결성 데모).
+- [x] **Task 13-4:** Arm CCA (Confidential Compute Architecture - RMM 기반 Realm 기밀 가상머신 메모리 암호화 및 무결성 데모).
