@@ -150,6 +150,7 @@ nav:
           - Seccomp-BPF Syscall Filtering: features/35-seccomp.md
           - BPF Hardening & JIT Blinding: features/36-bpf-hardening.md
           - Strict Devmem & Strict I/O: features/37-strict-devmem.md
+          - Kernel Info Leaks & Dmesg Restrict: features/38-info-leaks.md
 
 
 
