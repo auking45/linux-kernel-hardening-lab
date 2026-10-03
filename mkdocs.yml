@@ -148,6 +148,7 @@ nav:
           - Module Signature Verification: features/34-module-sig.md
       - 10. Attack Surface Reduction & System Hardening:
           - Seccomp-BPF Syscall Filtering: features/35-seccomp.md
+          - BPF Hardening & JIT Blinding: features/36-bpf-hardening.md
 
 
 

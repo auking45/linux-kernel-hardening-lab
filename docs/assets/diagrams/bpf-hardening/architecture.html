@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux BPF Hardening & JIT Constant Blinding Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 900px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.permissive {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.violation {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .status-bar {
+    font-family: monospace;
+    font-size: 0.85rem;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-top: 12px;
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .svg-box {
+    fill: var(--bg-primary);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    rx: 8;
+  }
+  .svg-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .svg-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+    font-family: monospace;
+  }
+
+  #token {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--accent-blue));
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div id="led" class="led-indicator"></div>
+      Linux BPF Hardening & Constant Blinding Architecture Simulator
+    </div>
+    <div style="font-family:monospace; font-size:0.8rem; color:var(--text-secondary);">
+      CONFIG_BPF_JIT_ALWAYS_ON=y
+    </div>
+  </div>
+
+  <div class="sim-toolbar">
+    <button id="btn-prog-valid" class="btn active" onclick="selectScenario('valid')">Benign BPF Program</button>
+    <button id="btn-prog-unpriv" class="btn" onclick="selectScenario('unpriv')">Unprivileged BPF Exploit</button>
+    <button id="btn-prog-spray" class="btn" onclick="selectScenario('spray')">JIT-Spray Constant Gadget</button>
+    <div style="flex-grow:1;"></div>
+    <button id="btn-mode" class="btn" onclick="toggleMode()">Mode: Hardened (unprivileged=2, harden=2)</button>
+    <button id="btn-step" class="btn" onclick="stepSimulation()">Next Step ⏭</button>
+    <button id="btn-play" class="btn" onclick="togglePlay()">Auto Play ▶</button>
+    <button id="btn-reset" class="btn" onclick="resetSimulation()">Reset ↺</button>
+    <button class="btn" onclick="toggleTheme()">Theme 🌓</button>
+  </div>
+
+  <svg viewBox="0 0 860 380" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--text-secondary)"/>
+      </marker>
+    </defs>
+
+    <!-- Column 1: Userspace BPF Bytecode Generation -->
+    <g id="col-user">
+      <rect x="20" y="20" width="220" height="340" fill="none" stroke="var(--border-color)" stroke-dasharray="4" rx="8"/>
+      <text class="svg-text-title" x="35" y="45">Userspace / bpf() Syscall</text>
+
+      <!-- Valid Program -->
+      <g id="box-prog-valid" transform="translate(30, 60)">
+        <rect class="svg-box" width="200" height="75"/>
+        <text class="svg-text-title" x="12" y="24">Benign eBPF Program</text>
+        <text class="svg-text-desc" x="12" y="44">BPF_PROG_TYPE_SOCKET_FILTER</text>
+        <text class="svg-text-desc" x="12" y="62" fill="var(--accent-green)">Privileged CAP_BPF / Root</text>
+      </g>
+
+      <!-- Unprivileged Exploit -->
+      <g id="box-prog-unpriv" transform="translate(30, 155)">
+        <rect class="svg-box" width="200" height="85"/>
+        <text class="svg-text-title" x="12" y="24">Unprivileged User Task</text>
+        <text class="svg-text-desc" x="12" y="44">UID=1000 without CAP_BPF</text>
+        <text class="svg-text-desc" x="12" y="60">bpf(BPF_PROG_LOAD, ...)</text>
+        <text class="svg-text-desc" x="12" y="76" fill="var(--accent-red)">Exploit probing kernel BPF</text>
+      </g>
+
+      <!-- JIT Spray Program -->
+      <g id="box-prog-spray" transform="translate(30, 260)">
+        <rect class="svg-box" width="200" height="85"/>
+        <text class="svg-text-title" x="12" y="24">JIT Spray Payload</text>
+        <text class="svg-text-desc" x="12" y="44">MOV64_IMM 0x4831c04831db</text>
+        <text class="svg-text-desc" x="12" y="60">Hidden shellcode inside IMM</text>
+        <text class="svg-text-desc" x="12" y="76" fill="var(--accent-amber)">Seeking native gadget jump</text>
+      </g>
+    </g>
+
+    <!-- Column 2: Kernel BPF Gatekeeper & JIT Blinding -->
+    <g id="col-kernel" transform="translate(280, 20)">
+      <rect class="svg-box" width="300" height="340"/>
+      <text class="svg-text-title" x="20" y="32">Kernel BPF Hardening Engine</text>
+      <text id="svg-mode-text" class="svg-text-desc" x="20" y="52" fill="var(--accent-blue)">
+        unprivileged_bpf_disabled=2 & bpf_jit_harden=2
+      </text>
+
+      <!-- Verifier Gatekeeper -->
+      <g transform="translate(15, 70)">
+        <rect width="270" height="110" fill="var(--bg-card)" stroke="var(--border-color)" rx="6"/>
+        <text class="svg-text-title" x="15" y="28">Access Control & Verifier</text>
+        <text class="svg-text-desc" x="15" y="50">1. unprivileged_bpf_disabled test</text>
+        <text class="svg-text-desc" x="15" y="70">2. DAG static safety analyzer</text>
+        <text class="svg-text-desc" x="15" y="90" fill="var(--accent-purple)">3. CONFIG_BPF_JIT_ALWAYS_ON=y</text>
+      </g>
+
+      <!-- JIT Constant Blinding Box -->
+      <g transform="translate(15, 200)">
+        <rect width="270" height="120" fill="var(--bg-card)" stroke="var(--border-color)" rx="6"/>
+        <text class="svg-text-title" x="15" y="26">JIT Constant Blinding</text>
+        <text class="svg-text-desc" x="15" y="48">bpf_jit_blind_constants()</text>
+        <text class="svg-text-desc" x="15" y="70">Mask M = prandom_u32()</text>
+        <text class="svg-text-desc" x="15" y="92">Emits: (IMM ^ M) followed by XOR M</text>
+        <text id="decision-text" class="svg-text-desc" x="15" y="112" fill="var(--accent-green)">Status: Shellcode constants destroyed</text>
+      </g>
+    </g>
+
+    <!-- Column 3: Memory & Execution Outcome -->
+    <g id="col-outcome" transform="translate(620, 20)">
+      <rect x="0" y="0" width="220" height="340" fill="none" stroke="var(--border-color)" stroke-dasharray="4" rx="8"/>
+      <text class="svg-text-title" x="20" y="32">JIT Compilation Outcome</text>
+
+      <!-- Success Box -->
+      <g id="box-outcome-allow" transform="translate(10, 60)">
+        <rect class="svg-box" width="200" height="110"/>
+        <text id="allow-title" class="svg-text-title" x="15" y="28" fill="var(--accent-green)">JIT COMPILED (SAFE)</text>
+        <text id="allow-desc1" class="svg-text-desc" x="15" y="50">Executable page allocated</text>
+        <text id="allow-desc2" class="svg-text-desc" x="15" y="72">All constants blinded</text>
+        <text class="svg-text-desc" x="15" y="94" fill="var(--accent-green)">Zero exploitable gadgets</text>
+      </g>
+
+      <!-- Denied Box -->
+      <g id="box-outcome-deny" transform="translate(10, 190)">
+        <rect class="svg-box" width="200" height="130"/>
+        <text id="deny-title" class="svg-text-title" x="15" y="28" fill="var(--accent-red)">BLOCKED: -EPERM</text>
+        <text id="deny-desc1" class="svg-text-desc" x="15" y="50">Syscall returned -1</text>
+        <text id="deny-desc2" class="svg-text-desc" x="15" y="72">unprivileged_bpf_disabled</text>
+        <text class="svg-text-desc" x="15" y="92" fill="var(--accent-red)">No BPF program loaded</text>
+        <text class="svg-text-desc" x="15" y="112" fill="var(--text-secondary)">Attack surface eliminated</text>
+      </g>
+    </g>
+
+    <!-- Connecting Pathways -->
+    <path d="M 230 100 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 230 200 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 230 300 L 280 120" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <path d="M 580 120 L 630 115" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+    <path d="M 580 150 L 630 255" stroke="var(--border-color)" stroke-width="2" marker-end="url(#arrow)" fill="none"/>
+
+    <!-- Animated Token -->
+    <circle id="token" cx="130" cy="100" r="10"/>
+  </svg>
+
+  <div class="status-bar">
+    <div id="status-text">Ready. Choose a scenario: Benign BPF Program, Unprivileged BPF Exploit, or JIT Spray.</div>
+    <div id="step-badge" style="font-weight:700; color:var(--accent-blue);">Step: 0/4</div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 'valid'; // 'valid', 'unpriv', 'spray'
+  let isHardened = true;
+  let currentStep = 0;
+  let isPlaying = false;
+  let playInterval = null;
+
+  const positions = {
+    valid: [
+      { cx: 130, cy: 100, text: "Step 1: Privileged process issues bpf(BPF_PROG_LOAD) with valid bytecode." },
+      { cx: 430, cy: 125, text: "Step 2: Gatekeeper validates CAP_BPF / CAP_SYS_ADMIN; Verifier approves program safety." },
+      { cx: 430, cy: 260, text: "Step 3: JIT compiler emits native instructions; Interpreter bypassed (BPF_JIT_ALWAYS_ON)." },
+      { cx: 730, cy: 115, text: "Step 4: Result: BPF program active and attached to socket (ret = fd)." }
+    ],
+    unpriv: [
+      { cx: 130, cy: 200, text: "Step 1: Non-root user (lab / UID 1000) calls sys_bpf() to load custom filter." },
+      { cx: 430, cy: 125, text: "Step 2: Gatekeeper evaluates kernel.unprivileged_bpf_disabled policy." },
+      { cx: 430, cy: 260, text: "Step 3: Verification gate: Missing CAP_SYS_ADMIN/CAP_BPF; unprivileged BPF forbidden." },
+      { cx: 730, cy: 255, text: "" } // Handled dynamically
+    ],
+    spray: [
+      { cx: 130, cy: 300, text: "Step 1: Attacker constructs BPF program embedding raw x86/ARM shellcode inside 32-bit constants." },
+      { cx: 430, cy: 125, text: "Step 2: Verifier processes bytecode; forwards instructions to BPF JIT compiler." },
+      { cx: 430, cy: 260, text: "Step 3: bpf_jit_harden splits every constant using randomized XOR keys (IMM ^ M) ^ M." },
+      { cx: 730, cy: 115, text: "" } // Handled dynamically
+    ]
+  };
+
+  function selectScenario(scenario) {
+    currentScenario = scenario;
+    document.getElementById('btn-prog-valid').classList.toggle('active', scenario === 'valid');
+    document.getElementById('btn-prog-unpriv').classList.toggle('active', scenario === 'unpriv');
+    document.getElementById('btn-prog-spray').classList.toggle('active', scenario === 'spray');
+    resetSimulation();
+  }
+
+  function toggleMode() {
+    isHardened = !isHardened;
+    const btn = document.getElementById('btn-mode');
+    const svgText = document.getElementById('svg-mode-text');
+    const decText = document.getElementById('decision-text');
+
+    if (isHardened) {
+      btn.innerText = "Mode: Hardened (unprivileged=2, harden=2)";
+      svgText.textContent = "unprivileged_bpf_disabled=2 & bpf_jit_harden=2";
+      decText.textContent = "Status: Shellcode constants destroyed";
+    } else {
+      btn.innerText = "Mode: Permissive (unprivileged=0, harden=0)";
+      svgText.textContent = "unprivileged_bpf_disabled=0 & bpf_jit_harden=0";
+      decText.textContent = "Status: Warning: Raw constants emitted into JIT page";
+    }
+    updateDisplay();
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  function updateDisplay() {
+    const token = document.getElementById('token');
+    const statusText = document.getElementById('status-text');
+    const stepBadge = document.getElementById('step-badge');
+    const led = document.getElementById('led');
+    const allowTitle = document.getElementById('allow-title');
+    const allowDesc1 = document.getElementById('allow-desc1');
+    const allowDesc2 = document.getElementById('allow-desc2');
+
+    const posList = positions[currentScenario];
+    const pos = posList[currentStep];
+
+    token.setAttribute('cx', pos.cx);
+    token.setAttribute('cy', pos.cy);
+    stepBadge.innerText = `Step: ${currentStep + 1}/4`;
+
+    const willBlock = (currentScenario === 'unpriv' && isHardened);
+
+    if (currentStep === 3) {
+      if (willBlock) {
+        token.setAttribute('cx', 730);
+        token.setAttribute('cy', 255);
+        token.style.fill = "var(--accent-red)";
+        led.className = "led-indicator violation";
+        statusText.innerText = "Step 4: [BLOCKED] sys_bpf() rejected with -EPERM! Attack surface protected.";
+      } else {
+        token.setAttribute('cx', 730);
+        token.setAttribute('cy', 115);
+        if (currentScenario === 'spray') {
+          if (isHardened) {
+            token.style.fill = "var(--accent-green)";
+            led.className = "led-indicator";
+            allowTitle.textContent = "CONSTANTS BLINDED";
+            allowDesc1.textContent = "Immediate values masked";
+            allowDesc2.textContent = "JIT spray attack neutralized";
+            statusText.innerText = "Step 4: [HARDENED] Shellcode constants blinded via random XOR keys. Exploit fails!";
+          } else {
+            token.style.fill = "var(--accent-amber)";
+            led.className = "led-indicator permissive";
+            allowTitle.textContent = "RAW JIT CONSTANTS";
+            allowDesc1.textContent = "Constants emitted verbatim";
+            allowDesc2.textContent = "Vulnerable to JIT spraying";
+            statusText.innerText = "Step 4: [PERMISSIVE] Raw constants emitted without blinding. Shellcode gadgets exposed!";
+          }
+        } else {
+          token.style.fill = (currentScenario === 'valid') ? "var(--accent-green)" : "var(--accent-amber)";
+          led.className = (currentScenario === 'valid') ? "led-indicator" : "led-indicator permissive";
+          allowTitle.textContent = "JIT COMPILED (SAFE)";
+          allowDesc1.textContent = "Executable page allocated";
+          allowDesc2.textContent = "Normal BPF filter active";
+          statusText.innerText = "Step 4: [ALLOWED] Program loaded successfully into JIT memory.";
+        }
+      }
+    } else {
+      if (currentScenario === 'valid') {
+        token.style.fill = "var(--accent-green)";
+        led.className = "led-indicator";
+      } else if (currentScenario === 'unpriv') {
+        token.style.fill = isHardened ? "var(--accent-red)" : "var(--accent-amber)";
+        led.className = isHardened ? "led-indicator violation" : "led-indicator permissive";
+      } else {
+        token.style.fill = isHardened ? "var(--accent-green)" : "var(--accent-amber)";
+        led.className = isHardened ? "led-indicator" : "led-indicator permissive";
+      }
+      statusText.innerText = pos.text;
+    }
+  }
+
+  function stepSimulation() {
+    currentStep = (currentStep + 1) % 4;
+    updateDisplay();
+  }
+
+  function togglePlay() {
+    const btn = document.getElementById('btn-play');
+    if (isPlaying) {
+      clearInterval(playInterval);
+      isPlaying = false;
+      btn.innerText = "Auto Play ▶";
+    } else {
+      isPlaying = true;
+      btn.innerText = "Pause ⏸";
+      playInterval = setInterval(() => {
+        stepSimulation();
+      }, 1400);
+    }
+  }
+
+  function resetSimulation() {
+    if (isPlaying) togglePlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>
