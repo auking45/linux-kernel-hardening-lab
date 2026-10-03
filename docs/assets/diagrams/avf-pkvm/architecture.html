@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android Virtualization Framework (AVF / pKVM) Architecture Simulator</title>
+<style>
+  :root {
+    --bg-primary: #0f172a;
+    --bg-card: #1e293b;
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --border-color: #334155;
+    --accent-blue: #38bdf8;
+    --accent-green: #34d399;
+    --accent-red: #f87171;
+    --accent-amber: #fbbf24;
+    --accent-purple: #c084fc;
+    --token-fill: #38bdf8;
+    --led-glow: rgba(52, 211, 153, 0.6);
+  }
+
+  body.light-mode {
+    --bg-primary: #f8fafc;
+    --bg-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --border-color: #cbd5e1;
+    --accent-blue: #0284c7;
+    --accent-green: #059669;
+    --accent-red: #dc2626;
+    --accent-amber: #d97706;
+    --accent-purple: #7c3aed;
+    --token-fill: #0284c7;
+    --led-glow: rgba(5, 150, 105, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    min-height: 100vh;
+  }
+
+  .sim-container {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 16px;
+    width: 100%;
+    max-width: 920px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+  }
+
+  .sim-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sim-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .led-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: var(--accent-green);
+    box-shadow: 0 0 10px var(--led-glow);
+    transition: background-color 0.3s, box-shadow 0.3s;
+  }
+  .led-indicator.warning {
+    background-color: var(--accent-amber);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.6);
+  }
+  .led-indicator.blocked {
+    background-color: var(--accent-red);
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.8);
+  }
+
+  .sim-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+
+  .btn {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+  .btn.active {
+    background: var(--accent-blue);
+    color: #ffffff;
+    border-color: var(--accent-blue);
+  }
+
+  .svg-canvas {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    display: block;
+  }
+
+  .status-panel {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .status-badge {
+    font-weight: 700;
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+  }
+  .badge-allowed { background: rgba(52, 211, 153, 0.2); color: var(--accent-green); border: 1px solid var(--accent-green); }
+  .badge-vulnerable { background: rgba(251, 191, 36, 0.2); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+  .badge-blocked { background: rgba(248, 113, 113, 0.2); color: var(--accent-red); border: 1px solid var(--accent-red); }
+
+  .node-box {
+    fill: var(--bg-card);
+    stroke: var(--border-color);
+    stroke-width: 1.5;
+    transition: stroke 0.3s, fill 0.3s;
+  }
+  .node-box.highlight {
+    stroke: var(--accent-blue);
+    stroke-width: 2.5;
+  }
+  .node-box.active-block {
+    stroke: var(--accent-red);
+    stroke-width: 2.5;
+    fill: rgba(248, 113, 113, 0.1);
+  }
+  .node-box.active-allow {
+    stroke: var(--accent-green);
+    stroke-width: 2.5;
+    fill: rgba(52, 211, 153, 0.1);
+  }
+
+  .node-text-title {
+    fill: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .node-text-desc {
+    fill: var(--text-secondary);
+    font-size: 11px;
+  }
+
+  .path-line {
+    stroke: var(--border-color);
+    stroke-width: 2;
+    stroke-dasharray: 4,4;
+    fill: none;
+    transition: stroke 0.3s;
+  }
+  .path-line.active {
+    stroke: var(--accent-blue);
+    stroke-width: 3;
+    stroke-dasharray: none;
+  }
+
+  .token-pulse {
+    fill: var(--token-fill);
+    filter: drop-shadow(0 0 6px var(--token-fill));
+  }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <div class="sim-header">
+    <div class="sim-title">
+      <div class="led-indicator" id="ledStatus"></div>
+      <span>Android Virtualization Framework (AVF / pKVM) Architecture</span>
+    </div>
+    <button class="btn" id="themeToggle" onclick="toggleTheme()">Toggle Theme</button>
+  </div>
+
+  <div class="sim-toolbar">
+    <button class="btn active" id="btnS1" onclick="selectScenario(1)">1. Legacy KVM (Exposed)</button>
+    <button class="btn" id="btnS2" onclick="selectScenario(2)">2. pKVM Memory Donation</button>
+    <button class="btn" id="btnS3" onclick="selectScenario(3)">3. Host Read Intercepted</button>
+    <button class="btn" id="btnS4" onclick="selectScenario(4)">4. Host Tampering Blocked</button>
+    <button class="btn" id="btnS5" onclick="selectScenario(5)">5. Virtio-Vsock RPC Channel</button>
+    <div style="flex-grow: 1;"></div>
+    <button class="btn" id="btnPlay" onclick="togglePlay()">Play / Pause</button>
+    <button class="btn" id="btnStep" onclick="stepForward()">Step</button>
+    <button class="btn" id="btnReset" onclick="resetSim()">Reset</button>
+  </div>
+
+  <svg class="svg-canvas" viewBox="0 0 880 380" id="mainSvg">
+    <defs>
+      <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--border-color)" id="arrowHead" />
+      </marker>
+    </defs>
+
+    <!-- 1. Host Android OS (Non-Secure EL1) -->
+    <rect id="boxHost" class="node-box" x="20" y="130" width="180" height="110" rx="8" />
+    <text class="node-text-title" x="35" y="156">Host Android OS</text>
+    <text class="node-text-desc" x="35" y="174">Execution Level: EL1</text>
+    <rect x="30" y="184" width="160" height="44" rx="4" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text class="node-text-desc" x="38" y="200" id="lblHostStatus">State: Compromised Root</text>
+    <text class="node-text-desc" x="38" y="216" id="lblHostAction">Action: Snooping pVM RAM</text>
+
+    <!-- Path from Host to Hypervisor / Stage-2 -->
+    <path id="pathHostToS2" class="path-line" d="M 200 185 L 270 185" marker-end="url(#arrow)" />
+
+    <!-- 2. pKVM Hypervisor (EL2 Secure Boundary) -->
+    <rect id="boxHypervisor" class="node-box" x="270" y="20" width="220" height="85" rx="8" />
+    <text class="node-text-title" x="285" y="46">pKVM Hypervisor</text>
+    <text class="node-text-desc" x="285" y="64">Execution Level: EL2</text>
+    <text class="node-text-desc" x="285" y="82" id="lblHypervisorMode">Mode: Host Deprivileged</text>
+
+    <!-- 3. Stage-2 Page Table (S2PT) Isolation Unit -->
+    <rect id="boxS2PT" class="node-box" x="270" y="130" width="220" height="110" rx="8" />
+    <text class="node-text-title" x="285" y="156">Stage-2 Page Table (S2PT)</text>
+    <text class="node-text-desc" x="285" y="174" id="lblS2Status">Host Mapping: UNMAPPED</text>
+    <text class="node-text-desc" x="285" y="192">pVM Mapping: Read-Write</text>
+    <rect x="285" y="202" width="190" height="26" rx="4" fill="var(--accent-purple)" opacity="0.2" stroke="var(--accent-purple)" />
+    <text x="295" y="219" font-size="11" fill="var(--text-primary)">Memory Ownership: pVM #1</text>
+
+    <!-- Path from Hypervisor to S2PT -->
+    <path id="pathHypToS2" class="path-line" d="M 380 105 L 380 130" marker-end="url(#arrow)" />
+
+    <!-- Path from S2PT to pVM (Allow) -->
+    <path id="pathS2ToPVM" class="path-line" d="M 490 185 L 560 185" marker-end="url(#arrow)" />
+
+    <!-- Path from S2PT to Stage-2 Abort (Drop Down) -->
+    <path id="pathS2ToAbort" class="path-line" d="M 380 240 L 380 290 L 380 320" />
+
+    <!-- 4. Stage-2 Abort / Hardware Trap Box -->
+    <rect id="boxAbort" class="node-box" x="270" y="300" width="220" height="60" rx="6" />
+    <text class="node-text-title" x="285" y="324" fill="var(--accent-red)" id="lblAbortTitle">STAGE-2 DATA ABORT</text>
+    <text class="node-text-desc" x="285" y="342" id="lblAbortDesc">Host EL1 Access Intercepted</text>
+
+    <!-- 5. Protected Micro-Guest (pVM, EL1) -->
+    <rect id="boxPVM" class="node-box" x="560" y="120" width="300" height="130" rx="8" />
+    <text class="node-text-title" x="580" y="146">Protected Micro-Guest (pVM)</text>
+    <text class="node-text-desc" x="580" y="164">Execution Level: Guest EL1</text>
+    <rect x="575" y="174" width="270" height="64" rx="4" fill="var(--bg-primary)" stroke="var(--border-color)" />
+    <text class="node-text-desc" x="585" y="194" fill="var(--accent-green)">Protected Confidential Enclave</text>
+    <text class="node-text-desc" x="585" y="210" font-size="10" fill="var(--accent-purple)">Biometric Key: 0x1337_IRIS_DATA</text>
+    <text class="node-text-desc" x="585" y="226" font-size="10" fill="var(--text-secondary)">DRM / Keystore Applet Running</text>
+
+    <!-- 6. Isolated Virtio-Vsock Channel (Bridge over top) -->
+    <path id="pathVsock" class="path-line" d="M 110 130 L 110 30 L 710 30 L 710 120" />
+    <rect id="boxVsock" class="node-box" x="340" y="15" width="200" height="30" rx="4" style="display:none;" />
+    <text id="lblVsockText" class="node-text-title" x="355" y="35" font-size="11" fill="var(--accent-blue)" style="display:none;">virtio-vsock Encrypted RPC</text>
+
+    <!-- Animated Token -->
+    <circle id="animToken" class="token-pulse" cx="110" cy="185" r="7" style="display:none;" />
+  </svg>
+
+  <div class="status-panel">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span id="badgeOutcome" class="status-badge badge-vulnerable">VULNERABLE</span>
+      <span id="stepCounter" style="color: var(--text-secondary); font-size: 0.8rem;">Step: 0 / 4</span>
+    </div>
+    <div id="statusDetails" style="color: var(--text-primary); font-weight: 500;">
+      Select an AVF / pKVM scenario above to observe hardware-enforced micro-guest isolation.
+    </div>
+    <div id="securityInsight" style="color: var(--text-secondary); font-size: 0.82rem;">
+      Security Insight: pKVM deprivileges the host Android kernel, preventing root compromises from leaking guest secrets.
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentScenario = 1;
+  let currentStep = 0;
+  let isPlaying = false;
+  let timer = null;
+
+  const scenarios = {
+    1: {
+      name: "1. Legacy KVM (Host Snooping Vulnerability)",
+      hostStatus: "State: Compromised Root",
+      hostAction: "Action: Snooping pVM RAM",
+      hypervisorMode: "Mode: Legacy KVM (Host Privileged)",
+      s2Status: "Host Mapping: FULL ACCESS",
+      abortTitle: "NO ABORT",
+      abortDesc: "Memory Snooping Allowed",
+      badgeClass: "badge-vulnerable",
+      badgeText: "VULNERABLE (HOST SNOOP)",
+      ledClass: "warning",
+      steps: [
+        { desc: "Attacker executes Kernel LPE on host Android OS, acquiring root and arbitrary kernel execution.", insight: "In standard virtualization, the host kernel manages stage-2 translations with full read/write rights." },
+        { desc: "Host kernel issues direct memory load targeting guest physical address.", insight: "Legacy hypervisor does not protect guest pages from host access." },
+        { desc: "Stage-2 translation resolves address without restriction. Data fetched into host memory.", insight: "No fault is raised; host has unrestricted access." },
+        { desc: "Attacker dumps biometric facial templates and DRM master keys! Entire enclave compromised.", insight: "CRITICAL COMPROMISE: Host kernel compromise cascades into full guest compromise." }
+      ]
+    },
+    2: {
+      name: "2. pKVM Memory Donation & Stage-2 Unmapping",
+      hostStatus: "State: Deprivileged Host EL1",
+      hostAction: "Action: Spawning pVM #1",
+      hypervisorMode: "Mode: pKVM Active (EL2)",
+      s2Status: "Host Mapping: UNMAPPED",
+      abortTitle: "DONATION COMPLETE",
+      abortDesc: "Page Donated to pVM",
+      badgeClass: "badge-allowed",
+      badgeText: "SECURE (STAGE-2 UNMAPPED)",
+      ledClass: "",
+      steps: [
+        { desc: "Host requests pKVM hypervisor to carve out and donate physical memory pages for pVM #1.", insight: "Host voluntarily surrenders control of memory pages to the hypervisor." },
+        { desc: "pKVM Hypervisor at EL2 takes exclusive ownership of the donated pages.", insight: "EL2 hypervisor is small, audited, and mathematically isolated from host vulnerabilities." },
+        { desc: "Hypervisor updates Stage-2 Page Tables: pages are strictly UNMAPPED from Host EL1!", insight: "Host Stage-2 translation is completely erased; host physical address becomes a black hole." },
+        { desc: "pVM micro-guest boots securely with isolated Stage-2 mapping. Host access is permanently revoked.", insight: "STRONG ISOLATION: Host kernel is deprivileged and cannot read or write pVM pages." }
+      ]
+    },
+    3: {
+      name: "3. Host Read Intercepted (Stage-2 Data Abort)",
+      hostStatus: "State: Rooted Host Attacker",
+      hostAction: "Action: Attempting pVM Read",
+      hypervisorMode: "Mode: pKVM Enforcing (EL2)",
+      s2Status: "Host Mapping: UNMAPPED (FAULT)",
+      abortTitle: "STAGE-2 DATA ABORT",
+      abortDesc: "Host Read Trapped (-EPERM)",
+      badgeClass: "badge-blocked",
+      badgeText: "INTERCEPTED (-EPERM)",
+      ledClass: "blocked",
+      steps: [
+        { desc: "Rooted attacker on host attempts direct read of pVM #1 memory page via /dev/mem or physical mapping.", insight: "Attacker attempts to bypass Android security boundaries using root privileges." },
+        { desc: "Memory access passes through Stage-1 MMU and hits Stage-2 Translation at EL2.", insight: "Hardware enforces Stage-2 translation independently of host kernel page tables." },
+        { desc: "Stage-2 translation fails! Target page is unmapped for Host EL1. Hardware raises Stage-2 Data Abort!", insight: "Hypervisor intercepts exception at EL2 before data is read from silicon." },
+        { desc: "pKVM hypervisor rejects read and returns -EPERM to host. Biometric keys remain 100% confidential!", insight: "DEFENSE SUCCESS: Even full kernel compromise on Android cannot breach pVM micro-guest memory." }
+      ]
+    },
+    4: {
+      name: "4. Host Tampering / Code Injection Blocked",
+      hostStatus: "State: Rogue Host Kernel",
+      hostAction: "Action: Writing Malicious Code",
+      hypervisorMode: "Mode: pKVM Enforcing (EL2)",
+      s2Status: "Host Mapping: UNMAPPED (WRITE FAULT)",
+      abortTitle: "STAGE-2 WRITE FAULT",
+      abortDesc: "Host Write Trapped (-EPERM)",
+      badgeClass: "badge-blocked",
+      badgeText: "INTERCEPTED (TAMPER BLOCKED)",
+      ledClass: "blocked",
+      steps: [
+        { desc: "Compromised host kernel attempts to inject malicious shellcode into pVM executable memory.", insight: "Attacker attempts to hijack pVM control flow or tamper with DRM validation." },
+        { desc: "Store instruction issued towards pVM physical page.", insight: "Host MMU outputs physical address; Stage-2 translation engine takes over." },
+        { desc: "Hardware detects write violation: Host has no Stage-2 write permission on pVM donated page!", insight: "Stage-2 permission fault halts instruction execution instantly." },
+        { desc: "pKVM blocks write-back; memory contents remain unmodified. Return -EPERM.", insight: "INTEGRITY GUARANTEE: pVM code and execution state are immune to host kernel modification." }
+      ]
+    },
+    5: {
+      name: "5. Authenticated Virtio-Vsock RPC Channel",
+      hostStatus: "State: Standard Host Client",
+      hostAction: "Action: Vsock RPC Query",
+      hypervisorMode: "Mode: pKVM Secure Bridge",
+      s2Status: "Host Mapping: Isolated",
+      abortTitle: "VSOCK VERIFIED",
+      abortDesc: "End-to-End Encrypted RPC",
+      badgeClass: "badge-allowed",
+      badgeText: "SECURE RPC (VSOCK)",
+      ledClass: "",
+      steps: [
+        { desc: "Host application sends biometric verification query via standardized virtio-vsock protocol.", insight: "Communication occurs without sharing raw memory pages." },
+        { desc: "pKVM hypervisor brokers network packet transport over virtualized ring buffers.", insight: "Data is copied through controlled hypervisor shared memory windows." },
+        { desc: "pVM micro-guest processes verification request inside isolated enclave.", insight: "Private credentials never leave the pVM perimeter." },
+        { desc: "pVM returns simple boolean result ('AUTHENTICATED: YES'). Host receives response safely.", insight: "PRODUCTION PARADIGM: Zero-trust micro-services architecture inside modern Android devices." }
+      ]
+    }
+  };
+
+  function selectScenario(num) {
+    currentScenario = num;
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById(`btnS${i}`).classList.toggle('active', i === num);
+    }
+    resetSim();
+  }
+
+  function resetSim() {
+    stopPlay();
+    currentStep = 0;
+    updateDisplay();
+  }
+
+  function stepForward() {
+    const sc = scenarios[currentScenario];
+    if (currentStep < sc.steps.length) {
+      currentStep++;
+      updateDisplay();
+    } else {
+      resetSim();
+    }
+  }
+
+  function togglePlay() {
+    if (isPlaying) {
+      stopPlay();
+    } else {
+      isPlaying = true;
+      document.getElementById('btnPlay').textContent = "Pause";
+      timer = setInterval(() => {
+        const sc = scenarios[currentScenario];
+        if (currentStep < sc.steps.length) {
+          currentStep++;
+          updateDisplay();
+        } else {
+          stopPlay();
+        }
+      }, 1800);
+    }
+  }
+
+  function stopPlay() {
+    isPlaying = false;
+    document.getElementById('btnPlay').textContent = "Play";
+    if (timer) { clearInterval(timer); timer = null; }
+  }
+
+  function updateDisplay() {
+    const sc = scenarios[currentScenario];
+    const led = document.getElementById('ledStatus');
+    led.className = 'led-indicator';
+    if (sc.ledClass) led.classList.add(sc.ledClass);
+
+    document.getElementById('lblHostStatus').textContent = sc.hostStatus;
+    document.getElementById('lblHostAction').textContent = sc.hostAction;
+    document.getElementById('lblHypervisorMode').textContent = sc.hypervisorMode;
+    document.getElementById('lblS2Status').textContent = sc.s2Status;
+    document.getElementById('lblAbortTitle').textContent = sc.abortTitle;
+    document.getElementById('lblAbortDesc').textContent = sc.abortDesc;
+
+    const badge = document.getElementById('badgeOutcome');
+    badge.className = `status-badge ${sc.badgeClass}`;
+    badge.textContent = sc.badgeText;
+
+    document.getElementById('stepCounter').textContent = `Step: ${currentStep} / ${sc.steps.length}`;
+
+    if (currentStep === 0) {
+      document.getElementById('statusDetails').textContent = `Scenario: ${sc.name}. Click 'Step' or 'Play' to begin.`;
+      document.getElementById('securityInsight').textContent = "Observe how pKVM deprivileges the Host Android OS using Stage-2 Page Tables.";
+      hideAllHighlights();
+      document.getElementById('animToken').style.display = 'none';
+      document.getElementById('pathVsock').classList.remove('active');
+      document.getElementById('boxVsock').style.display = 'none';
+      document.getElementById('lblVsockText').style.display = 'none';
+      return;
+    }
+
+    const stepInfo = sc.steps[currentStep - 1];
+    document.getElementById('statusDetails').textContent = stepInfo.desc;
+    document.getElementById('securityInsight').textContent = "Security Insight: " + stepInfo.insight;
+
+    applyStepVisuals(currentScenario, currentStep);
+  }
+
+  function hideAllHighlights() {
+    ['boxHost', 'boxHypervisor', 'boxS2PT', 'boxAbort', 'boxPVM'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className.baseVal = 'node-box';
+    });
+    ['pathHostToS2', 'pathHypToS2', 'pathS2ToPVM', 'pathS2ToAbort'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.className.baseVal = 'path-line';
+    });
+  }
+
+  function applyStepVisuals(scNum, step) {
+    hideAllHighlights();
+    const token = document.getElementById('animToken');
+    token.style.display = 'block';
+
+    if (scNum === 5) {
+      document.getElementById('pathVsock').classList.add('active');
+      document.getElementById('boxVsock').style.display = 'block';
+      document.getElementById('lblVsockText').style.display = 'block';
+
+      if (step === 1) {
+        document.getElementById('boxHost').classList.add('highlight');
+        token.setAttribute('cx', 110);
+        token.setAttribute('cy', 80);
+      } else if (step === 2) {
+        token.setAttribute('cx', 440);
+        token.setAttribute('cy', 30);
+      } else if (step === 3 || step === 4) {
+        document.getElementById('boxPVM').classList.add('active-allow');
+        token.setAttribute('cx', 710);
+        token.setAttribute('cy', 185);
+      }
+      return;
+    } else {
+      document.getElementById('pathVsock').classList.remove('active');
+      document.getElementById('boxVsock').style.display = 'none';
+      document.getElementById('lblVsockText').style.display = 'none';
+    }
+
+    if (step === 1) {
+      document.getElementById('boxHost').classList.add('highlight');
+      token.setAttribute('cx', 110);
+      token.setAttribute('cy', 185);
+    } else if (step === 2) {
+      if (scNum === 2) {
+        document.getElementById('boxHypervisor').classList.add('highlight');
+        document.getElementById('pathHypToS2').classList.add('active');
+        token.setAttribute('cx', 380);
+        token.setAttribute('cy', 60);
+      } else {
+        document.getElementById('boxS2PT').classList.add('highlight');
+        document.getElementById('pathHostToS2').classList.add('active');
+        token.setAttribute('cx', 270);
+        token.setAttribute('cy', 185);
+      }
+    } else if (step === 3) {
+      document.getElementById('boxS2PT').classList.add('highlight');
+      token.setAttribute('cx', 380);
+      token.setAttribute('cy', 185);
+    } else if (step === 4) {
+      if (scNum === 1) {
+        document.getElementById('boxS2PT').classList.add('active-allow');
+        document.getElementById('pathS2ToPVM').classList.add('active');
+        document.getElementById('boxPVM').classList.add('active-allow');
+        token.setAttribute('cx', 680);
+        token.setAttribute('cy', 185);
+      } else if (scNum === 2) {
+        document.getElementById('boxPVM').classList.add('active-allow');
+        token.setAttribute('cx', 680);
+        token.setAttribute('cy', 185);
+      } else if (scNum === 3 || scNum === 4) {
+        document.getElementById('boxS2PT').classList.add('active-block');
+        document.getElementById('pathS2ToAbort').classList.add('active');
+        document.getElementById('boxAbort').classList.add('active-block');
+        token.setAttribute('cx', 380);
+        token.setAttribute('cy', 330);
+      }
+    }
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('light-mode');
+  }
+
+  // Initialize
+  updateDisplay();
+</script>
+</body>
+</html>
