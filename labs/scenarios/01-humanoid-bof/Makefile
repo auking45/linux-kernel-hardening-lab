@@ -1,5 +1,4 @@
-# Linux Kernel Hardening Lab - Scenario 01 Makefile
-CC ?= clang
+CC = clang
 CFLAGS ?= -O2 -Wall -Wextra
 
 TARGET = humanoid_bof_demo

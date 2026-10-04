@@ -104,6 +104,7 @@ nav:
   - Attack Scenarios:
       - Roadmap & Overview: scenarios/index.md
       - 01. Humanoid BOF & Stack Canary: scenarios/01-humanoid-bof.md
+      - 02. ret2usr & SMEP/PXN Defense: scenarios/02-ret2usr.md
   - Features:
       - Taxonomy Roadmap: features/index.md
       - 01. Stack & Buffer Protection:

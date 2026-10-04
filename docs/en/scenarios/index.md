@@ -20,7 +20,7 @@ While the `Features` tab acts as an encyclopedic specification of 44 hardening f
 | Scenario | Core Vulnerability & Technique | Real-World CVE Precedent | Primary & Secondary Defenses | Status |
 | :---: | :--- | :--- | :--- | :---: |
 | **01** | **[Stack Buffer Overflow (BOF)](01-humanoid-bof.md)** | **CVE-2026-76640** (Unitree G1 EDU BLE Daemon BOF ➔ Locomotion PC Root) | **Stack Protector** & **Fortify Source** | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **02** | **Return-to-User (ret2usr)** | **CVE-2017-7308** (Packet Socket Bug ➔ User Shellcode Execution) | **SMEP** (x86) & **PXN** (ARM64) | Planned |
+| **02** | **[Return-to-User (ret2usr)](02-ret2usr.md)** | **CVE-2017-7308** (Packet Socket Bug ➔ User Shellcode Execution) | **SMEP** (x86) & **PXN** (ARM64) | <span style="color: #22c55e; font-weight: bold;">Active</span> |
 | **03** | **User Data Access (ret2dir / SMAP)** | **CVE-2016-8655** (Packet Socket UAF ➔ User Data Tampering) | **SMAP** (x86) & **PAN** (ARM64) | Planned |
 | **04** | **Heap UAF & SLAB Corruption** | **CVE-2022-0185** (fs_context Heap BOF ➔ `struct cred` Overwrite) | **SLAB Freelist Hardening** & **KFENCE** | Planned |
 | **05** | **Control Flow Hijacking (CFI)** | **CVE-2021-4154** (Type Confusion ➔ Indirect Function Pointer Hijack) | **Clang kCFI** & **ARM64 PAC/BTI** | Planned |

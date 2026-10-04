@@ -24,7 +24,7 @@
 | 시나리오 | 핵심 취약점 및 공격 기술 | 실제 현실 CVE 사례 | 1차 및 2차 방어선 | 상태 |
 | :---: | :--- | :--- | :--- | :---: |
 | **01** | **[스택 버퍼 오버플로우 (BOF)](01-humanoid-bof.md)** | **CVE-2026-76640** (Unitree G1 EDU BLE 데몬 BOF ➔ Locomotion PC Root) | **Stack Protector** & **Fortify Source** | <span style="color: #22c55e; font-weight: bold;">완료</span> |
-| **02** | **유저 코드 실행 점프 (ret2usr)** | **CVE-2017-7308** (소켓 취약점 ➔ 커널 권한 유저 쉘코드 실행) | **SMEP** (x86) & **PXN** (ARM64) | 준비 중 |
+| **02** | **[유저 코드 실행 점프 (ret2usr)](02-ret2usr.md)** | **CVE-2017-7308** (소켓 취약점 ➔ 커널 권한 유저 쉘코드 실행) | **SMEP** (x86) & **PXN** (ARM64) | <span style="color: #22c55e; font-weight: bold;">완료</span> |
 | **03** | **유저 데이터 오염 (ret2dir / SMAP)** | **CVE-2016-8655** (UAF ➔ 커널 모드 유저 메모리 데이터 변조) | **SMAP** (x86) & **PAN** (ARM64) | 준비 중 |
 | **04** | **힙 UAF & 슬랩 메모리 오염** | **CVE-2022-0185** (fs_context Heap BOF ➔ `struct cred` 덮어쓰기) | **SLAB Freelist Hardening** & **KFENCE** | 준비 중 |
 | **05** | **제어 흐름 하이재킹 (CFI)** | **CVE-2021-4154** (Type Confusion ➔ 간접 함수 포인터 조작) | **Clang kCFI** & **ARM64 PAC/BTI** | 준비 중 |

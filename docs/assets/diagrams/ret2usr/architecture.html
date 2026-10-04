@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 02: Return-to-User (ret2usr) & SMEP/PXN Defense Architecture</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --perm-user: #fb923c;
+      --perm-kernel: #38bdf8;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px 16px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-cve {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+      font-weight: 700;
+    }
+
+    .badge-sub {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    /* Sticky Simulation Control Toolbar */
+    .sim-toolbar {
+      position: sticky;
+      top: 10px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 24px;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sim-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sim-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .sim-btn.primary {
+      color: #ffffff;
+    }
+
+    .sim-status {
+      font-size: 0.85rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* Vertical Flow Timeline Wrapper */
+    .timeline-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      position: relative;
+    }
+
+    .timeline-flow::before {
+      content: '';
+      position: absolute;
+      top: 40px;
+      bottom: 40px;
+      left: 28px;
+      width: 3px;
+      background: linear-gradient(180deg, var(--accent-blue) 0%, var(--accent-red) 35%, var(--accent-yellow) 65%, var(--accent-green) 100%);
+      border-radius: 2px;
+    }
+
+    /* Phase Step Cards */
+    .phase-card {
+      position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-left: 60px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .phase-card:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .phase-node {
+      position: absolute;
+      left: -60px;
+      top: 20px;
+      width: 58px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .node-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 2px solid var(--accent-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--accent-blue);
+      box-shadow: 0 0 12px var(--glow-blue);
+      z-index: 2;
+    }
+
+    .node-circle.attack {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      box-shadow: 0 0 12px var(--glow-red);
+    }
+
+    .node-circle.trap {
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+      box-shadow: 0 0 12px var(--glow-yellow);
+    }
+
+    .node-circle.safe {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      box-shadow: 0 0 12px var(--glow-green);
+    }
+
+    .phase-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .phase-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .badge-normal { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+    .badge-attack { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-trap { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+    .badge-safe { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+    .phase-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    /* Embedded Phase Frame */
+    .embedded-phase {
+      width: 100%;
+      height: 380px;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      background: transparent;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px 14px;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .metric-val {
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .metric-val.blue { color: var(--accent-blue); }
+    .metric-val.red { color: var(--accent-red); }
+    .metric-val.yellow { color: var(--accent-yellow); }
+    .metric-val.green { color: var(--accent-green); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1><span>⚡</span> Return-to-User (ret2usr) & SMEP/PXN 방어 흐름도</h1>
+        <span class="badge-cve">CVE-2017-7308</span>
+        <span class="badge-sub">Ring 3 vs Ring 0 Boundary Defense</span>
+      </div>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀️ 라이트 모드</button>
+    </header>
+
+    <div class="sim-toolbar">
+      <div class="sim-controls">
+        <button class="sim-btn primary" id="playBtn" onclick="togglePlay()">⏸ 일시정지</button>
+        <button class="sim-btn" onclick="resetSim()">↺ 상단 리셋</button>
+      </div>
+      <div class="sim-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Simulation Active: 4-Phase Hardware Interlock</span>
+      </div>
+    </div>
+
+    <div class="timeline-flow">
+
+      <!-- Phase 1 -->
+      <div class="phase-card" id="card-phase1">
+        <div class="phase-node">
+          <div class="node-circle">01</div>
+        </div>
+        <div class="phase-header">
+          <div class="phase-title">
+            <span>[Phase 1]</span> 정상 시스템 콜 디스패치 (Normal Syscall Dispatch)
+          </div>
+          <span class="phase-badge badge-normal">NORMAL OPERATION</span>
+        </div>
+        <div class="phase-desc">
+          유저 공간(Ring 3)의 로봇 모션 프로세스가 시스템 콜(<code>syscall</code> / <code>svc #0</code>)을 호출하면, 커널 워커(Ring 0)가 커널 공간 메모리 내에서 안전하게 요청을 처리하고 <code>SYSRET</code> / <code>ERET</code> 명령어를 통해 유저 공간으로 복귀함.
+        </div>
+        <iframe src="phase1-normal.html" class="embedded-phase" id="iframe-p1" title="Phase 1"></iframe>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">CPU Privilege Level</div>
+            <div class="metric-val blue">Ring 3 -> Ring 0 -> Ring 3</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">RIP Execution Location</div>
+            <div class="metric-val green">0xffffffff81200000 (Kernel Text)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Hardware MMU Defense</div>
+            <div class="metric-val blue">CR4.SMEP=1 / PTE_PXN=1 (Armed)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2 -->
+      <div class="phase-card" id="card-phase2">
+        <div class="phase-node">
+          <div class="node-circle attack">02</div>
+        </div>
+        <div class="phase-header">
+          <div class="phase-title">
+            <span style="color: var(--accent-red)">[Phase 2]</span> ret2usr 공격 분기 주입 (Return-to-User Hijack)
+          </div>
+          <span class="phase-badge badge-attack">CRITICAL ATTACK</span>
+        </div>
+        <div class="phase-desc">
+          소켓 힙 취약점(CVE-2017-7308)을 통해 커널 내부 함수 포인터가 유저 공간 메모리(<code>0x00401337</code>)로 오염됨. SMEP 방어선이 없는 취약 커널에서는 CPU가 Ring 0 권한인 채로 유저 메모리의 악성 쉘코드를 무제한 실행하여 로봇 모터 전류를 85A로 폭주시키고 워치독을 강제 사살함.
+        </div>
+        <iframe src="phase2-attack.html" class="embedded-phase" id="iframe-p2" title="Phase 2"></iframe>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">Target Execution Target</div>
+            <div class="metric-val red">0x00401337 (User Memory)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Cyber-Physical Impact</div>
+            <div class="metric-val red">Motor Overload 85A / Watchdog Killed</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Kernel Privilege Level</div>
+            <div class="metric-val red">Ring 0 executing Ring 3 Shellcode</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 3 -->
+      <div class="phase-card" id="card-phase3">
+        <div class="phase-node">
+          <div class="node-circle trap">03</div>
+        </div>
+        <div class="phase-header">
+          <div class="phase-title">
+            <span style="color: var(--accent-yellow)">[Phase 3]</span> 하드웨어 MMU 트랩 발동 (SMEP / PXN Hardware Trap)
+          </div>
+          <span class="phase-badge badge-trap">HARDWARE TRAP</span>
+        </div>
+        <div class="phase-desc">
+          하드웨어 레벨에서 활성화된 <code>CR4.SMEP=1</code> (x86_64) 또는 <code>PTE_PXN=1</code> (ARM64) 기능이 작동함. CPU가 Ring 0 상태에서 User 비트(U/S=1)가 설정된 페이지로 분기하려는 순간, MMU가 0 CPU 클록 지연 없이 즉각 페이지 폴트(<code>#PF</code> Error Code 0x0011) 예외를 발동하여 쉘코드 진입을 100% 원천 차단함.
+        </div>
+        <iframe src="phase3-trap.html" class="embedded-phase" id="iframe-p3" title="Phase 3"></iframe>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">Page Fault Error Code</div>
+            <div class="metric-val yellow">0x0011 (P=1, U/S=0, I/D=1)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Exception Vector</div>
+            <div class="metric-val yellow">x86 #PF / ARM64 ESR_EL1 EC 0x21</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Code Execution Intercept</div>
+            <div class="metric-val green">100% Blocked (0 Insns Executed)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 4 -->
+      <div class="phase-card" id="card-phase4">
+        <div class="phase-node">
+          <div class="node-circle safe">04</div>
+        </div>
+        <div class="phase-header">
+          <div class="phase-title">
+            <span style="color: var(--accent-green)">[Phase 4]</span> 페일세이프 E-Stop 및 관절 기구 록 (Fail-Safe Lockdown)
+          </div>
+          <span class="phase-badge badge-safe">FAIL-SAFE RECOVERY</span>
+        </div>
+        <div class="phase-desc">
+          커널 패닉 또는 악성 프로세스 종료 직후, 하드웨어 안전 감시 릴레이(Safety Relay)가 로봇 구동부의 모터 버스 전원을 0V로 즉각 차단함. 스프링 작동형 파킹 브레이크가 모든 관절을 물리적으로 고정하여 전복 및 기구부 파손을 예방하고 안전 기립 상태를 유지함.
+        </div>
+        <iframe src="phase4-failsafe.html" class="embedded-phase" id="iframe-p4" title="Phase 4"></iframe>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">Motor Bus Power</div>
+            <div class="metric-val green">0.0V (Relay De-energized)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Brake Status</div>
+            <div class="metric-val green">Spring-engaged LOCKED</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Physical Damage</div>
+            <div class="metric-val green">0% (Zero Collision / Stable Halt)</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let isPlaying = true;
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      document.getElementById('themeToggle').textContent = next === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+      try { localStorage.setItem('diagram-theme', next); } catch(e){}
+
+      // 모든 내부 iframe으로 테마 전파
+      document.querySelectorAll('iframe').forEach(function(iframe) {
+        try {
+          iframe.contentWindow.postMessage({ type: 'set-diagram-theme', theme: next }, '*');
+        } catch(err){}
+      });
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const playBtn = document.getElementById('playBtn');
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+
+      if (isPlaying) {
+        playBtn.textContent = '⏸ 일시정지';
+        playBtn.classList.add('primary');
+        statusDot.style.background = 'var(--accent-green)';
+        statusText.textContent = 'Simulation Active: 4-Phase Hardware Interlock';
+      } else {
+        playBtn.textContent = '▶ 재생';
+        playBtn.classList.remove('primary');
+        statusDot.style.background = 'var(--accent-yellow)';
+        statusText.textContent = 'Simulation Paused';
+      }
+
+      // 내부 iframe으로 재생/일시정지 토글 전파
+      document.querySelectorAll('iframe').forEach(function(iframe) {
+        try {
+          const btn = iframe.contentWindow.document.getElementById('playBtn');
+          if (btn) btn.click();
+        } catch(err){}
+      });
+    }
+
+    function resetSim() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelectorAll('iframe').forEach(function(iframe) {
+        try {
+          const resetBtn = iframe.contentWindow.document.querySelector("button[onclick*='resetSim']");
+          if (resetBtn) resetBtn.click();
+        } catch(err){}
+      });
+    }
+
+    // iframe 크기 보고 및 상위 테마 변경 수신
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'diagram-resize') {
+        document.querySelectorAll('iframe').forEach(function(iframe) {
+          if (iframe.contentWindow === e.source) {
+            iframe.style.height = e.data.height + 'px';
+          }
+        });
+      }
+      if (e.data && e.data.type === 'diagram-theme-change') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        const toggleBtn = document.getElementById('themeToggle');
+        if (toggleBtn) toggleBtn.textContent = e.data.theme === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+        document.querySelectorAll('iframe').forEach(function(iframe) {
+          if (iframe.contentWindow !== e.source) {
+            try {
+              iframe.contentWindow.postMessage({ type: 'set-diagram-theme', theme: e.data.theme }, '*');
+            } catch(err){}
+          }
+        });
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        const toggleBtn = document.getElementById('themeToggle');
+        if (toggleBtn) toggleBtn.textContent = savedTheme === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+      }
+    })();
+  </script>
+</body>
+</html>

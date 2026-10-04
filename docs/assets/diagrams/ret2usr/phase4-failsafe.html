@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 02 - Phase 4: Fail-Safe E-Stop & Recovery</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-green);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(34, 197, 94, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .badge-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent-green);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .step-badge {
+      background: rgba(34, 197, 94, 0.2);
+      border: 1px solid var(--accent-green);
+      color: var(--accent-green);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .ctrl-btn {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .ctrl-btn:hover:not(:disabled) {
+      background: rgba(34, 197, 94, 0.25);
+      border-color: var(--accent-green);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .ctrl-btn.primary {
+      background: var(--accent-green);
+      color: #0b132b;
+      border-color: var(--accent-green);
+      font-weight: 700;
+    }
+
+    [data-theme="light"] .ctrl-btn.primary {
+      color: #ffffff;
+    }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-left: 3px solid var(--accent-green);
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+      color: var(--text-main);
+      line-height: 1.4;
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .reg-preview-bar {
+      display: flex;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .reg-cell {
+      padding: 5px 4px;
+      flex: 1;
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      transition: all 0.3s ease;
+    }
+    .reg-cell:last-child { border-right: none; }
+    .cell-panic { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); }
+    .cell-wdog { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); }
+    .cell-relay { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+    .cell-joint { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); }
+
+    .svg-canvas { width: 100%; height: 110px; display: block; }
+    @keyframes flowDash { to { stroke-dashoffset: -48; } }
+
+    .flow-path.safe {
+      stroke: var(--accent-green);
+      stroke-dasharray: 8 6;
+      animation: flowDash 1.2s linear infinite;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .metric-item {
+      background: rgba(11, 19, 43, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 5px;
+      padding: 5px 8px;
+    }
+    .metric-name { font-size: 0.68rem; color: var(--text-muted); }
+    .metric-val { font-size: 0.82rem; font-weight: 700; color: var(--accent-green); font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div class="badge-title">
+        <span>🛑 Phase 4: 페일세이프 E-Stop 및 로봇 관절 기립 고정</span>
+        <span class="step-badge" id="stepBadge">Step 1/3: 커널 패닉 인터럽트 전달</span>
+      </div>
+      <div class="btn-group">
+        <button class="ctrl-btn primary" id="playBtn" onclick="togglePlay()">▶ 재생</button>
+        <button class="ctrl-btn" id="prevBtn" onclick="prevStep()" disabled>⏮ 이전</button>
+        <button class="ctrl-btn" id="nextBtn" onclick="nextStep()">⏭ 다음 스텝</button>
+        <button class="ctrl-btn" id="resetBtn" onclick="resetSim()">↺ 리셋</button>
+        <button class="ctrl-btn" id="themeBtn" onclick="toggleTheme()" title="다크/라이트 테마 전환">☀️ 테마</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="stepDesc">
+      <span>SMEP #PF 예외로 유발된 커널 패닉이 하드웨어 워치독 타이머 및 안전 인터럽트로 즉각 전파됨.</span>
+    </div>
+
+    <div class="reg-preview-bar" id="regPreview">
+      <div class="reg-cell cell-panic"><code>Kernel Oops</code><br><small>공격 프로세스 사살</small></div>
+      <div class="reg-cell cell-wdog"><code>Watchdog NMI</code><br><small>E-Stop 신호 활성</small></div>
+      <div class="reg-cell cell-relay"><code>Relay Cut (0V)</code><br><small>모터 전원 물리 차단</small></div>
+      <div class="reg-cell cell-joint"><code>Joint Brake LOCK</code><br><small>기립 안전 자세 고정</small></div>
+    </div>
+
+    <svg class="svg-canvas" viewBox="0 0 850 110">
+      <defs>
+        <filter id="glowGreen" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      <!-- Node 1: Kernel Panic / Watchdog -->
+      <rect id="nodeWatchdog" x="20" y="20" width="220" height="70" rx="8" fill="#1c2541" stroke="#22c55e" stroke-width="2"/>
+      <text x="130" y="48" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">⏱️ 하드웨어 워치독 NMI</text>
+      <text id="wdogSub" x="130" y="68" fill="#94a3b8" font-size="10" text-anchor="middle">SMEP 위반 시 비상 신호 생성</text>
+
+      <!-- Flow 1: E-Stop signal to power relay -->
+      <path id="pathRelay" d="M 240 55 L 420 55" fill="none" class="flow-path safe" stroke-width="2"/>
+      <circle id="pRelay" r="5" fill="#22c55e" filter="url(#glowGreen)">
+        <animateMotion dur="1.2s" repeatCount="indefinite" path="M 240 55 L 420 55"/>
+      </circle>
+
+      <!-- Node 2: Motor Power Relay (0V cut) -->
+      <rect id="nodePower" x="420" y="15" width="220" height="80" rx="8" fill="#1c2541" stroke="#22c55e" stroke-width="1.5"/>
+      <text id="powerTitle" x="530" y="42" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">⚡ 액추에이터 전원 차단</text>
+      <text id="powerSub1" x="530" y="62" fill="#94a3b8" font-size="11" text-anchor="middle">Power Relay: 0V 즉시 차단</text>
+      <text id="powerSub2" x="530" y="80" fill="#22c55e" font-size="9" text-anchor="middle">토크 폭주 원천 무력화</text>
+
+      <!-- Flow 2: Joint Lock Signal -->
+      <path id="pathLock" d="M 640 55 L 690 55" fill="none" stroke="#22c55e" stroke-width="2" stroke-dasharray="4 4"/>
+
+      <!-- Node 3: Mechanical Joint Brakes -->
+      <rect id="nodeLock" x="690" y="20" width="140" height="70" rx="8" fill="#1c2541" stroke="#22c55e" stroke-width="2"/>
+      <text id="lockTitle" x="760" y="48" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">🤖 관절 파킹 브레이크</text>
+      <text id="lockSub" x="760" y="68" fill="#94a3b8" font-size="10" text-anchor="middle">기립 자세 고정 완료</text>
+    </svg>
+
+    <div class="metric-grid">
+      <div class="metric-item">
+        <div class="metric-name">액추에이터 인가 전압</div>
+        <div class="metric-val" id="metricVolt">0.0V (물리 차단)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-name">관절 제동 상태</div>
+        <div class="metric-val" id="metricBrake">Mechanical LOCK</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-name">로봇 기구부 상태</div>
+        <div class="metric-val" id="metricSafety" style="color: var(--accent-green);">안전 보존 (파손 0%)</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 3;
+    let isPlaying = false;
+    let playTimer = null;
+
+    const steps = [
+      {
+        badge: "Step 1/3: 커널 패닉 인터럽트 전달",
+        desc: "SMEP #PF 예외로 유발된 커널 패닉이 하드웨어 워치독 타이머 및 안전 인터럽트로 즉각 전파됨.",
+        volt: "48.0V -> 감전압 대기",
+        brake: "제동 명령 수신 중",
+        safety: "페일세이프 시퀀스 진입",
+        wdogSub: "워치독 비상 인터럽트 발령",
+        powerSub1: "릴레이 구동 신호 전송",
+        lockSub: "파킹 브레이크 대기"
+      },
+      {
+        badge: "Step 2/3: 모터 드라이버 전원 물리 차단 (0V)",
+        desc: "세이프티 릴레이가 관절 모터 드라이버 인가 전원을 0V로 즉각 차단하여 모터 과열 및 토크 폭주를 원천 차단함.",
+        volt: "0.0V (물리 전원 차단)",
+        brake: "스프링 브레이크 결속",
+        safety: "토크 0.0 Nm (과부하 방지)",
+        wdogSub: "전원 차단 확인 완료",
+        powerSub1: "Power Relay: OPEN (0V)",
+        lockSub: "전자식 클러치 체결 중"
+      },
+      {
+        badge: "Step 3/3: 기계식 브레이크 체결 및 기립 고정",
+        desc: "전자 기계식 파킹 브레이크가 맞물려 로봇의 관절이 단단히 고정되며, 붕괴나 낙하 없이 기립 상태로 안전 보존됨.",
+        volt: "0.0V (안전 차단 유지)",
+        brake: "100% Locked (기계식 고정)",
+        safety: "기구부 파손율 0% (완전 보호)",
+        wdogSub: "시스템 안전 정지 완료",
+        powerSub1: "드라이버 무전력 셧다운",
+        lockSub: "기립 자세 안전 보존 완료"
+      }
+    ];
+
+    function renderStep(step) {
+      currentStep = step;
+      const data = steps[step - 1];
+
+      document.getElementById('stepBadge').textContent = data.badge;
+      document.getElementById('stepDesc').textContent = data.desc;
+      document.getElementById('metricVolt').textContent = data.volt;
+      document.getElementById('metricBrake').textContent = data.brake;
+      document.getElementById('metricSafety').textContent = data.safety;
+
+      document.getElementById('wdogSub').textContent = data.wdogSub;
+      document.getElementById('powerSub1').textContent = data.powerSub1;
+      document.getElementById('lockSub').textContent = data.lockSub;
+
+      document.getElementById('prevBtn').disabled = (step === 1);
+      document.getElementById('nextBtn').disabled = (step === totalSteps);
+
+      reportHeight();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) {
+        renderStep(currentStep + 1);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        renderStep(currentStep - 1);
+      }
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const playBtn = document.getElementById('playBtn');
+      if (isPlaying) {
+        playBtn.textContent = '⏸ 정지';
+        playBtn.classList.remove('primary');
+        playLoop();
+      } else {
+        playBtn.textContent = '▶ 재생';
+        playBtn.classList.add('primary');
+        if (playTimer) clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      if (currentStep < totalSteps) {
+        renderStep(currentStep + 1);
+        playTimer = setTimeout(playLoop, 1600);
+      } else {
+        playTimer = setTimeout(() => {
+          if (!isPlaying) return;
+          renderStep(1);
+          playTimer = setTimeout(playLoop, 1600);
+        }, 2200);
+      }
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) {
+        btn.innerHTML = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+      }
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) {
+      new ResizeObserver(reportHeight).observe(document.body);
+    }
+  </script>
+</body>
+</html>
