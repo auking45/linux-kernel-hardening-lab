@@ -36,14 +36,10 @@ build-arm64:
 	@./scripts/run_lab.sh --arch arm64 --feature base --build-only
 
 docs:
-	@python3 -m venv .venv 2>/dev/null || true
-	@.venv/bin/pip install -q -r requirements.txt
-	@.venv/bin/mkdocs serve
+	@./scripts/run_docs.sh --serve
 
 docs-build:
-	@python3 -m venv .venv 2>/dev/null || true
-	@.venv/bin/pip install -q -r requirements.txt
-	@.venv/bin/mkdocs build --strict
+	@./scripts/run_docs.sh --build --strict
 
 docker-pull:
 	@docker compose pull lab

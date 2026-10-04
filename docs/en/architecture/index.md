@@ -23,6 +23,9 @@ graph TD
     end
 ```
 
+> [!NOTE]
+> **Distinction Between UID 0 (root) and Ring 0**: Processes executing under the root account (UID 0) remain confined within unprivileged user mode (Ring 3 / EL0) from the CPU hardware perspective. For a deep architectural comparison between rooting and Ring 0 kernel control, see [Scenarios Overview: Rooting vs Kernel Space Security Boundary](../scenarios/index.md#security-boundary-root-vs-kernel).
+
 ---
 
 ## 2. 64-bit Virtual Address Space Splitting

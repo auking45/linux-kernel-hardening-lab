@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Phase 1: Normal State</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"], (prefers-color-scheme: light) {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-blue);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(56, 189, 248, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .badge-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .step-badge {
+      background: rgba(56, 189, 248, 0.2);
+      border: 1px solid var(--accent-blue);
+      color: var(--accent-blue);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .ctrl-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .ctrl-btn:hover:not(:disabled) {
+      background: rgba(56, 189, 248, 0.25);
+      border-color: var(--accent-blue);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .ctrl-btn.primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .ctrl-btn.primary {
+      color: #ffffff;
+    }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-left: 3px solid var(--accent-blue);
+      border-radius: 6px;
+      padding: 6px 10px;
+      margin-bottom: 10px;
+      font-size: 0.8rem;
+      color: var(--text-main);
+      line-height: 1.4;
+      min-height: 34px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stack-preview-bar {
+      display: flex;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 10px;
+      font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-align: center;
+    }
+
+    .stack-cell {
+      padding: 5px 2px;
+      flex: 1;
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+      transition: all 0.3s ease;
+    }
+    .stack-cell:last-child { border-right: none; }
+    .cell-buf { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); }
+    .cell-canary { background: rgba(34, 197, 94, 0.2); color: var(--accent-green); }
+    .cell-sfp { background: rgba(168, 85, 247, 0.15); color: var(--accent-purple); }
+    .cell-ret { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); }
+    .cell-highlight-green { background: rgba(34, 197, 94, 0.4); color: #fff; font-weight: bold; box-shadow: inset 0 0 8px rgba(34, 197, 94, 0.8); }
+
+    .svg-canvas { width: 100%; height: 110px; display: block; }
+    @keyframes flowDash { to { stroke-dashoffset: -48; } }
+
+    .flow-path {
+      stroke-dasharray: 8 6;
+      animation: flowDash 1.2s linear infinite;
+    }
+    .flow-path.normal { stroke: var(--accent-blue); }
+    .flow-path.safe { stroke: var(--accent-green); }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .metric-item {
+      background: rgba(11, 19, 43, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 5px;
+      padding: 5px 8px;
+    }
+    .metric-name { font-size: 0.68rem; color: var(--text-muted); }
+    .metric-val { font-size: 0.82rem; font-weight: 700; color: var(--accent-blue); font-family: monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div class="badge-title">
+        <span>📶 Phase 1: 정상 무선 텔레메트리 (Normal State)</span>
+        <span class="step-badge" id="stepBadge">Step 1/3: 정상 패킷 수신</span>
+      </div>
+      <div class="btn-group">
+        <button class="ctrl-btn primary" id="playBtn" onclick="togglePlay()">▶ 재생</button>
+        <button class="ctrl-btn" id="prevBtn" onclick="prevStep()" disabled>⏮ 이전</button>
+        <button class="ctrl-btn" id="nextBtn" onclick="nextStep()">⏭ 다음 스텝</button>
+        <button class="ctrl-btn" id="resetBtn" onclick="resetSim()">↺ 리셋</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="stepDesc">
+      <span>관제 콘솔에서 32바이트 규격의 합법적 이동 제어 패킷이 btgatt-server 데몬으로 전송됨.</span>
+    </div>
+
+    <div class="stack-preview-bar" id="stackPreview">
+      <div class="stack-cell cell-buf"><code>cmd_buf[64]</code><br><small>32B 유효 패킷 수신</small></div>
+      <div class="stack-cell cell-canary"><code>[스택 카나리]</code><br><small>0x8f3c7a10e42d (정상)</small></div>
+      <div class="stack-cell cell-sfp"><code>[Saved FP]</code><br><small>0x7fff... (정상 FP)</small></div>
+      <div class="stack-cell cell-ret"><code>[리턴 주소]</code><br><small>0x5555... (정상 RIP)</small></div>
+    </div>
+
+    <svg class="svg-canvas" viewBox="0 0 850 110">
+      <defs>
+        <filter id="glowBlue" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+        <filter id="glowGreen" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      <rect x="20" y="20" width="160" height="70" rx="8" fill="#1c2541" stroke="#38bdf8" stroke-width="2"/>
+      <text x="100" y="50" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">🎮 관제 콘솔</text>
+      <text x="100" y="70" fill="#94a3b8" font-size="10" text-anchor="middle">32B BLE 제어 패킷</text>
+
+      <path id="pathIn" d="M 180 55 L 340 55" fill="none" class="flow-path normal" stroke-width="2"/>
+      <circle id="pIn" r="5" fill="#38bdf8" filter="url(#glowBlue)">
+        <animateMotion dur="1.2s" repeatCount="indefinite" path="M 180 55 L 340 55"/>
+      </circle>
+
+      <rect id="nodeServer" x="340" y="15" width="220" height="80" rx="8" fill="#1c2541" stroke="#38bdf8" stroke-width="2"/>
+      <text x="450" y="42" fill="#38bdf8" font-size="12" font-weight="bold" text-anchor="middle">🤖 btgatt-server</text>
+      <text id="serverSub1" x="450" y="62" fill="#94a3b8" font-size="11" text-anchor="middle">버퍼 사용: 32 / 500 Bytes</text>
+      <text id="serverSub2" x="450" y="80" fill="#22c55e" font-size="10" text-anchor="middle">카나리 무결성 VALID</text>
+
+      <path id="pathOut" d="M 560 55 L 670 55" fill="none" class="flow-path safe" stroke-width="2"/>
+      <circle id="pOut" r="5" fill="#22c55e" filter="url(#glowGreen)">
+        <animateMotion dur="1.2s" repeatCount="indefinite" path="M 560 55 L 670 55"/>
+      </circle>
+
+      <rect id="nodeMotor" x="670" y="20" width="160" height="70" rx="8" fill="#1c2541" stroke="#22c55e" stroke-width="2"/>
+      <text id="motorTitle" x="750" y="50" fill="#22c55e" font-size="12" font-weight="bold" text-anchor="middle">⚙️ 보행 제어기</text>
+      <text id="motorSub" x="750" y="70" fill="#94a3b8" font-size="10" text-anchor="middle">정상 토크 유지</text>
+    </svg>
+
+    <div class="metric-grid">
+      <div class="metric-item">
+        <div class="metric-name">입력 크기</div>
+        <div class="metric-val" id="metricBytes">32 / 500 Bytes</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-name">스택 카나리 상태</div>
+        <div class="metric-val" id="metricCanary" style="color: var(--accent-green);">VALID (일치)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-name">로봇 하드웨어</div>
+        <div class="metric-val" id="metricStatus">명령 대기</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 3;
+    let isPlaying = false;
+    let playTimer = null;
+
+    const steps = [
+      {
+        badge: "Step 1/3: 정상 패킷 수신",
+        desc: "관제 콘솔에서 32바이트 규격의 합법적 이동 제어 패킷이 btgatt-server 데몬으로 전송됨.",
+        stack: [
+          { text: "<code>cmd_buf[64]</code><br><small>32B 유효 패킷 수신</small>", cls: "cell-buf" },
+          { text: "<code>[스택 카나리]</code><br><small>0x8f3c7a10e42d (정상)</small>", cls: "cell-canary" },
+          { text: "<code>[Saved FP]</code><br><small>0x7fff... (정상 FP)</small>", cls: "cell-sfp" },
+          { text: "<code>[리턴 주소]</code><br><small>0x5555... (정상 RIP)</small>", cls: "cell-ret" }
+        ],
+        serverSub1: "버퍼 사용: 32 / 500 Bytes",
+        serverSub2: "카나리 대조 대기",
+        outActive: false,
+        metrics: ["32 / 500 Bytes", "VALID (보존)", "패킷 수신 완료"]
+      },
+      {
+        badge: "Step 2/3: 카나리 무결성 확인",
+        desc: "함수 복귀 전 스택 카나리 값을 마스터 가드와 대조함. 버퍼 경계 내 안전 기록으로 카나리 값이 100% 일치함.",
+        stack: [
+          { text: "<code>cmd_buf[64]</code><br><small>32B 유효 패킷 처리</small>", cls: "cell-buf" },
+          { text: "<code>[카나리 무결성 검증]</code><br><small>0x8f3c... (100% 일치!)</small>", cls: "cell-highlight-green" },
+          { text: "<code>[Saved FP]</code><br><small>0x7fff... (정상 FP)</small>", cls: "cell-sfp" },
+          { text: "<code>[리턴 주소]</code><br><small>0x5555... (정상 RIP)</small>", cls: "cell-ret" }
+        ],
+        serverSub1: "에필로그 검증 완료",
+        serverSub2: "카나리 일치: RET 승인",
+        outActive: false,
+        metrics: ["32 / 500 Bytes", "VALID (100% 일치)", "검증 통과 (안전)"]
+      },
+      {
+        badge: "Step 3/3: 정상 반환 및 모터 제어",
+        desc: "정상 리턴 주소로 복귀하여 보행 제어기에 정상 토크 명령을 전달하고 로봇의 안정 보행을 유지함.",
+        stack: [
+          { text: "<code>cmd_buf[64]</code><br><small>처리 완료 및 해제</small>", cls: "cell-buf" },
+          { text: "<code>[스택 카나리]</code><br><small>정상 보존 완료</small>", cls: "cell-canary" },
+          { text: "<code>[Saved FP]</code><br><small>프레임 안전 복귀</small>", cls: "cell-sfp" },
+          { text: "<code>[리턴 주소]</code><br><small>정상 분기 실행</small>", cls: "cell-ret" }
+        ],
+        serverSub1: "명령 디스패치 완료",
+        serverSub2: "정상 토크 유지",
+        outActive: true,
+        metrics: ["32 / 500 Bytes", "VALID (일치)", "정상 보행 유지"]
+      }
+    ];
+
+    function renderStep(idx) {
+      currentStep = idx;
+      const s = steps[idx - 1];
+      document.getElementById('stepBadge').textContent = s.badge;
+      document.getElementById('stepDesc').innerHTML = `<span>${s.desc}</span>`;
+      
+      const stackContainer = document.getElementById('stackPreview');
+      stackContainer.innerHTML = s.stack.map(cell => 
+        `<div class="stack-cell ${cell.cls}">${cell.text}</div>`
+      ).join('');
+
+      document.getElementById('serverSub1').textContent = s.serverSub1;
+      document.getElementById('serverSub2').textContent = s.serverSub2;
+
+      const pathOut = document.getElementById('pathOut');
+      const pOut = document.getElementById('pOut');
+      const nodeMotor = document.getElementById('nodeMotor');
+      const motorTitle = document.getElementById('motorTitle');
+      const motorSub = document.getElementById('motorSub');
+
+      if (s.outActive) {
+        pathOut.style.display = 'block';
+        pOut.style.display = 'block';
+        nodeMotor.setAttribute('stroke', '#22c55e');
+        motorTitle.setAttribute('fill', '#22c55e');
+        motorSub.textContent = '정상 토크 유지';
+      } else {
+        pathOut.style.display = 'none';
+        pOut.style.display = 'none';
+        nodeMotor.setAttribute('stroke', '#334155');
+        motorTitle.setAttribute('fill', '#64748b');
+        motorSub.textContent = '명령 대기 상태';
+      }
+
+      document.getElementById('metricBytes').textContent = s.metrics[0];
+      document.getElementById('metricCanary').textContent = s.metrics[1];
+      document.getElementById('metricStatus').textContent = s.metrics[2];
+
+      document.getElementById('prevBtn').disabled = (currentStep === 1);
+      document.getElementById('nextBtn').textContent = (currentStep === totalSteps) ? '↺ 처음으로' : '⏭ 다음 스텝';
+
+      reportHeight();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) {
+        renderStep(currentStep + 1);
+      } else {
+        renderStep(1);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 1) {
+        renderStep(currentStep - 1);
+      }
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const playBtn = document.getElementById('playBtn');
+      if (isPlaying) {
+        playBtn.textContent = '⏸ 정지';
+        playBtn.classList.remove('primary');
+        playLoop();
+      } else {
+        playBtn.textContent = '▶ 재생';
+        playBtn.classList.add('primary');
+        if (playTimer) clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      if (currentStep < totalSteps) {
+        renderStep(currentStep + 1);
+        playTimer = setTimeout(playLoop, 1600);
+      } else {
+        playTimer = setTimeout(() => {
+          if (!isPlaying) return;
+          renderStep(1);
+          playTimer = setTimeout(playLoop, 1600);
+        }, 2200);
+      }
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) {
+      new ResizeObserver(reportHeight).observe(document.body);
+    }
+  </script>
+</body>
+</html>

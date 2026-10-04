@@ -80,3 +80,104 @@
   color: #f8fafc !important;
 }
 
+/* Full-width vertical cards (1 card per row) */
+.md-typeset .grid.cards.vertical {
+  grid-template-columns: 1fr !important;
+  grid-gap: 0.8rem;
+  margin: 1.2rem 0;
+}
+
+.md-typeset .grid.cards.vertical > ol > li,
+.md-typeset .grid.cards.vertical > ul > li {
+  border-radius: 8px;
+  padding: 1.1rem 1.4rem;
+  border-color: var(--md-default-fg-color--lightest);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+}
+
+.md-typeset .grid.cards.vertical > ol > li:hover,
+.md-typeset .grid.cards.vertical > ul > li:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: var(--md-shadow-z2);
+}
+
+/* Numbered items inside cards (Hanging indent & clean spacing) */
+.md-typeset .grid.cards.vertical > ul > li ol,
+.md-typeset .grid.cards.vertical > ol > li ol {
+  display: block !important;
+  list-style-type: decimal !important;
+  padding-left: 1.4rem !important;
+  margin: 0.8rem 0 0.3rem 0 !important;
+}
+
+.md-typeset .grid.cards.vertical > ul > li ol > li,
+.md-typeset .grid.cards.vertical > ol > li ol > li {
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 0 0.85rem 0 !important;
+  box-shadow: none !important;
+  line-height: 1.6;
+  list-style-type: decimal !important;
+}
+
+.md-typeset .grid.cards.vertical > ul > li ol > li:last-child,
+.md-typeset .grid.cards.vertical > ol > li ol > li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.md-typeset .grid.cards.vertical > ul > li ol > li > p:first-child,
+.md-typeset .grid.cards.vertical > ol > li ol > li > p:first-child {
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+  margin-bottom: 0.25rem !important;
+}
+
+.md-typeset .grid.cards.vertical > ul > li ol > li > p:not(:first-child),
+.md-typeset .grid.cards.vertical > ol > li ol > li > p:not(:first-child) {
+  margin-top: 0.25rem !important;
+  margin-left: 0 !important;
+  color: var(--md-default-fg-color--light);
+  line-height: 1.65;
+}
+
+/* Unnumbered/bullet items inside cards */
+.md-typeset .grid.cards.vertical > ul > li ul,
+.md-typeset .grid.cards.vertical > ol > li ul {
+  display: block !important;
+  list-style-type: disc !important;
+  padding-left: 1.4rem !important;
+  margin: 0.8rem 0 0.3rem 0 !important;
+}
+
+.md-typeset .grid.cards.vertical > ul > li ul > li,
+.md-typeset .grid.cards.vertical > ol > li ul > li {
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 0 0.85rem 0 !important;
+  box-shadow: none !important;
+  line-height: 1.6;
+  list-style-type: disc !important;
+}
+
+.md-typeset .grid.cards.vertical > ul > li ul > li:last-child,
+.md-typeset .grid.cards.vertical > ol > li ul > li:last-child {
+  margin-bottom: 0 !important;
+}
+
+.md-typeset .grid.cards.vertical > ul > li ul > li > p:first-child,
+.md-typeset .grid.cards.vertical > ol > li ul > li > p:first-child {
+  font-weight: 700;
+  color: var(--md-default-fg-color);
+  margin-bottom: 0.25rem !important;
+}
+
+.md-typeset .grid.cards.vertical > ul > li ul > li > p:not(:first-child),
+.md-typeset .grid.cards.vertical > ol > li ul > li > p:not(:first-child) {
+  margin-top: 0.25rem !important;
+  margin-left: 0 !important;
+  color: var(--md-default-fg-color--light);
+  line-height: 1.65;
+}
+
+

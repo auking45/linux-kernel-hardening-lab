@@ -101,6 +101,9 @@ nav:
       - Dual-Arch Environment: getting-started/dual-arch.md
   - Architecture:
       - Memory & Protection Models: architecture/index.md
+  - Attack Scenarios:
+      - Roadmap & Overview: scenarios/index.md
+      - 01. Humanoid BOF & Stack Canary: scenarios/01-humanoid-bof.md
   - Features:
       - Taxonomy Roadmap: features/index.md
       - 01. Stack & Buffer Protection:
