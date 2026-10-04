@@ -17,8 +17,8 @@ Every process executed under Linux does not see physical hardware RAM directly, 
 
 Click on any segment in the virtual memory tower below to explore its address ranges, access permissions, and underlying security implications:
 
-<div style="width: 100%; height: 600px; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
-  <iframe src="../../assets/diagrams/principles/02-virtual-memory.html" style="width: 100%; height: 100%; border: none;"></iframe>
+<div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
+  <iframe src="../../assets/diagrams/principles/02-virtual-memory.html" style="width: 100%; min-height: 680px; border: none; display: block; overflow: hidden;" scrolling="no" onload="try { const h = this.contentWindow.document.documentElement.scrollHeight; if(h) this.style.height = (h + 30) + 'px'; } catch(e){}"></iframe>
 </div>
 
 ---

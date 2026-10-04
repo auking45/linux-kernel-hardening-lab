@@ -17,8 +17,8 @@
 
 아래 다이어그램에서 4단계(미해결 심볼 수집 ➔ Strong/Weak 해석 ➔ 섹션 병합 ➔ 릴로케이션 패치)를 거치며 심볼 테이블과 기계어 바이트가 어떻게 완성되는지 확인 가능함:
 
-<div style="width: 100%; height: 600px; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
-  <iframe src="../../assets/diagrams/principles/07-symbols-linking.html" style="width: 100%; height: 100%; border: none;"></iframe>
+<div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
+  <iframe src="../../assets/diagrams/principles/07-symbols-linking.html" style="width: 100%; min-height: 680px; border: none; display: block; overflow: hidden;" scrolling="no" onload="try { const h = this.contentWindow.document.documentElement.scrollHeight; if(h) this.style.height = (h + 30) + 'px'; } catch(e){}"></iframe>
 </div>
 
 ---

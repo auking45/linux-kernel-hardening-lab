@@ -32,6 +32,9 @@
     --code-bg: #f1f5f9;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    overflow-y: hidden;
+  }
   body {
     background: var(--bg);
     color: var(--text);
@@ -314,6 +317,19 @@ function setStaticPhase(idx) {
   const cur = staticPhases[idx];
   document.getElementById('phaseCodeBox').innerHTML = cur.code;
   document.getElementById('phaseDescBox').innerHTML = cur.desc;
+  setTimeout(reportHeight, 30);
+}
+
+function reportHeight() {
+  const height = Math.max(
+    document.documentElement.scrollHeight,
+    document.body.scrollHeight,
+    document.documentElement.offsetHeight,
+    document.body.offsetHeight
+  );
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'diagram-resize', height: height }, '*');
+  }
 }
 
 function toggleTheme() {
@@ -330,20 +346,32 @@ function applyTheme(theme) {
 function updateThemeButton(isLight) {
   const icon = document.getElementById('themeIcon');
   const text = document.getElementById('themeText');
-  if (isLight) {
-    icon.textContent = '🌙';
-    text.textContent = 'Dark Mode';
-  } else {
-    icon.textContent = '☀️';
-    text.textContent = 'Light Mode';
+  if (icon && text) {
+    if (isLight) {
+      icon.textContent = '🌙';
+      text.textContent = 'Dark Mode';
+    } else {
+      icon.textContent = '☀️';
+      text.textContent = 'Light Mode';
+    }
   }
 }
 
 window.addEventListener('message', function(event) {
-  if (event.data && event.data.type === 'theme-change') {
+  if (event.data && (event.data.type === 'theme-change' || event.data.type === 'set-diagram-theme')) {
     applyTheme(event.data.theme);
+  } else if (event.data && event.data.type === 'request-resize') {
+    reportHeight();
   }
 });
+
+window.addEventListener('load', reportHeight);
+window.addEventListener('resize', reportHeight);
+if (window.ResizeObserver) {
+  new ResizeObserver(function() {
+    reportHeight();
+  }).observe(document.body);
+}
 
 // Default to phase 0
 setStaticPhase(0);

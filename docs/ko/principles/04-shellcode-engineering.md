@@ -18,8 +18,8 @@
 
 아래 다이어그램에서 x86_64와 ARM64 쉘코드의 16진수 바이트열과 각 어셈블리 인스트럭션이 레지스터를 조작하는 과정을 비교 탐색 가능함:
 
-<div style="width: 100%; height: 600px; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
-  <iframe src="../../assets/diagrams/principles/04-shellcode.html" style="width: 100%; height: 100%; border: none;"></iframe>
+<div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
+  <iframe src="../../assets/diagrams/principles/04-shellcode.html" style="width: 100%; min-height: 680px; border: none; display: block; overflow: hidden;" scrolling="no" onload="try { const h = this.contentWindow.document.documentElement.scrollHeight; if(h) this.style.height = (h + 30) + 'px'; } catch(e){}"></iframe>
 </div>
 
 ---

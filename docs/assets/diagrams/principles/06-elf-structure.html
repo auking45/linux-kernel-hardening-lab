@@ -32,6 +32,9 @@
     --code-bg: #f1f5f9;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    overflow-y: hidden;
+  }
   body {
     background: var(--bg);
     color: var(--text);
@@ -332,14 +335,18 @@ Flags: RWE (Read/Write/Execute)        ➔ 취약 (-z execstack)</div>
 
 function selectItem(key) {
   document.querySelectorAll('.elf-box').forEach(b => b.classList.remove('active'));
-  const target = event.currentTarget;
-  if (target) target.classList.add('active');
+  if (typeof event !== 'undefined' && event && event.currentTarget) {
+    event.currentTarget.classList.add('active');
+  }
 
   const d = itemsData[key];
-  document.getElementById('detailDesc').innerHTML = `
-    <h3 style="color:var(--accent-blue); margin-bottom:10px;">${d.title}</h3>
-    ${d.text}
-  `;
+  if (d) {
+    document.getElementById('detailDesc').innerHTML = `
+      <h3 style="color:var(--accent-blue); margin-bottom:10px;">${d.title}</h3>
+      ${d.text}
+    `;
+  }
+  setTimeout(reportHeight, 30);
 }
 
 function switchView(view) {
@@ -347,6 +354,19 @@ function switchView(view) {
   if (view === 'dual') document.getElementById('btnDual').classList.add('active');
   if (view === 'exec') document.getElementById('btnExec').classList.add('active');
   if (view === 'link') document.getElementById('btnLink').classList.add('active');
+  setTimeout(reportHeight, 30);
+}
+
+function reportHeight() {
+  const height = Math.max(
+    document.documentElement.scrollHeight,
+    document.body.scrollHeight,
+    document.documentElement.offsetHeight,
+    document.body.offsetHeight
+  );
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'diagram-resize', height: height }, '*');
+  }
 }
 
 function toggleTheme() {
@@ -363,20 +383,32 @@ function applyTheme(theme) {
 function updateThemeButton(isLight) {
   const icon = document.getElementById('themeIcon');
   const text = document.getElementById('themeText');
-  if (isLight) {
-    icon.textContent = '🌙';
-    text.textContent = 'Dark Mode';
-  } else {
-    icon.textContent = '☀️';
-    text.textContent = 'Light Mode';
+  if (icon && text) {
+    if (isLight) {
+      icon.textContent = '🌙';
+      text.textContent = 'Dark Mode';
+    } else {
+      icon.textContent = '☀️';
+      text.textContent = 'Light Mode';
+    }
   }
 }
 
 window.addEventListener('message', function(event) {
-  if (event.data && event.data.type === 'theme-change') {
+  if (event.data && (event.data.type === 'theme-change' || event.data.type === 'set-diagram-theme')) {
     applyTheme(event.data.theme);
+  } else if (event.data && event.data.type === 'request-resize') {
+    reportHeight();
   }
 });
+
+window.addEventListener('load', reportHeight);
+window.addEventListener('resize', reportHeight);
+if (window.ResizeObserver) {
+  new ResizeObserver(function() {
+    reportHeight();
+  }).observe(document.body);
+}
 
 // Default to ehdr
 selectItem('ehdr');

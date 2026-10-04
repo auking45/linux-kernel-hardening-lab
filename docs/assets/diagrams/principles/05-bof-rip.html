@@ -32,6 +32,9 @@
     --code-bg: #f1f5f9;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    overflow-y: hidden;
+  }
   body {
     background: var(--bg);
     color: var(--text);
@@ -375,6 +378,19 @@ function setSmashStep(idx) {
       • <strong>ASLR / PIE</strong>: 코드 및 함수의 가상 메모리 주소를 매 실행마다 무작위 난수화하여 고정 타깃 점프 무력화.
     </div>
   `;
+  setTimeout(reportHeight, 30);
+}
+
+function reportHeight() {
+  const height = Math.max(
+    document.documentElement.scrollHeight,
+    document.body.scrollHeight,
+    document.documentElement.offsetHeight,
+    document.body.offsetHeight
+  );
+  if (window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'diagram-resize', height: height }, '*');
+  }
 }
 
 function toggleTheme() {
@@ -391,20 +407,32 @@ function applyTheme(theme) {
 function updateThemeButton(isLight) {
   const icon = document.getElementById('themeIcon');
   const text = document.getElementById('themeText');
-  if (isLight) {
-    icon.textContent = '🌙';
-    text.textContent = 'Dark Mode';
-  } else {
-    icon.textContent = '☀️';
-    text.textContent = 'Light Mode';
+  if (icon && text) {
+    if (isLight) {
+      icon.textContent = '🌙';
+      text.textContent = 'Dark Mode';
+    } else {
+      icon.textContent = '☀️';
+      text.textContent = 'Light Mode';
+    }
   }
 }
 
 window.addEventListener('message', function(event) {
-  if (event.data && event.data.type === 'theme-change') {
+  if (event.data && (event.data.type === 'theme-change' || event.data.type === 'set-diagram-theme')) {
     applyTheme(event.data.theme);
+  } else if (event.data && event.data.type === 'request-resize') {
+    reportHeight();
   }
 });
+
+window.addEventListener('load', reportHeight);
+window.addEventListener('resize', reportHeight);
+if (window.ResizeObserver) {
+  new ResizeObserver(function() {
+    reportHeight();
+  }).observe(document.body);
+}
 
 // Default step 0
 setSmashStep(0);

@@ -17,8 +17,8 @@ C 언어의 경계 검사 부재 결함으로 인해 입력 데이터가 스택 
 
 아래 다이어그램에서 4단계(정상 상태 ➔ 버퍼 초과 유입 ➔ SFP/RET 변조 ➔ RIP 탈취)를 거치며 메모리 바이트와 CPU 레지스터가 어떻게 전이되는지 확인 가능함:
 
-<div style="width: 100%; height: 600px; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
-  <iframe src="../../assets/diagrams/principles/05-bof-rip.html" style="width: 100%; height: 100%; border: none;"></iframe>
+<div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
+  <iframe src="../../assets/diagrams/principles/05-bof-rip.html" style="width: 100%; min-height: 680px; border: none; display: block; overflow: hidden;" scrolling="no" onload="try { const h = this.contentWindow.document.documentElement.scrollHeight; if(h) this.style.height = (h + 30) + 'px'; } catch(e){}"></iframe>
 </div>
 
 ---
