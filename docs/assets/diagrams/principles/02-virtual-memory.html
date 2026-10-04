@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>64-bit Process Virtual Address Space & Memory Segments</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+    --code-bg: #090d16;
+  }
+  body.light-theme {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --accent-blue: #0284c7;
+    --accent-green: #16a34a;
+    --accent-amber: #d97706;
+    --accent-red: #dc2626;
+    --accent-purple: #9333ea;
+    --code-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h2 { font-size: 1.4rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+  .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent-blue); }
+
+  .layout-container {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 24px;
+  }
+  .memory-tower {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .tower-header {
+    font-size: 0.75rem;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 4px 0;
+  }
+  .seg-block {
+    border-radius: 6px;
+    padding: 10px 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .seg-block:hover { transform: scale(1.02); filter: brightness(1.2); }
+  .seg-block.active {
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.4);
+    border-color: #ffffff;
+    filter: brightness(1.15);
+  }
+  .seg-name { font-weight: 700; font-size: 0.82rem; }
+  .seg-perm {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* Segment coloring */
+  .bg-kernel { background: #7f1d1d; color: #fca5a5; }
+  .bg-hole { background: #334155; color: #94a3b8; border-style: dashed; }
+  .bg-stack { background: #831843; color: #fbcfe8; }
+  .bg-mmap { background: #4c1d95; color: #ddd6fe; }
+  .bg-heap { background: #14532d; color: #bbf7d0; }
+  .bg-bss { background: #1e3a5f; color: #bfdbfe; }
+  .bg-data { background: #065f46; color: #a7f3d0; }
+  .bg-text { background: #1e40af; color: #dbeafe; }
+  .bg-null { background: #18181b; color: #a1a1aa; border-style: dashed; }
+
+  .inspector-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .inspector-title {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .inspector-vma {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    background: var(--code-bg);
+    padding: 10px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    color: var(--accent-amber);
+  }
+  .inspector-desc {
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+  .security-box {
+    background: rgba(56, 189, 248, 0.08);
+    border-left: 4px solid var(--accent-blue);
+    padding: 14px;
+    border-radius: 0 6px 6px 0;
+  }
+  .security-box h4 {
+    font-size: 0.88rem;
+    color: var(--accent-blue);
+    margin-bottom: 6px;
+  }
+  .security-box p {
+    font-size: 0.82rem;
+    color: var(--text);
+    line-height: 1.5;
+  }
+
+  @media (max-width: 840px) {
+    .layout-container { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2><span>🗺️</span> 64비트 리눅스 프로세스 가상 메모리 공간 (Virtual Address Space)</h2>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span> <span id="themeText">Light Mode</span>
+  </button>
+</div>
+
+<div class="layout-container">
+  <!-- Interactive Memory Tower (High to Low Addresses) -->
+  <div class="memory-tower">
+    <div class="tower-header">0xFFFFFFFFFFFFFFFF (최상위 주소)</div>
+    <div class="seg-block bg-kernel active" onclick="selectSegment('kernel')">
+      <span class="seg-name">Kernel Space (128TB)</span>
+      <span class="seg-perm">Ring 0</span>
+    </div>
+    <div class="tower-header">0xFFFF800000000000</div>
+    <div class="seg-block bg-hole" onclick="selectSegment('hole')">
+      <span class="seg-name">Non-Canonical Hole</span>
+      <span class="seg-perm">Fault</span>
+    </div>
+    <div class="tower-header">0x00007FFFFFFFFFFF (유저 공간 최상단)</div>
+    <div class="seg-block bg-stack" onclick="selectSegment('stack')">
+      <span class="seg-name">Stack [아래로 성장 ▼]</span>
+      <span class="seg-perm">rw-p</span>
+    </div>
+    <div class="seg-block bg-mmap" onclick="selectSegment('mmap')">
+      <span class="seg-name">Memory Mapping (mmap/libc)</span>
+      <span class="seg-perm">r-xp / rw-p</span>
+    </div>
+    <div class="seg-block bg-heap" onclick="selectSegment('heap')">
+      <span class="seg-name">Heap [위로 성장 ▲]</span>
+      <span class="seg-perm">rw-p</span>
+    </div>
+    <div class="seg-block bg-bss" onclick="selectSegment('bss')">
+      <span class="seg-name">BSS (.bss - 미초기화)</span>
+      <span class="seg-perm">rw-p</span>
+    </div>
+    <div class="seg-block bg-data" onclick="selectSegment('data')">
+      <span class="seg-name">Data (.data - 초기화 전역)</span>
+      <span class="seg-perm">rw-p</span>
+    </div>
+    <div class="seg-block bg-text" onclick="selectSegment('text')">
+      <span class="seg-name">Text (.text / .rodata)</span>
+      <span class="seg-perm">r-xp / r--p</span>
+    </div>
+    <div class="seg-block bg-null" onclick="selectSegment('null')">
+      <span class="seg-name">Reserved / Null Trap</span>
+      <span class="seg-perm">---p</span>
+    </div>
+    <div class="tower-header">0x0000000000000000 (최하위 주소)</div>
+  </div>
+
+  <!-- Detailed Inspector Panel -->
+  <div class="inspector-card" id="inspectorCard">
+    <!-- Populated by JS -->
+  </div>
+</div>
+
+<script>
+const segmentData = {
+  kernel: {
+    title: "🛡️ 커널 주소 공간 (Kernel Space, Ring 0)",
+    vma: "0xFFFF800000000000 ~ 0xFFFFFFFFFFFFFFFF (128TB)",
+    perms: "Supervisor Only (U/S Bit = 0)",
+    desc: "모든 프로세스의 상위 주소 공간에 동일하게 매핑되는 운영체제 핵심 영역임. 하드웨어 페이지 테이블, 인터럽트 벡터, 커널 코드 및 드라이버가 위치함. 유저 모드(Ring 3 / EL0)에서 이 주소에 직접 접근하려 시도하면 MMU가 Page Fault (#PF) 또는 General Protection Fault (#GP)를 발생시킴.",
+    securityTitle: "🔒 보안 관점 (KPTI & SMEP/SMAP)",
+    securityDesc: "과거에는 Meltdown 취약점으로 인해 유저 공간에서 예측 실행 부채널을 통해 커널 메모리를 훔쳐볼 수 있었으나, KPTI(Kernel Page Table Isolation)를 통해 유저 모드 실행 중에는 커널 페이지 테이블 매핑이 최소 트램펄린을 제외하고 완전히 분리됨."
+  },
+  hole: {
+    title: "🕳️ 비정규 주소 홀 (Non-Canonical Address Hole)",
+    vma: "0x0000800000000000 ~ 0xFFFF7FFFFFFFFFFF (약 1600만 TB)",
+    perms: "하드웨어 미지원 (Invalid)",
+    desc: "x86_64 아키텍처는 현재 48비트(또는 57비트) 가상 주소를 사용함. 64비트 포인터의 47번째 비트(부호 비트)가 48~63번 비트로 부호 확장(Sign Extension)되어야만 정규(Canonical) 주소로 인정됨. 따라서 부호 확장이 맞지 않는 중간 주소 영역은 물리적으로 존재하지 않는 가상 홀로 남겨짐.",
+    securityTitle: "🔒 보안 관점 (Invalid Pointer Trap)",
+    securityDesc: "공격자가 힙 오버플로우나 UAF로 포인터를 오염시킬 때 이 비정규 주소를 가리키게 되면 CPU 하드웨어가 즉각 #GP 예외를 던져 익스플로잇 시도를 조기에 격추함."
+  },
+  stack: {
+    title: "📚 스택 세그먼트 (User Stack)",
+    vma: "0x7FFFFFFDE000 ~ 0x7FFFFFFFF000 (아래로 자람 ▼)",
+    perms: "rw-p (Read, Write, No-Execute)",
+    desc: "함수 호출 시 생성되는 지역 변수, 매개변수, 반환 주소(Return Address), 프레임 포인터(SFP)를 저장하는 메모리 공간임. LIFO(Last-In First-Out) 구조로 동작하며 높은 주소에서 낮은 주소로 자라남. RSP(Stack Pointer) 레지스터가 현재 스택 최상단을 추적함.",
+    securityTitle: "🔒 보안 관점 (Stack Smashing & NX/DEP)",
+    securityDesc: "스택 버퍼 오버플로우 공격의 주요 타깃임. 현대 리눅스는 W^X(NX/DEP) 원칙에 따라 스택에 쓰기(W) 권한만 부여하고 실행(X) 권한을 철저히 박탈하여 스택에 주입된 쉘코드가 직접 실행되는 것을 원천 차단함."
+  },
+  mmap: {
+    title: "📦 메모리 매핑 및 공유 라이브러리 (mmap Region)",
+    vma: "0x7F0000000000 대역 (ASLR 난수화)",
+    perms: "r-xp (코드) / rw-p (데이터)",
+    desc: "공유 라이브러리(libc.so, ld.so 등)의 코드와 데이터가 mmap() 시스템 콜을 통해 매핑되는 구역임. 대용량 동적 메모리 할당이나 파일 매핑(Memory-Mapped Files)에도 활용됨.",
+    securityTitle: "🔒 보안 관점 (Return-to-libc & ASLR)",
+    securityDesc: "스택 실행이 금지된 후 공격자들은 libc 내부의 system() 함수 주소로 점프하는 Return-to-libc 기법을 고안함. 이에 대응하여 ASLR은 프로세스가 실행될 때마다 libc 매핑 베이스 주소를 무작위 난수화하여 공격자가 고정 주소를 참조할 수 없도록 방어함."
+  },
+  heap: {
+    title: "🏗️ 런타임 힙 세그먼트 (Run-time Heap)",
+    vma: "brk / malloc 할당 영역 (위로 자람 ▲)",
+    perms: "rw-p (Read, Write, No-Execute)",
+    desc: "프로그래머가 malloc(), calloc(), new 등을 통해 동적으로 할당하는 가변 크기 메모리 풀임. 낮은 주소에서 높은 주소 방향으로 자라나며, glibc의 ptmalloc은 brk() 또는 mmap() 시스템 콜을 호출하여 힙 크기를 확장함.",
+    securityTitle: "🔒 보안 관점 (Heap UAF & Freelist Hardening)",
+    securityDesc: "메모리 해제 후 재사용(Use-After-Free)이나 힙 오버플로우 취약점이 주로 발생함. 커널 및 glibc는 힙 청크 메타데이터 검증, Freelist 포인터 난독화, 할당 시 제로 초기화(Heap Zeroing)를 통해 힙 익스플로잇을 차단함."
+  },
+  bss: {
+    title: "📄 BSS 세그먼트 (Block Started by Symbol)",
+    vma: "정적/전역 미초기화 변수 영역",
+    perms: "rw-p (Read, Write, Demand Zero)",
+    desc: "초기화되지 않은 전역 변수(예: static int count;)가 위치함. 바이너리 파일 자체에는 실제 0 바이트들을 저장하지 않고 크기 정보만 기록하며, 커널이 프로세스를 로드할 때 Demand Paging 기법을 통해 0으로 초기화된 익명 페이지를 매핑해 줌.",
+    securityTitle: "🔒 보안 관점 (Global Variable Corruption)",
+    securityDesc: "BSS 영역의 함수 포인터나 상태 플래그가 오염될 경우 프로그램의 흐름이 왜곡될 수 있음."
+  },
+  data: {
+    title: "💾 데이터 세그먼트 (Initialized Data)",
+    vma: "바이너리 내 초기화된 전역/정적 변수",
+    perms: "rw-p (Read, Write, Non-Executable)",
+    desc: "소스 코드에서 초기값이 지정된 전역 변수(예: int g_count = 100;)가 저장되는 영역임. 바이너리 파일의 크기에 직접 포함되어 로드됨.",
+    securityTitle: "🔒 보안 관점 (Writable Data Isolation)",
+    securityDesc: "읽기/쓰기가 모두 가능하므로 코드 영역(.text)과 철저히 다른 페이지 권한으로 격리되어야 함."
+  },
+  text: {
+    title: "⚙️ 텍스트/코드 세그먼트 (.text & .rodata)",
+    vma: "CPU 기계어 명령어 & 상수 문자열",
+    perms: "r-xp (.text) / r--p (.rodata)",
+    desc: "컴파일된 순수 CPU 기계어 인스트럭션이 상주하는 영역임. CPU의 명령어 포인터(RIP/PC)가 이 영역을 순회하며 코드를 페치(Fetch)함. 또한 문자열 리터럴(예: \"Hello World\")은 읽기 전용 데이터(.rodata)에 배치됨.",
+    securityTitle: "🔒 보안 관점 (Strict W^X & ROP)",
+    securityDesc: "텍스트 영역은 실행(X)이 가능하므로 절대로 쓰기(W) 권한이 부여되지 않음(W^X 원칙). 공격자가 코드를 직접 수정하는 것은 불가능하며, 기존에 존재하는 코드 조각(가젯)을 엮어 공격하는 ROP(Return-Oriented Programming)를 시도하게 됨."
+  },
+  null: {
+    title: "⛔ 널 포인터 트랩 구역 (Null Page Trap)",
+    vma: "0x0000000000000000 ~ 0x0000000000010000 (첫 64KB)",
+    perms: "---p (접근 불가 / 매핑 금지)",
+    desc: "C 언어에서 NULL 포인터는 0번지를 의미함. 잘못된 널 포인터 역참조(Null Pointer Dereference) 버그가 발생했을 때 즉각 Segmentation Fault (SIGSEGV)를 유발하여 프로세스를 안전하게 종료시키기 위해 의도적으로 매핑을 금지한 보호 구역임.",
+    securityTitle: "🔒 보안 관점 (mmap_min_addr 보호)",
+    securityDesc: "과거에는 로컬 공격자가 0번지에 쉘코드를 mmap()한 뒤 커널의 널 포인터 역참조 버그를 유도하여 커널 권한으로 쉘코드를 실행하는 기법이 유행했음. 현대 리눅스는 sysctl vm.mmap_min_addr=65536 설정을 통해 비특권 유저의 저위 주소 매핑을 원천 봉쇄함."
+  }
+};
+
+function selectSegment(key) {
+  document.querySelectorAll('.seg-block').forEach(b => b.classList.remove('active'));
+  const target = event.currentTarget || document.querySelector(`.bg-${key}`);
+  if (target) target.classList.add('active');
+
+  const d = segmentData[key];
+  const card = document.getElementById('inspectorCard');
+  card.innerHTML = `
+    <div class="inspector-title">
+      <span>${d.title}</span>
+      <span style="font-size:0.8rem; background:rgba(56,189,248,0.15); padding:3px 8px; border-radius:4px;">권한: ${d.perms}</span>
+    </div>
+    <div class="inspector-vma">가상 주소 범위: ${d.vma}</div>
+    <div class="inspector-desc">${d.desc}</div>
+    <div class="security-box">
+      <h4>${d.securityTitle}</h4>
+      <p>${d.securityDesc}</p>
+    </div>
+  `;
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  updateThemeButton(isLight);
+}
+
+function applyTheme(theme) {
+  const isLight = (theme === 'light' || theme === 'default');
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+  const icon = document.getElementById('themeIcon');
+  const text = document.getElementById('themeText');
+  if (isLight) {
+    icon.textContent = '🌙';
+    text.textContent = 'Dark Mode';
+  } else {
+    icon.textContent = '☀️';
+    text.textContent = 'Light Mode';
+  }
+}
+
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'theme-change') {
+    applyTheme(event.data.theme);
+  }
+});
+
+// Default select stack
+selectSegment('stack');
+</script>
+
+</body>
+</html>

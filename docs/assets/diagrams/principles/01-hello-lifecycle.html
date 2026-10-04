@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hello World Execution Lifecycle: From C Code to CPU Execution</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+    --code-bg: #090d16;
+  }
+  body.light-theme {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --accent-blue: #0284c7;
+    --accent-green: #16a34a;
+    --accent-amber: #d97706;
+    --accent-red: #dc2626;
+    --accent-purple: #9333ea;
+    --code-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h2 { font-size: 1.4rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+  .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent-blue); }
+
+  .pipeline-steps {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .step-tab {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .step-tab:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
+  .step-tab.active { border-color: var(--accent-blue); background: rgba(56, 189, 248, 0.12); }
+  .step-tab .num { font-size: 0.75rem; color: var(--accent-blue); font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+  .step-tab .title { font-size: 0.88rem; font-weight: 600; }
+
+  .main-display {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+  .flow-diagram {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 20px 0;
+    position: relative;
+  }
+  .flow-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    width: 18%;
+    text-align: center;
+    font-size: 0.85rem;
+    transition: all 0.3s;
+  }
+  .flow-box.highlight {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
+    transform: scale(1.05);
+  }
+  .flow-arrow {
+    color: var(--accent-blue);
+    font-size: 1.2rem;
+    font-weight: bold;
+  }
+
+  .content-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 20px;
+  }
+  .detail-card {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .detail-card h4 {
+    font-size: 0.95rem;
+    color: var(--accent-blue);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .detail-card p, .detail-card li {
+    font-size: 0.85rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .detail-card ul { padding-left: 18px; }
+  .code-snippet {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 6px;
+    font-family: "JetBrains Mono", Consolas, monospace;
+    font-size: 0.8rem;
+    color: #e2e8f0;
+    margin-top: 10px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+  }
+  body.light-theme .code-snippet { background: #e2e8f0; color: #0f172a; }
+
+  @media (max-width: 840px) {
+    .pipeline-steps { grid-template-columns: 1fr 1fr; }
+    .content-grid { grid-template-columns: 1fr; }
+    .flow-diagram { flex-direction: column; gap: 10px; }
+    .flow-box { width: 100%; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2><span>🚀</span> Hello World 실행 라이프사이클 (Program Lifecycle)</h2>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span> <span id="themeText">Light Mode</span>
+  </button>
+</div>
+
+<div class="pipeline-steps">
+  <div class="step-tab active" onclick="setStep(0)">
+    <div class="num">Step 1</div>
+    <div class="title">컴파일 & 링킹</div>
+  </div>
+  <div class="step-tab" onclick="setStep(1)">
+    <div class="num">Step 2</div>
+    <div class="title">execve 커널 진입</div>
+  </div>
+  <div class="step-tab" onclick="setStep(2)">
+    <div class="num">Step 3</div>
+    <div class="title">ELF 로딩 & VMA 매핑</div>
+  </div>
+  <div class="step-tab" onclick="setStep(3)">
+    <div class="num">Step 4</div>
+    <div class="title">동적 링커 & CRT0</div>
+  </div>
+  <div class="step-tab" onclick="setStep(4)">
+    <div class="num">Step 5</div>
+    <div class="title">main() & 종료</div>
+  </div>
+</div>
+
+<div class="main-display">
+  <div class="flow-diagram">
+    <div class="flow-box" id="box0">
+      <div style="font-weight:700; color:var(--accent-blue);">Source Code</div>
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px;">hello.c ➔ ELF 바이너리</div>
+    </div>
+    <div class="flow-arrow">➔</div>
+    <div class="flow-box" id="box1">
+      <div style="font-weight:700; color:var(--accent-amber);">Kernel Syscall</div>
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px;">sys_execve ➔ do_execve</div>
+    </div>
+    <div class="flow-arrow">➔</div>
+    <div class="flow-box" id="box2">
+      <div style="font-weight:700; color:var(--accent-purple);">Memory Mapping</div>
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px;">load_elf_binary (VMA)</div>
+    </div>
+    <div class="flow-arrow">➔</div>
+    <div class="flow-box" id="box3">
+      <div style="font-weight:700; color:var(--accent-green);">Linker & Init</div>
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px;">ld-linux.so ➔ _start</div>
+    </div>
+    <div class="flow-arrow">➔</div>
+    <div class="flow-box" id="box4">
+      <div style="font-weight:700; color:var(--accent-blue);">Execution</div>
+      <div style="font-size:0.75rem; color:var(--text-dim); margin-top:4px;">main() ➔ exit_group</div>
+    </div>
+  </div>
+
+  <div class="content-grid" id="stepContent">
+    <!-- Populated by JavaScript -->
+  </div>
+</div>
+
+<script>
+const stepsData = [
+  {
+    boxIndex: 0,
+    title1: "⚙️ 4단계 빌드 파이프라인 (Build Pipeline)",
+    desc1: `
+      <ul>
+        <li><strong>전처리(Preprocessing, cpp)</strong>: <code>#include &lt;stdio.h&gt;</code> 등 헤더 파일 전개 및 매크로 치환.</li>
+        <li><strong>컴파일(Compilation, cc1)</strong>: C 소스 코드를 아키텍처 의존적 어셈블리(<code>.s</code>)로 변환.</li>
+        <li><strong>어셈블(Assembly, as)</strong>: 기계어 오브젝트 파일(<code>.o</code>, ELF Relocatable) 생성.</li>
+        <li><strong>링킹(Linking, ld)</strong>: C 런타임(crt1.o, crti.o) 및 공유 라이브러리(libc.so)를 결합하여 최종 실행 가능 ELF 바이너리(ET_EXEC 또는 ET_DYN) 생성.</li>
+      </ul>
+    `,
+    title2: "📄 ELF 바이너리 해부 (ELF Header Structure)",
+    desc2: `
+      <p>ELF 헤더(64바이트)는 운영체제가 바이너리를 해석하기 위한 설계도임:</p>
+      <div class="code-snippet">
+7f 45 4c 46 (ELF 매직넘버: \\x7fELF)
+Class: ELF64 (64비트 아키텍처)
+Data: 2's complement, little endian
+Type: DYN (Position-Independent Executable)
+Machine: Advanced Micro Devices X86-64 / AArch64
+Entry point address: 0x1060 (_start)</div>
+    `
+  },
+  {
+    boxIndex: 1,
+    title1: "⚡ 쉘의 입력부터 시스템 콜 진입까지",
+    desc1: `
+      <ul>
+        <li>터미널에서 <code>./hello</code>를 입력하면 부모 쉘(bash/zsh)이 <code>fork()</code>를 호출하여 자식 프로세스 복제 생성.</li>
+        <li>자식 프로세스는 <code>execve("./hello", argv, envp)</code> 시스템 콜을 호출하여 Ring 0 커널 공간으로 제어권 전이.</li>
+        <li>x86_64: <code>RAX=59 (__NR_execve)</code> 레지스터 적재 후 <code>syscall</code> 명령어 수행.</li>
+        <li>ARM64: <code>X8=221 (__NR_execve)</code> 레지스터 적재 후 <code>svc #0</code> 명령어 수행.</li>
+      </ul>
+    `,
+    title2: "🛡️ 커널 내부 do_execve() 흐름",
+    desc2: `
+      <p>커널은 기존 주소 공간을 정리하고 새로운 실행 이미지를 준비함:</p>
+      <div class="code-snippet">
+sys_execve(filename, argv, envp)
+  ➔ do_execveat_common()
+    ➔ bprm_execve()
+      ➔ search_binary_handler()
+        ➔ load_elf_binary() (fs/binfmt_elf.c)</div>
+      <p style="margin-top:8px;">이 과정에서 파일 권한, 바이너리 무결성(IMA) 및 실행 가능 여부를 엄격히 검증함.</p>
+    `
+  },
+  {
+    boxIndex: 2,
+    title1: "🗺️ load_elf_binary(): 가상 메모리 VMA 구축",
+    desc1: `
+      <ul>
+        <li><strong>기존 메모리 소멸</strong>: 이전 프로세스의 <code>mm_struct</code> 메모리 맵(VMA)을 완전 해제(<code>flush_old_exec</code>).</li>
+        <li><strong>PT_LOAD 세그먼트 매핑</strong>: ELF의 Program Header를 순회하며 텍스트(RX), 데이터(RW) 영역을 페이지 테이블에 매핑.</li>
+        <li><strong>스택 & 힙 초기화</strong>: 새 사용자 스택 영역을 할당하고, 명령행 인자(<code>argv</code>)와 환경 변수(<code>envp</code>), 보조 벡터(<code>auxv</code>)를 스택 최상단에 푸시.</li>
+        <li><strong>ASLR 적용</strong>: <code>CONFIG_RANDOMIZE_BASE</code>에 따라 베이스 주소 난수화 오프셋 적용.</li>
+      </ul>
+    `,
+    title2: "🔍 PT_LOAD 세그먼트 플래그 분리 (W^X 원칙)",
+    desc2: `
+      <p>현대 커널은 세그먼트 권한을 철저히 분리하여 메모리 보안을 확립함:</p>
+      <div class="code-snippet">
+Type     Offset   VirtAddr   PhysAddr   FileSiz  MemSiz   Flg
+LOAD     0x000000 0x00000000 0x00000000 0x000638 0x000638 R   (.rodata)
+LOAD     0x001000 0x00001000 0x00001000 0x0001a1 0x0001a1 R E (.text)
+LOAD     0x002000 0x00002000 0x00002000 0x000130 0x000130 RW  (.data/.bss)</div>
+      <p style="margin-top:8px;">코드 영역은 쓰기 금지(R-E), 데이터 영역은 실행 금지(RW-)로 매핑됨.</p>
+    `
+  },
+  {
+    boxIndex: 3,
+    title1: "🔗 동적 링커(ld-linux.so) 인터프리터 구동",
+    desc1: `
+      <ul>
+        <li>동적으로 링크된 바이너리의 경우 커널은 실행 진입점을 바이너리 본체가 아닌 <strong>인터프리터(<code>/lib64/ld-linux-x86-64.so.2</code>)</strong>로 설정함.</li>
+        <li>동적 링커는 프로그램이 요구하는 공유 라이브러리(<code>libc.so.6</code> 등)를 탐색하고 <code>mmap()</code>을 통해 메모리에 로드.</li>
+        <li>심볼 재배치(Relocation)를 수행하여 전역 오프셋 테이블(GOT)과 프로시저 연결 테이블(PLT)을 초기화.</li>
+      </ul>
+    `,
+    title2: "🏁 C 런타임 시작 지점: _start ➔ __libc_start_main",
+    desc2: `
+      <p>동적 링킹이 완료되면 CPU 제어권이 C 런타임 시작 함수로 전달됨:</p>
+      <div class="code-snippet">
+_start (sysdeps/x86_64/start.S)
+  ➔ xor %ebp, %ebp (프레임 포인터 최상단 0 초기화)
+  ➔ pop %rsi (argc 추출)
+  ➔ mov %rsp, %rdx (argv 포인터 설정)
+  ➔ call __libc_start_main
+    ➔ __libc_csu_init (글로벌 생성자 호출)
+    ➔ main(argc, argv, envp) 호출!</div>
+    `
+  },
+  {
+    boxIndex: 4,
+    title1: "🎉 main() 실행과 표준 출력 버퍼링",
+    desc1: `
+      <ul>
+        <li>개발자가 작성한 <code>main()</code> 함수가 호출되며 실제 프로그램 로직이 수행됨.</li>
+        <li><code>printf("Hello World\\n")</code> 호출 시:
+          <ul>
+            <li>문자열이 glibc stdout 라인 버퍼에 저장됨.</li>
+            <li>개행 문자(<code>\\n</code>)를 만나면 버퍼를 비우며 <code>write(1, "Hello World\\n", 12)</code> 시스템 콜을 커널로 발행.</li>
+            <li>커널 가상 파일 시스템(VFS) ➔ TTY 드라이버 ➔ 가상 터미널 에뮬레이터 화면에 폰트 렌더링.</li>
+          </ul>
+        </li>
+      </ul>
+    `,
+    title2: "🛑 정상 복귀와 프로세스 청소: exit_group()",
+    desc2: `
+      <p><code>return 0;</code> 수행 시 일어나는 정리 파이프라인:</p>
+      <div class="code-snippet">
+main() 반환 (return 0)
+  ➔ __libc_start_main 내부로 복귀
+    ➔ exit(result) 호출
+      ➔ atexit()에 등록된 클린업 핸들러 순차 실행
+      ➔ 모든 I/O 스트림 버퍼 flush & close
+      ➔ exit_group(0) 시스템 콜 (__NR_exit_group = 231)
+        ➔ 커널: do_group_exit() ➔ 자원 반환 ➔ ZOMBIE 상태 전이 (부모 대기)</div>
+    `
+  }
+];
+
+function setStep(idx) {
+  document.querySelectorAll('.step-tab').forEach((tab, i) => {
+    tab.classList.toggle('active', i === idx);
+  });
+  for (let i = 0; i < 5; i++) {
+    const box = document.getElementById(`box${i}`);
+    if (box) {
+      box.classList.toggle('highlight', i === idx);
+    }
+  }
+  const data = stepsData[idx];
+  const container = document.getElementById('stepContent');
+  container.innerHTML = `
+    <div class="detail-card">
+      <h4>${data.title1}</h4>
+      ${data.desc1}
+    </div>
+    <div class="detail-card">
+      <h4>${data.title2}</h4>
+      ${data.desc2}
+    </div>
+  `;
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  updateThemeButton(isLight);
+}
+
+function applyTheme(theme) {
+  const isLight = (theme === 'light' || theme === 'default');
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+  const icon = document.getElementById('themeIcon');
+  const text = document.getElementById('themeText');
+  if (isLight) {
+    icon.textContent = '🌙';
+    text.textContent = 'Dark Mode';
+  } else {
+    icon.textContent = '☀️';
+    text.textContent = 'Light Mode';
+  }
+}
+
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'theme-change') {
+    applyTheme(event.data.theme);
+  }
+});
+
+// Init step 0
+setStep(0);
+</script>
+
+</body>
+</html>

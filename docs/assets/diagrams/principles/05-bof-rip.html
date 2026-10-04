@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Classic Buffer Overflow & Instruction Pointer (RIP) Hijacking</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+    --code-bg: #090d16;
+  }
+  body.light-theme {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --accent-blue: #0284c7;
+    --accent-green: #16a34a;
+    --accent-amber: #d97706;
+    --accent-red: #dc2626;
+    --accent-purple: #9333ea;
+    --code-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h2 { font-size: 1.4rem; color: var(--accent-red); display: flex; align-items: center; gap: 8px; }
+  .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent-blue); }
+
+  .stepper {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .step-tab {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .step-tab:hover { border-color: var(--accent-red); }
+  .step-tab.active {
+    border-color: var(--accent-red);
+    background: rgba(248, 113, 113, 0.12);
+  }
+  .step-tab .num { font-size: 0.75rem; color: var(--accent-red); font-weight: bold; }
+  .step-tab .title { font-size: 0.85rem; font-weight: 600; margin-top: 4px; }
+
+  .comparison-view {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .stack-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .panel-badge {
+    font-size: 0.85rem;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+
+  .mem-cell {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    transition: all 0.3s;
+  }
+  .mem-cell.smash {
+    background: rgba(248, 113, 113, 0.2);
+    border-color: var(--accent-red);
+    color: #fca5a5;
+    box-shadow: 0 0 12px rgba(248, 113, 113, 0.3);
+  }
+
+  .exploit-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 24px;
+  }
+  .exploit-card h3 {
+    font-size: 1rem;
+    color: var(--accent-amber);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .exploit-card p {
+    font-size: 0.88rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+
+  @media (max-width: 840px) {
+    .stepper { grid-template-columns: 1fr 1fr; }
+    .comparison-view { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2><span>💥</span> 클래식 버퍼 오버플로우와 RIP 장악 (Buffer Overflow & Control Flow Hijack)</h2>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span> <span id="themeText">Light Mode</span>
+  </button>
+</div>
+
+<div class="stepper">
+  <div class="step-tab active" onclick="setSmashStep(0)">
+    <div class="num">Step 1</div>
+    <div class="title">정상 스택 상태</div>
+  </div>
+  <div class="step-tab" onclick="setSmashStep(1)">
+    <div class="num">Step 2</div>
+    <div class="title">버퍼 초과 유입 (Overflow)</div>
+  </div>
+  <div class="step-tab" onclick="setSmashStep(2)">
+    <div class="num">Step 3</div>
+    <div class="title">SFP & RET 변조</div>
+  </div>
+  <div class="step-tab" onclick="setSmashStep(3)">
+    <div class="num">Step 4</div>
+    <div class="title">RET 실행 ➔ RIP 탈취</div>
+  </div>
+</div>
+
+<div class="comparison-view">
+  <!-- Stack State View -->
+  <div class="stack-panel">
+    <div class="panel-badge" id="stateBadge" style="background:rgba(74,222,128,0.15); color:var(--accent-green);">
+      정상 상태: 메모리 무결성 유지
+    </div>
+    <div style="font-size:0.75rem; color:var(--text-dim); text-align:center;">▲ High Memory (상위 주소)</div>
+
+    <div class="mem-cell" id="cellRet">
+      <span>Return Address (RET)</span>
+      <span id="valRet" style="color:var(--accent-blue);">0x000000000040124a (&lt;main+32&gt;)</span>
+    </div>
+
+    <div class="mem-cell" id="cellSfp">
+      <span>Saved Frame Pointer (SFP)</span>
+      <span id="valSfp" style="color:var(--accent-amber);">0x7fffffffe050</span>
+    </div>
+
+    <div class="mem-cell" id="cellBufHi">
+      <span>stack_buffer[48..63]</span>
+      <span id="valBufHi" style="color:var(--text-dim);">0x0000000000000000</span>
+    </div>
+
+    <div class="mem-cell" id="cellBufMid">
+      <span>stack_buffer[16..47]</span>
+      <span id="valBufMid" style="color:var(--text-dim);">0x0000000000000000</span>
+    </div>
+
+    <div class="mem-cell" id="cellBufLo">
+      <span>stack_buffer[0..15]</span>
+      <span id="valBufLo" style="color:var(--accent-green);">"NORMAL_DATA\0"</span>
+    </div>
+
+    <div style="font-size:0.75rem; color:var(--text-dim); text-align:center;">▼ Low Memory (하위 주소 - RSP)</div>
+  </div>
+
+  <!-- CPU Register & Execution View -->
+  <div class="stack-panel">
+    <div class="panel-badge" style="background:rgba(56,189,248,0.15); color:var(--accent-blue);">
+      CPU 레지스터 및 명령어 흐름
+    </div>
+
+    <div class="mem-cell">
+      <span style="font-weight:bold;">Instruction Pointer (RIP)</span>
+      <span id="regRip" style="color:var(--accent-blue); font-weight:bold;">0x401180 (&lt;vulnerable_service&gt;)</span>
+    </div>
+
+    <div class="mem-cell">
+      <span style="font-weight:bold;">Stack Pointer (RSP)</span>
+      <span id="regRsp" style="color:var(--accent-green);">0x7fffffffe000</span>
+    </div>
+
+    <div class="mem-cell">
+      <span style="font-weight:bold;">Base Pointer (RBP)</span>
+      <span id="regRbp" style="color:var(--accent-amber);">0x7fffffffe050</span>
+    </div>
+
+    <div style="background:var(--code-bg); padding:14px; border-radius:8px; border:1px solid var(--border); margin-top:10px;">
+      <div style="font-size:0.8rem; font-weight:bold; color:var(--accent-blue); margin-bottom:6px;">현재 실행 명령어:</div>
+      <div id="asmCurrent" style="font-family:'JetBrains Mono',monospace; font-size:0.85rem; color:#f8fafc;">
+        memcpy(stack_buffer, user_input, 12);
+      </div>
+    </div>
+
+    <div style="background:rgba(251,191,36,0.1); border-left:4px solid var(--accent-amber); padding:12px; border-radius:0 6px 6px 0; font-size:0.8rem; color:var(--text-dim); line-height:1.5;">
+      <span style="color:var(--accent-amber); font-weight:bold;">💡 취약점 핵심:</span>
+      입력 크기 검증 없이 메모리를 복사하면, 버퍼의 경계를 넘어 상위 주소에 위치한 SFP와 RET를 순차적으로 덮어쓰게 됨.
+    </div>
+  </div>
+</div>
+
+<div class="exploit-card" id="exploitExplanation">
+  <!-- Explanation populated by JS -->
+</div>
+
+<script>
+const smashSteps = [
+  {
+    badge: "정상 상태: 메모리 무결성 유지",
+    badgeBg: "rgba(74,222,128,0.15)",
+    badgeColor: "var(--accent-green)",
+    valRet: "0x000000000040124a (<main+32>)",
+    valSfp: "0x7fffffffe050",
+    valBufHi: "0x0000000000000000",
+    valBufMid: "0x0000000000000000",
+    valBufLo: "\"NORMAL_DATA\\0\"",
+    rip: "0x401180 (<vulnerable_service>)",
+    rsp: "0x7fffffffe000",
+    rbp: "0x7fffffffe050",
+    asm: "memcpy(stack_buffer, user_input, 12);",
+    smashRet: false,
+    smashSfp: false,
+    smashBuf: false,
+    cardTitle: "✅ 정상 입력 처리 (Normal In-Bounds Execution)",
+    cardDesc: "입력 데이터(12바이트)가 버퍼 크기(64바이트) 이내이므로 스택의 SFP와 Return Address가 온전히 보존됨. 함수가 종료되면 정확히 main()의 다음 명령어로 안전하게 복귀함."
+  },
+  {
+    badge: "오버플로우 발생: 버퍼 경계 붕괴",
+    badgeBg: "rgba(251,191,36,0.15)",
+    badgeColor: "var(--accent-amber)",
+    valRet: "0x000000000040124a (<main+32>)",
+    valSfp: "0x7fffffffe050",
+    valBufHi: "'AAAAAAAAAAAAAAAA' (0x414141...)",
+    valBufMid: "'AAAAAAAAAAAAAAAA' (0x414141...)",
+    valBufLo: "'AAAAAAAAAAAAAAAA' (0x414141...)",
+    rip: "0x401192 (<vulnerable_service+18>)",
+    rsp: "0x7fffffffe000",
+    rbp: "0x7fffffffe050",
+    asm: "memcpy(stack_buffer, payload, 80); // 64바이트 버퍼에 80바이트 주입",
+    smashRet: false,
+    smashSfp: false,
+    smashBuf: true,
+    cardTitle: "⚠️ 64바이트 패딩 유입 ('A' * 64)",
+    cardDesc: "공격자가 64바이트 크기의 로컬 버퍼 전체를 0x41('A')로 가득 채우며 SFP 바로 직전까지 메모리를 빈틈없이 밀고 올라감."
+  },
+  {
+    badge: "위험: SFP 및 Return Address 조작 완료",
+    badgeBg: "rgba(248,113,113,0.15)",
+    badgeColor: "var(--accent-red)",
+    valRet: "0x0000000000401156 (<unreachable_admin_shell>)",
+    valSfp: "'BBBBBBBB' (0x4242424242424242)",
+    valBufHi: "'AAAAAAAAAAAAAAAA' (0x414141...)",
+    valBufMid: "'AAAAAAAAAAAAAAAA' (0x414141...)",
+    valBufLo: "'AAAAAAAAAAAAAAAA' (0x414141...)",
+    rip: "0x4011a0 (<vulnerable_service: leave>)",
+    rsp: "0x7fffffffe000",
+    rbp: "0x7fffffffe050",
+    asm: "leave; // mov %rbp, %rsp && pop %rbp",
+    smashRet: true,
+    smashSfp: true,
+    smashBuf: true,
+    cardTitle: "💥 Return Address 덮어쓰기 완료 (SFP + 8바이트 타깃 주소)",
+    cardDesc: "64바이트 버퍼를 넘쳐흐른 공격 페이로드가 SFP(8바이트 'B')를 덮어쓰고, 최종적으로 원래의 복귀 주소(0x40124a)를 관리자 비밀 쉘 함수 주소(0x401156)로 변조함!"
+  },
+  {
+    badge: "공격 성공: CPU Instruction Pointer (RIP) 탈취",
+    badgeBg: "rgba(192,132,252,0.15)",
+    badgeColor: "var(--accent-purple)",
+    valRet: "POPPED INTO RIP ➔ [0x401156]",
+    valSfp: "RESTORED RBP",
+    valBufHi: "'AAAAAAAAAAAAAAAA'",
+    valBufMid: "'AAAAAAAAAAAAAAAA'",
+    valBufLo: "'AAAAAAAAAAAAAAAA'",
+    rip: "0x0000000000401156 (<unreachable_admin_shell>) ★ HIJACKED",
+    rsp: "0x7fffffffe058",
+    rbp: "0x4242424242424242",
+    asm: "ret; // pop %rip ➔ unreachable_admin_shell() 실행 시작!",
+    smashRet: true,
+    smashSfp: true,
+    smashBuf: true,
+    cardTitle: "🚩 임의 코드 실행 성공 (Arbitrary Code Execution)",
+    cardDesc: "CPU가 <code>ret</code> 명령어를 만나는 순간, 스택에 남아있던 변조된 주소(0x401156)를 RIP 레지스터로 꺼내(POP) 즉시 분기함. 공격자는 프로그램을 완전히 장악하여 관리자 쉘을 탈취함!"
+  }
+];
+
+function setSmashStep(idx) {
+  document.querySelectorAll('.step-tab').forEach((tab, i) => {
+    tab.classList.toggle('active', i === idx);
+  });
+
+  const cur = smashSteps[idx];
+  const badge = document.getElementById('stateBadge');
+  badge.textContent = cur.badge;
+  badge.style.background = cur.badgeBg;
+  badge.style.color = cur.badgeColor;
+
+  document.getElementById('valRet').textContent = cur.valRet;
+  document.getElementById('valSfp').textContent = cur.valSfp;
+  document.getElementById('valBufHi').textContent = cur.valBufHi;
+  document.getElementById('valBufMid').textContent = cur.valBufMid;
+  document.getElementById('valBufLo').textContent = cur.valBufLo;
+
+  document.getElementById('cellRet').classList.toggle('smash', cur.smashRet);
+  document.getElementById('cellSfp').classList.toggle('smash', cur.smashSfp);
+  document.getElementById('cellBufHi').classList.toggle('smash', cur.smashBuf);
+
+  document.getElementById('regRip').textContent = cur.rip;
+  document.getElementById('regRsp').textContent = cur.rsp;
+  document.getElementById('regRbp').textContent = cur.rbp;
+  document.getElementById('asmCurrent').textContent = cur.asm;
+
+  document.getElementById('exploitExplanation').innerHTML = `
+    <h3><span>🔥</span> ${cur.cardTitle}</h3>
+    <p>${cur.cardDesc}</p>
+    <div style="margin-top:12px; font-size:0.82rem; color:var(--text-dim); border-top:1px solid var(--border); padding-top:10px;">
+      🛡️ <strong>현대 보안 완화책과의 연결:</strong><br>
+      • <strong>Stack Canary</strong>: SFP 바로 앞에 랜덤 카나리 값을 배치하여 RET가 변조되기 전 조기 강제 종료 (<code>__stack_chk_fail</code>).<br>
+      • <strong>NX / DEP</strong>: 주입된 쉘코드가 스택에서 실행되는 것을 하드웨어(Page Table XD/NX Bit) 차원에서 거부.<br>
+      • <strong>ASLR / PIE</strong>: 코드 및 함수의 가상 메모리 주소를 매 실행마다 무작위 난수화하여 고정 타깃 점프 무력화.
+    </div>
+  `;
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  updateThemeButton(isLight);
+}
+
+function applyTheme(theme) {
+  const isLight = (theme === 'light' || theme === 'default');
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+  const icon = document.getElementById('themeIcon');
+  const text = document.getElementById('themeText');
+  if (isLight) {
+    icon.textContent = '🌙';
+    text.textContent = 'Dark Mode';
+  } else {
+    icon.textContent = '☀️';
+    text.textContent = 'Light Mode';
+  }
+}
+
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'theme-change') {
+    applyTheme(event.data.theme);
+  }
+});
+
+// Default step 0
+setSmashStep(0);
+</script>
+
+</body>
+</html>

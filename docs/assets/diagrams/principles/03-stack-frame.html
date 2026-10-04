@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stack Frame Mechanics & ABI Calling Conventions</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+    --code-bg: #090d16;
+  }
+  body.light-theme {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --accent-blue: #0284c7;
+    --accent-green: #16a34a;
+    --accent-amber: #d97706;
+    --accent-red: #dc2626;
+    --accent-purple: #9333ea;
+    --code-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h2 { font-size: 1.4rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+  .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent-blue); }
+
+  .stepper {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .step-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .step-btn:hover { border-color: var(--accent-blue); }
+  .step-btn.active { border-color: var(--accent-blue); background: rgba(56, 189, 248, 0.12); }
+  .step-btn .step-no { font-size: 0.75rem; color: var(--accent-blue); font-weight: bold; }
+  .step-btn .step-title { font-size: 0.85rem; font-weight: 600; margin-top: 2px; }
+
+  .stack-visual-grid {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 24px;
+  }
+  .stack-container {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .stack-edge-label {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-align: center;
+  }
+  .stack-slot {
+    border-radius: 6px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    background: var(--code-bg);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.3s;
+  }
+  .stack-slot.active-slot {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.3);
+    background: rgba(56, 189, 248, 0.08);
+  }
+  .stack-slot .name { font-weight: 700; font-size: 0.84rem; }
+  .stack-slot .desc { font-size: 0.75rem; color: var(--text-dim); }
+  .slot-ret { border-left: 5px solid var(--accent-red); }
+  .slot-sfp { border-left: 5px solid var(--accent-amber); }
+  .slot-buf { border-left: 5px solid var(--accent-green); }
+  .slot-arg { border-left: 5px solid var(--accent-purple); }
+
+  .asm-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .asm-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.85rem;
+    color: #e2e8f0;
+    line-height: 1.6;
+  }
+  body.light-theme .asm-box { color: #0f172a; }
+  .asm-highlight {
+    color: var(--accent-blue);
+    font-weight: bold;
+    background: rgba(56, 189, 248, 0.15);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  .abi-comparison-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-top: 10px;
+  }
+  .abi-comparison-table th, .abi-comparison-table td {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  .abi-comparison-table th { background: var(--code-bg); color: var(--accent-blue); }
+
+  @media (max-width: 840px) {
+    .stepper { grid-template-columns: 1fr 1fr; }
+    .stack-visual-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2><span>🧱</span> 스택 프레임 구조와 함수 호출 규약 (Stack Frame & ABI)</h2>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span> <span id="themeText">Light Mode</span>
+  </button>
+</div>
+
+<div class="stepper">
+  <div class="step-btn active" onclick="setFrameStep(0)">
+    <div class="step-no">Phase 1</div>
+    <div class="step-title">인자 전달 (Args)</div>
+  </div>
+  <div class="step-btn" onclick="setFrameStep(1)">
+    <div class="step-no">Phase 2</div>
+    <div class="step-title">CALL (RET 푸시)</div>
+  </div>
+  <div class="step-btn" onclick="setFrameStep(2)">
+    <div class="step-no">Phase 3</div>
+    <div class="step-title">프롤로그 (SFP/RSP)</div>
+  </div>
+  <div class="step-btn" onclick="setFrameStep(3)">
+    <div class="step-no">Phase 4</div>
+    <div class="step-title">지역 변수 공간</div>
+  </div>
+  <div class="step-btn" onclick="setFrameStep(4)">
+    <div class="step-no">Phase 5</div>
+    <div class="step-title">에필로그 (LEAVE/RET)</div>
+  </div>
+</div>
+
+<div class="stack-visual-grid">
+  <!-- Stack Layout View (High to Low Addresses) -->
+  <div class="stack-container">
+    <div class="stack-edge-label">▲ High Memory (상위 주소)</div>
+
+    <div class="stack-slot slot-arg" id="slotCallerArgs">
+      <div>
+        <div class="name">Caller Stack Frame</div>
+        <div class="desc">호출자 스택 (7번째 이후 초과 인자 등)</div>
+      </div>
+      <div style="font-family:monospace; font-size:0.75rem;">+0x18(%rbp)</div>
+    </div>
+
+    <div class="stack-slot slot-ret" id="slotRet">
+      <div>
+        <div class="name">Return Address (RET)</div>
+        <div class="desc">호출자로 복귀할 명령어 포인터 (RIP)</div>
+      </div>
+      <div style="font-family:monospace; font-size:0.75rem;">+0x08(%rbp)</div>
+    </div>
+
+    <div class="stack-slot slot-sfp" id="slotSfp">
+      <div>
+        <div class="name">Saved Frame Pointer (SFP)</div>
+        <div class="desc">이전 함수의 RBP 백업 값</div>
+      </div>
+      <div style="font-family:monospace; font-size:0.75rem;">0x00(%rbp)</div>
+    </div>
+
+    <div class="stack-slot slot-buf" id="slotBuffer">
+      <div>
+        <div class="name">Local Buffer [char buf[32]]</div>
+        <div class="desc">지역 변수 및 배열 (낮은 주소로 할당)</div>
+      </div>
+      <div style="font-family:monospace; font-size:0.75rem;">-0x20(%rbp)</div>
+    </div>
+
+    <div class="stack-slot slot-buf" id="slotLocalVar">
+      <div>
+        <div class="name">Local Variables (uint64_t val)</div>
+        <div class="desc">RSP가 가리키는 현재 스택 최하단</div>
+      </div>
+      <div style="font-family:monospace; font-size:0.75rem;">(%rsp)</div>
+    </div>
+
+    <div class="stack-edge-label">▼ Low Memory (하위 주소 - RSP가 아래로 자람)</div>
+  </div>
+
+  <!-- Assembly & ABI Explanation Panel -->
+  <div class="asm-panel">
+    <div class="asm-box" id="asmInstructionBox">
+      <!-- Populated by JS -->
+    </div>
+
+    <div id="stepExplanation" style="font-size:0.88rem; line-height:1.7; color:var(--text-dim);">
+      <!-- Populated by JS -->
+    </div>
+
+    <div style="margin-top:auto;">
+      <h4 style="font-size:0.9rem; color:var(--accent-blue); margin-bottom:8px;">⚖️ x86_64 vs ARM64 호출 규약(Calling Convention)</h4>
+      <table class="abi-comparison-table">
+        <tr>
+          <th>구분</th>
+          <th>x86_64 (System V AMD64 ABI)</th>
+          <th>ARM64 (AAPCS64)</th>
+        </tr>
+        <tr>
+          <td><strong>레지스터 인자</strong></td>
+          <td>RDI, RSI, RDX, RCX, R8, R9 (총 6개)</td>
+          <td>X0 ~ X7 (총 8개)</td>
+        </tr>
+        <tr>
+          <td><strong>초과 인자</strong></td>
+          <td>스택에 역순으로 PUSH</td>
+          <td>스택에 연속 저장</td>
+        </tr>
+        <tr>
+          <td><strong>반환 주소 보관</strong></td>
+          <td>스택 메모리에 PUSH (CALL 명령)</td>
+          <td>링크 레지스터 <code>LR (X30)</code>에 저장 (BL 명령)</td>
+        </tr>
+        <tr>
+          <td><strong>프레임 포인터</strong></td>
+          <td><code>RBP</code> (기본 베이스 포인터)</td>
+          <td><code>X29 (FP)</code></td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const frameSteps = [
+  {
+    activeSlots: ['slotCallerArgs'],
+    asm: `
+; [main 함수] target_function(arg1, ..., arg8) 호출 준비
+mov $0x11, %rdi    ; 1st 인자 (RDI)
+mov $0x22, %rsi    ; 2nd 인자 (RSI)
+mov $0x33, %rdx    ; 3rd 인자 (RDX)
+mov $0x44, %rcx    ; 4th 인자 (RCX)
+mov $0x55, %r8     ; 5th 인자 (R8)
+mov $0x66, %r9     ; 6th 인자 (R9)
+push $0x88         ; 8th 인자 (스택 Spill)
+push $0x77         ; 7th 인자 (스택 Spill)
+`,
+    desc: `
+      <p><strong>Step 1: 호출 규약에 따른 인자 전달</strong></p>
+      <p>System V AMD64 ABI에 따라 처음 6개 정수/포인터 인자는 레지스터(RDI, RSI, RDX, RCX, R8, R9)를 통해 초고속으로 전달됨. 6개를 초과하는 7번째, 8번째 인자는 스택에 거꾸로 푸시되어 전달됨.</p>
+    `
+  },
+  {
+    activeSlots: ['slotRet'],
+    asm: `
+; [main 함수] CALL 명령 실행
+<span class="asm-highlight">call 0x1149 &lt;target_function&gt;</span>
+; ➔ 내부적으로 수행되는 하드웨어 동작:
+; 1. push %rip (다음에 실행할 main의 복귀 주소)
+; 2. jmp 0x1149 (target_function 시작 주소로 분기)
+; (이로 인해 RSP는 8바이트 감소하여 RET를 가리킴)
+`,
+    desc: `
+      <p><strong>Step 2: CALL 명령어와 Return Address 푸시</strong></p>
+      <p><code>call</code> 명령어가 실행되는 순간 CPU는 호출이 끝난 뒤 돌아올 다음 명령어의 주소(Return Address)를 스택에 자동으로 밀어 넣음(Push). 이 8바이트 값이 바로 버퍼 오버플로우 공격자가 조작하려는 <strong>최종 타깃(Target RET)</strong>임.</p>
+    `
+  },
+  {
+    activeSlots: ['slotSfp'],
+    asm: `
+; [target_function 프롤로그 (Prologue)]
+<span class="asm-highlight">push %rbp</span>        ; 이전 main 함수의 RBP 값을 스택에 백업 (SFP)
+<span class="asm-highlight">mov %rsp, %rbp</span>   ; 현재 RSP를 새로운 기준점(RBP)으로 설정
+`,
+    desc: `
+      <p><strong>Step 3: 함수 프롤로그와 베이스 프레임 형성</strong></p>
+      <p>피호출 함수(target_function)는 자신만의 독립적인 스택 프레임을 만들기 위해 이전 함수의 베이스 포인터를 스택에 백업(Saved Frame Pointer, SFP)하고, 현재 스택 최상단(RSP)을 새 RBP로 복사함. 이제부터 이 함수 내부의 모든 지역 변수는 <code>%rbp - 오프셋</code> 형태로 주소 지정됨.</p>
+    `
+  },
+  {
+    activeSlots: ['slotBuffer', 'slotLocalVar'],
+    asm: `
+; [target_function 지역 변수 공간 확보]
+<span class="asm-highlight">sub $0x30, %rsp</span>   ; 스택 포인터를 아래로 48바이트 내려 공간 확보
+; char local_buffer[32] ➔ -0x20(%rbp)
+; uint64_t local_var    ➔ -0x28(%rbp)
+`,
+    desc: `
+      <p><strong>Step 4: 지역 변수 메모리 할당</strong></p>
+      <p>컴파일러는 함수 내부에 선언된 지역 변수들의 크기를 합산하여 <code>sub $0x30, %rsp</code> 명령으로 스택 공간을 확보함. 스택은 아래로 자라므로 <code>local_buffer[0]</code>은 SFP보다 낮은 주소에 위치하게 됨. 즉, <code>local_buffer</code>에 데이터를 쓰면서 위쪽(높은 주소)으로 밀고 나가면 <strong>SFP를 거쳐 RET를 덮어쓰게 되는 물리적 취약점</strong>이 여기서 발생함!</p>
+    `
+  },
+  {
+    activeSlots: ['slotRet', 'slotSfp'],
+    asm: `
+; [target_function 에필로그 (Epilogue)]
+<span class="asm-highlight">leave</span>              ; mov %rbp, %rsp && pop %rbp (SFP 복원)
+<span class="asm-highlight">ret</span>                ; pop %rip (복귀 주소를 꺼내 Instruction Pointer로 점프)
+`,
+    desc: `
+      <p><strong>Step 5: 함수 에필로그와 복귀</strong></p>
+      <p>함수 실행이 끝나면 <code>leave</code> 명령어가 로컬 변수를 정리하고 백업해 둔 SFP를 꺼내 RBP를 이전 함수의 값으로 복원함. 이어서 <code>ret</code> 명령어가 스택에 남아있는 Return Address를 꺼내(Pop) CPU의 <code>RIP</code> 레지스터에 넣음으로써 원래의 <code>main()</code>으로 제어권이 돌아감.</p>
+    `
+  }
+];
+
+function setFrameStep(idx) {
+  document.querySelectorAll('.step-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', i === idx);
+  });
+  document.querySelectorAll('.stack-slot').forEach(slot => {
+    slot.classList.remove('active-slot');
+  });
+
+  const cur = frameSteps[idx];
+  cur.activeSlots.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active-slot');
+  });
+
+  document.getElementById('asmInstructionBox').innerHTML = cur.asm;
+  document.getElementById('stepExplanation').innerHTML = cur.desc;
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  updateThemeButton(isLight);
+}
+
+function applyTheme(theme) {
+  const isLight = (theme === 'light' || theme === 'default');
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+  const icon = document.getElementById('themeIcon');
+  const text = document.getElementById('themeText');
+  if (isLight) {
+    icon.textContent = '🌙';
+    text.textContent = 'Dark Mode';
+  } else {
+    icon.textContent = '☀️';
+    text.textContent = 'Light Mode';
+  }
+}
+
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'theme-change') {
+    applyTheme(event.data.theme);
+  }
+});
+
+// Default to Phase 3 (Prologue)
+setFrameStep(2);
+</script>
+
+</body>
+</html>

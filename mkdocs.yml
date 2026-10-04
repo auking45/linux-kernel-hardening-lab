@@ -99,6 +99,16 @@ nav:
   - Getting Started:
       - Overview: getting-started/index.md
       - Dual-Arch Environment: getting-started/dual-arch.md
+  - Principles:
+      - Curriculum Roadmap: principles/index.md
+      - Track 1. Program Execution Mechanics:
+          - 01. Hello World Pipeline & ELF: principles/01-hello-world-pipeline.md
+          - 02. Virtual Memory & Address Space: principles/02-virtual-memory-layout.md
+      - Track 2. Process Memory & ABI:
+          - 03. Stack Frame & Calling Convention: principles/03-stack-frame-and-abi.md
+      - Track 3. Memory Exploitation Fundamentals:
+          - 04. Shellcode Engineering: principles/04-shellcode-engineering.md
+          - 05. Classic Stack BOF & RIP Hijacking: principles/05-stack-bof-rip.md
   - Architecture:
       - Memory & Protection Models: architecture/index.md
   - Attack Scenarios:
