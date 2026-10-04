@@ -101,6 +101,8 @@ flowchart TD
         F --> G["[Scenario 02] ret2usr Technique ➔ Collides with SMEP/PXN"]
         F --> H["[Scenario 03] ret2dir / SMAP Technique ➔ User Data Access Blocked"]
         F --> I["[Scenario 04] Heap UAF / SLAB Corruption ➔ struct cred Protected"]
+        F --> J["[Scenario 05] Indirect Call Hijacking ➔ Clang kCFI / PAC Validation"]
+        F --> K["[Scenario 06] Speculative Side-Channels ➔ Retpoline / nospec Interception"]
     end
 
     style Stage1 fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
@@ -114,7 +116,7 @@ flowchart TD
    - Despite root credentials, kernel hardening defenses (`Strict Devmem`, `Lockdown`, `Module Signing`) thwart attempts to deploy kernel rootkits or seize hardware sovereignty.
 3. **Stage 2 (Scenarios 02 through 06 - Kernel Escapes)**:
    - Attackers must pivot to local privilege escalation (LPE) flaws in syscall handlers or network subsystems to break from Ring 3 into Ring 0.
-   - Intercepting attempts to pivot execution into user shellcode constitutes **[Scenario 02. ret2usr & SMEP/PXN Defense]**, while blocking kernel heap corruption constitutes **[Scenario 04. Heap UAF & SLAB Hardening]**.
+   - Intercepting attempts to pivot execution into user shellcode constitutes **[Scenario 02. ret2usr & SMEP/PXN Defense]**, while blocking kernel heap corruption constitutes **[Scenario 04. Heap UAF & SLAB Hardening]**, preventing indirect dispatch hijacking constitutes **[Scenario 05. kCFI]**, and mitigating microarchitectural leaks constitutes **[Scenario 06. Spectre]**.
 
 ---
 

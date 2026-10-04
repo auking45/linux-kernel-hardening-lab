@@ -105,6 +105,8 @@ flowchart TD
         F --> G["[Scenario 02] ret2usr 기법 ➔ SMEP/PXN 방어선과 충돌"]
         F --> H["[Scenario 03] ret2dir / SMAP 기법 ➔ 커널의 유저 데이터 접근 방어"]
         F --> I["[Scenario 04] Heap UAF / SLAB 오염 ➔ struct cred 변조 차단"]
+        F --> J["[Scenario 05] 간접 호출 하이재킹 ➔ Clang kCFI / PAC 검증"]
+        F --> K["[Scenario 06] 부채널/예측 실행 유출 ➔ Retpoline / nospec 차단"]
     end
 
     style Stage1 fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff
@@ -118,7 +120,7 @@ flowchart TD
    - 루트 권한을 얻었음에도 불구하고 커널 하드닝(`Strict Devmem`, `Lockdown`, `Module Signing`)에 가로막혀 영구 루트킷 설치나 하드웨어 완전 장악이 불가능함을 체감함.
 3. **2단계 (Scenario 02 ~ 06 - 커널 침투 피벗)**:
    - 공격자는 시스템 콜 핸들러나 소켓 서브시스템의 취약점을 찾아 **Ring 3에서 Ring 0로 침투하는 2차 로컬 권한 상승(LPE)**을 시도함.
-   - 이때 유저 공간 쉘코드로 점프하려는 공격을 막아내는 메커니즘이 바로 **[Scenario 02. ret2usr & SMEP/PXN]**이며, 커널 힙 메모리 변조를 막아내는 기법이 **[Scenario 04. Heap UAF]**임.
+   - 이때 유저 공간 쉘코드로 점프하려는 공격을 막아내는 메커니즘이 바로 **[Scenario 02. ret2usr & SMEP/PXN]**이며, 커널 힙 메모리 변조를 막아내는 기법이 **[Scenario 04. Heap UAF]**, 간접 호출 변조 차단이 **[Scenario 05. kCFI]**, 마이크로아키텍처 누출 방어가 **[Scenario 06. Spectre]**임.
 
 ---
 
