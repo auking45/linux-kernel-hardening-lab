@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 04: Kernel Heap UAF & Freelist Hardening Architecture Flow</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px 16px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-cve {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+      font-weight: 700;
+    }
+
+    .badge-sub {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .sim-toolbar {
+      position: sticky;
+      top: 10px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 24px;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .sim-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sim-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .sim-btn.primary {
+      color: #ffffff;
+    }
+
+    .sim-status {
+      font-size: 0.85rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .timeline-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      position: relative;
+    }
+
+    .timeline-flow::before {
+      content: '';
+      position: absolute;
+      top: 40px;
+      bottom: 40px;
+      left: 28px;
+      width: 3px;
+      background: linear-gradient(180deg, var(--accent-blue) 0%, var(--accent-red) 35%, var(--accent-yellow) 65%, var(--accent-green) 100%);
+      border-radius: 2px;
+    }
+
+    .phase-card {
+      position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-left: 60px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .phase-card:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .phase-node {
+      position: absolute;
+      left: -60px;
+      top: 20px;
+      width: 58px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .node-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 3px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      z-index: 2;
+      transition: all 0.3s;
+    }
+
+    .active-p1 .node-circle { border-color: var(--accent-blue); box-shadow: 0 0 12px var(--glow-blue); }
+    .active-p2 .node-circle { border-color: var(--accent-red); box-shadow: 0 0 12px var(--glow-red); }
+    .active-p3 .node-circle { border-color: var(--accent-yellow); box-shadow: 0 0 12px var(--glow-yellow); }
+    .active-p4 .node-circle { border-color: var(--accent-green); box-shadow: 0 0 12px var(--glow-green); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-badge {
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-p1 { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+    .badge-p2 { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-p3 { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+    .badge-p4 { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .grid-2col { grid-template-columns: 1fr; }
+    }
+
+    .sub-box {
+      background: rgba(11, 19, 43, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    [data-theme="light"] .sub-box {
+      background: #f8fafc;
+    }
+
+    .sub-box-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .code-box {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px 10px;
+      border-radius: 4px;
+      color: #e2e8f0;
+      line-height: 1.4;
+      border-left: 3px solid var(--accent-blue);
+      overflow-x: auto;
+    }
+
+    [data-theme="light"] .code-box {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .deep-dive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .dive-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .dive-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dive-content {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1><span>🤖</span> Scenario 04: 커널 힙 UAF &amp; 슬랩 오염 방어 아키텍처</h1>
+        <span class="badge-cve">CVE-2022-0185 / CVE-2021-22555</span>
+        <span class="badge-sub">SLAB_FREELIST_HARDENED &amp; KFENCE</span>
+      </div>
+      <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">☀️ 라이트 모드</button>
+    </header>
+
+    <!-- Simulation Toolbar -->
+    <div class="sim-toolbar">
+      <div class="sim-controls">
+        <button class="sim-btn" onclick="goToPhase(1)">Phase 1: 정상 할당</button>
+        <button class="sim-btn" onclick="goToPhase(2)">Phase 2: 힙 오염 공격</button>
+        <button class="sim-btn" onclick="goToPhase(3)">Phase 3: Hardened 트랩</button>
+        <button class="sim-btn" onclick="goToPhase(4)">Phase 4: 페일세이프 E-Stop</button>
+        <button class="sim-btn primary" id="playBtn" onclick="togglePlay()">전체 재생</button>
+        <button class="sim-btn" onclick="resetSim()">초기화</button>
+      </div>
+      <div class="sim-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">System: Ready</span>
+      </div>
+    </div>
+
+    <!-- Timeline Flow -->
+    <div class="timeline-flow">
+
+      <!-- Phase 1 Card -->
+      <div class="phase-card active-p1" id="cardPhase1">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-blue);">1</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-blue);">
+            <span>📦</span> Phase 1: 정상 SLUB 메모리 할당 및 Freelist 순회 (Normal Operation)
+          </div>
+          <span class="card-badge badge-p1">Baseline Normal</span>
+        </div>
+        <div class="card-desc">
+          리눅스 커널 SLUB 할당자는 고정 크기 캐시(<code>kmalloc-128</code> 등) 내의 가용 객체들을 싱글 링크드 리스트(Freelist)로 관리함.
+          <code>kmem_cache_cpu-&gt;freelist</code> 포인터가 첫 번째 가용 청크를 가리키며, 할당 시 freepointer를 따라 연속 순회함.
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚙️</span> SLUB 할당 메커니즘 (mm/slub.c)</div>
+            <div class="code-box">
+void *object = c->freelist;
+c->freelist = get_freepointer(s, object);
+return object; // 정상 청크 반환</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🤖</span> 휴머노이드 로봇 관절 제어 상태</div>
+            <div class="code-box">
+gait->kp_pitch = 150.0f; // 공칭 비례 이득
+gait->kd_pitch = 12.0f;  // 공칭 감쇠 계수
+yaw_rate_limit = 1.2 rad/s (정상 보행)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2 Card -->
+      <div class="phase-card" id="cardPhase2">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-red);">2</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-red);">
+            <span>💥</span> Phase 2: 힙 버퍼 오버플로우 &amp; 평문 Freelist 오염 공격 (Attack Detonation)
+          </div>
+          <span class="card-badge badge-p2">Vulnerable (SLAB_HARDENED=n)</span>
+        </div>
+        <div class="card-desc">
+          <code>CONFIG_SLAB_FREELIST_HARDENED=n</code> 환경에서 freepointer는 평문 주소로 노출됨.
+          공격자는 fs_context 버퍼 오버플로우(CVE-2022-0185) 또는 Netfilter 힙 오염(CVE-2021-22555)을 유발하여 인접 미할당 슬롯의 freepointer를 임의 커널 구조체 주소로 덮어씀.
+          차기 <code>kmalloc</code> 호출 시 할당자가 해당 메모리를 공격자에게 그대로 할당함!
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚠️</span> Freelist Poisoning Exploit</div>
+            <div class="code-box">
+// 8바이트 OOB 쓰기로 Slot 1 freepointer 변조
+cache->objects[1].freelist_ptr = &amp;victim_gait;
+// 차기 kmalloc() 호출 -> victim_gait 할당 반환!
+void *hacked = kmalloc(128, GFP_KERNEL);</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔴</span> 사이버-물리 파괴 전이: 관절 공진 발산</div>
+            <div class="code-box">
+hacked->kp_pitch = 9500.0f; // 제어 이득 폭주!
+hacked->kd_pitch = 0.0f;    // 감쇠 제로 (공진)
+yaw_oscillation = 32.5 rad/s -> 급격한 전도 파괴</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 3 Card -->
+      <div class="phase-card" id="cardPhase3">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-yellow);">3</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-yellow);">
+            <span>🛡️</span> Phase 3: SLAB Freelist Hardening XOR 쿠키 검증 &amp; KFENCE 트랩 (Hardened Defense)
+          </div>
+          <span class="card-badge badge-p3">Hardened (CONFIG_SLAB_FREELIST_HARDENED=y)</span>
+        </div>
+        <div class="card-desc">
+          <code>CONFIG_SLAB_FREELIST_HARDENED=y</code> 설정 시 커널은 freepointer를 <code>ptr ^ s-&gt;random ^ swab64(slot_addr)</code> 연산으로 상시 난독화함.
+          공격자가 평문 주소를 덮어쓰더라도 복호화 과정에서 고차 엔트로피 쓰레기 주소(<code>0x756acb91f00cb3ce</code>)가 산출되며,
+          캐노니컬 주소 및 정렬 검증에서 즉각 감지되어 <code>kmem_cache_alloc</code> 트랩(Oops/Panic)을 격발함!
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔐</span> Freepointer 암호화/복호화 공식</div>
+            <div class="code-box">
+static inline freelist_ptr_t freelist_ptr_encode(...) {
+    return ptr ^ s->random ^ swab64(ptr_addr);
+}
+// 평문 주입 시 -> 쓰레기 주소로 붕괴 -> Panic 트랩!</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🛑</span> KFENCE (Kernel Electric-Fence) 가드 페이지</div>
+            <div class="code-box">
+[Guard Page (PROT_NONE)] [Sampled Object] [Guard Page]
+// 인접 슬롯 OOB 침범 즉시 하드웨어 #PF 예외 트랩!
+// 커널 힙 손상 0%, 공격 시도 즉각 동결</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 4 Card -->
+      <div class="phase-card" id="cardPhase4">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-green);">4</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-green);">
+            <span>🛑</span> Phase 4: 사이버-물리 페일세이프 E-Stop 및 관절 락 (Deterministic Safe State)
+          </div>
+          <span class="card-badge badge-p4">Safe State</span>
+        </div>
+        <div class="card-desc">
+          커널 슬랩 무결성 트랩 또는 KFENCE <code>#PF</code> 인터럽트 발생 시, 하드웨어 Safety Watchdog 릴레이가 개입하여 48V 서보 모터 전원 버스를 0.0V로 즉각 차단함.
+          스프링 복귀형 전자 파킹 브레이크가 5ms 이내 로봇 12개 관절을 기계적으로 고정하여 전도 및 물리 충돌 피해를 0 J로 완벽 차단함.
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚡</span> 하드웨어 전원 버스 차단 (Depower)</div>
+            <div class="code-box">
+Watchdog ISR Triggered (&lt; 100 μs)
+Safety Relay Coil -> De-energized
+Motor Bus Voltage: 48.0V -> 0.0V (Depowered)</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔒</span> 관절 파킹 브레이크 체결 (Joint Lock)</div>
+            <div class="code-box">
+12x Actuator Clamps: Mechanical Snap (&lt; 5 ms)
+Kinetic Energy Dissipation: Zero Impact
+System State: Deterministic Safe Halt</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Deep Dive Architecture Grid -->
+    <div class="deep-dive-grid">
+      <div class="dive-card">
+        <div class="dive-title"><span>🧮</span> Freelist Obfuscation 수학적 원리</div>
+        <div class="dive-content">
+          <code>ptr ^ s-&gt;random ^ swab(ptr_addr)</code> 연산은 캐시별 무작위 64비트 시크릿(<code>s-&gt;random</code>)뿐만 아니라 객체 자신의 메모리 주소(<code>swab</code>)를 암호 키로 함께 결합함. 따라서 동일한 객체 주소라도 다른 슬랩 슬롯으로 복사되거나 재사용될 수 없음.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>🧱</span> KFENCE vs KASAN 오버헤드 비교</div>
+        <div class="dive-content">
+          KASAN은 모든 8바이트 메모리마다 1바이트 섀도 메모리를 할당하여 CPU 2~3배, RAM 1.5배의 막대한 오버헤드를 유발함. 반면 <strong>KFENCE</strong>는 프로덕션 환경을 위해 샘플링 기반(수 초에 1회)으로 가드 페이지 객체를 할당하여 성능 저하 1% 미만으로 힙 OOB/UAF를 포획함.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>🎲</span> CONFIG_SLAB_FREELIST_RANDOM</div>
+        <div class="dive-content">
+          슬랩 페이지가 처음 할당될 때 선형적인 오름차순(Slot 0-&gt;1-&gt;2-&gt;3)으로 freelist를 구축하지 않고, Fisher-Yates 셔플 알고리즘으로 무작위 배치함. 공격자가 인접 객체의 물리적/가상 오프셋을 사전에 예측(Heap Grooming/Feng-shui)하는 것을 무력화함.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>🛡️</span> Defense-in-Depth 슬랩 방어 계층</div>
+        <div class="dive-content">
+          1단계 <code>SLAB_FREELIST_HARDENED</code>(XOR 검증) + 2단계 <code>SLAB_FREELIST_RANDOM</code>(배치 난수화) + 3단계 <code>KFENCE</code>(프로덕션 가드 페이지 탐지) + 4단계 <code>HARDENED_USERCOPY</code>(경계 검증)의 다층 방어로 커널 힙 익스플로잇 체인을 원천 차단함.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentPhase = 1;
+    let isPlaying = false;
+    let playTimer = null;
+
+    function reportHeight() {
+      const h = Math.ceil(document.body.scrollHeight + 20);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+      reportHeight();
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    function goToPhase(phase) {
+      currentPhase = phase;
+      for (let i = 1; i <= 4; i++) {
+        const card = document.getElementById(`cardPhase${i}`);
+        card.classList.remove(`active-p${i}`);
+        card.style.opacity = '0.5';
+        card.style.transform = 'scale(0.99)';
+      }
+      const activeCard = document.getElementById(`cardPhase${phase}`);
+      activeCard.classList.add(`active-p${phase}`);
+      activeCard.style.opacity = '1';
+      activeCard.style.transform = 'scale(1)';
+
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+
+      if (phase === 1) {
+        statusDot.style.background = 'var(--accent-blue)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-blue)';
+        statusText.textContent = "Phase 1: Normal Allocation & Clean Freelist";
+      } else if (phase === 2) {
+        statusDot.style.background = 'var(--accent-red)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-red)';
+        statusText.textContent = "Phase 2: Heap Overflow & Plaintext Freelist Poisoning";
+      } else if (phase === 3) {
+        statusDot.style.background = 'var(--accent-yellow)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-yellow)';
+        statusText.textContent = "Phase 3: Hardened XOR Freepointer Trap & KFENCE Guard";
+      } else if (phase === 4) {
+        statusDot.style.background = 'var(--accent-green)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-green)';
+        statusText.textContent = "Phase 4: Hardware Relay Depower & Safe Joint Lock";
+      }
+
+      reportHeight();
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.classList.remove('primary');
+        playLoop();
+      } else {
+        btn.textContent = "전체 재생";
+        btn.classList.add('primary');
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      currentPhase = (currentPhase % 4) + 1;
+      goToPhase(currentPhase);
+      playTimer = setTimeout(playLoop, 3200);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      goToPhase(1);
+    }
+
+    window.addEventListener('load', () => {
+      goToPhase(1);
+      reportHeight();
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>

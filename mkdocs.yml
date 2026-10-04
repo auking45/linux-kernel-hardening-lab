@@ -106,6 +106,7 @@ nav:
       - 01. Humanoid BOF & Stack Canary: scenarios/01-humanoid-bof.md
       - 02. ret2usr & SMEP/PXN Defense: scenarios/02-ret2usr.md
       - 03. ret2dir & SMAP/PAN Defense: scenarios/03-smap.md
+      - 04. Heap UAF & SLAB Hardening: scenarios/04-heap-slab.md
   - Features:
       - Taxonomy Roadmap: features/index.md
       - 01. Stack & Buffer Protection:

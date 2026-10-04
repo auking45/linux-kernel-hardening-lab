@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 04 - Phase 2: Heap Out-of-Bounds & Plaintext Freelist Poisoning</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-red);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .controls { display: flex; gap: 6px; align-items: center; }
+    .btn {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(239, 68, 68, 0.25); border-color: var(--accent-red); }
+    .btn.primary { background: var(--accent-red); color: #ffffff; }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-viewport {
+      width: 100%;
+      height: 250px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: rgba(11, 19, 43, 0.4);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .svg-canvas { width: 100%; height: 100%; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+    }
+
+    .metric-title { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
+    .metric-val { font-size: 0.85rem; font-weight: 700; color: var(--accent-red); }
+
+    .status-ok { color: var(--accent-green) !important; }
+    .status-alert { color: var(--accent-red) !important; }
+
+    @keyframes overflow-pulse {
+      0% { stroke: #ef4444; stroke-width: 2; }
+      50% { stroke: #ef4444; stroke-width: 4; filter: drop-shadow(0 0 8px #ef4444); }
+      100% { stroke: #ef4444; stroke-width: 2; }
+    }
+    .pulse-overflow { animation: overflow-pulse 1.2s infinite; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="phase-badge">Phase 2: 힙 버퍼 오버플로우 &amp; 평문 Freelist 오염 공격</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);" id="stepIndicator">단계 1 / 4</span>
+      </div>
+      <div class="controls">
+        <button class="btn" onclick="prevStep()">◀ 이전</button>
+        <button class="btn" onclick="nextStep()">다음 ▶</button>
+        <button class="btn primary" id="playBtn" onclick="togglePlay()">자동 재생</button>
+        <button class="btn" onclick="resetSim()">초기화</button>
+        <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="descBar">
+      <span id="descIcon">⚠️</span>
+      <span id="descText">공격자가 CVE-2022-0185 취약점을 악용하여 활성 청크(Chunk 0)의 128바이트 경계를 초과하는 힙 쓰기를 개시함.</span>
+    </div>
+
+    <div class="diagram-viewport">
+      <svg class="svg-canvas" viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
+          </marker>
+          <marker id="arrow-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#38bdf8" />
+          </marker>
+        </defs>
+
+        <!-- Kernel kmem_cache Header Box -->
+        <g id="kmemCacheBox">
+          <rect x="20" y="25" width="160" height="75" rx="6" fill="#1c2541" stroke="#3a506b" stroke-width="1.5"/>
+          <text x="30" y="45" font-size="11" font-weight="700" fill="#94a3b8">kmem_cache (Unhardened)</text>
+          <text x="30" y="65" font-size="9.5" fill="#ef4444">SLAB_HARDENED=n (평문)</text>
+          <text x="30" y="83" font-size="10" font-weight="600" fill="#f8fafc" id="cacheHeadText">freelist: Chunk 1 (0x...8308)</text>
+        </g>
+
+        <!-- Slab Chunks -->
+        <!-- Chunk 0 (Attacker Buffer) -->
+        <g id="chunk0">
+          <rect x="210" y="25" width="130" height="175" rx="6" fill="#1c2541" stroke="#ef4444" stroke-width="1.5" id="c0Rect"/>
+          <text x="220" y="48" font-size="11" font-weight="700" fill="#ef4444">Chunk 0 [Vulnerable]</text>
+          <text x="220" y="66" font-size="9" fill="#94a3b8">Addr: 0xFFFF...8288</text>
+          <line x1="210" y1="75" x2="340" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="218" y="85" width="114" height="42" rx="4" fill="rgba(239,68,68,0.15)" stroke="#ef4444" stroke-dasharray="2,2"/>
+          <text x="225" y="102" font-size="9" fill="#ef4444">fs_context Payload</text>
+          <text x="225" y="118" font-size="9" font-weight="700" fill="#ef4444">Overflow Triggered!</text>
+          <text x="220" y="152" font-size="8.5" fill="#ef4444" id="c0Status">Boundary Breach: +8B</text>
+          <text x="220" y="180" font-size="9" font-weight="600" fill="#ef4444">EXPLOIT ACTIVE</text>
+        </g>
+
+        <!-- Overflow Arrow across boundary -->
+        <path id="overflowPath" d="M 335 106 L 365 106" stroke="#ef4444" stroke-width="3" marker-end="url(#arrow-red)" class="pulse-overflow"/>
+
+        <!-- Chunk 1 (Victim Free Slot with Poisoned freelist_ptr) -->
+        <g id="chunk1">
+          <rect x="365" y="25" width="130" height="175" rx="6" fill="#1c2541" stroke="#3a506b" stroke-width="1.2" id="c1Rect"/>
+          <text x="375" y="48" font-size="11" font-weight="700" fill="#94a3b8" id="c1Title">Chunk 1 [Free Slot]</text>
+          <text x="375" y="66" font-size="9" fill="#94a3b8">Addr: 0xFFFF...8308</text>
+          <line x1="365" y1="75" x2="495" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="373" y="85" width="114" height="42" rx="4" fill="rgba(255,255,255,0.03)" stroke="#3a506b" id="c1PtrBox"/>
+          <text x="380" y="102" font-size="9" fill="#94a3b8" id="c1PtrLabel">freelist_ptr (Plaintext):</text>
+          <text x="380" y="118" font-size="9.5" font-weight="600" fill="#94a3b8" id="c1PtrVal">&amp;Chunk 2 (0x...8388)</text>
+          <text x="375" y="152" font-size="8.5" fill="#94a3b8" id="c1Payload">Payload: (Unallocated)</text>
+          <text x="375" y="180" font-size="9" font-weight="600" fill="#94a3b8" id="c1State">STATE: FREE</text>
+        </g>
+
+        <!-- Target Victim Struct (Kernel Gait Config in adjacent memory) -->
+        <g id="victimBox">
+          <rect x="525" y="25" width="250" height="175" rx="6" fill="#1c2541" stroke="#f59e0b" stroke-width="1.5" id="victimRect"/>
+          <text x="535" y="48" font-size="11" font-weight="700" fill="#f59e0b" id="victimTitle">Victim: robot_gait_config_t</text>
+          <text x="535" y="66" font-size="9" fill="#94a3b8">Addr: 0xFFFF...01B0 (Target Heap Struct)</text>
+          <line x1="525" y1="75" x2="775" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <text x="535" y="98" font-size="9.5" fill="#f8fafc" id="vKp">kp_pitch: 150.0 (Nominal)</text>
+          <text x="535" y="118" font-size="9.5" fill="#f8fafc" id="vKd">kd_pitch: 12.0 (Damping)</text>
+          <text x="535" y="138" font-size="9.5" fill="#f8fafc" id="vYaw">yaw_rate_limit: 1.2 rad/s</text>
+          <rect x="533" y="155" width="234" height="30" rx="4" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" id="vBadgeBox"/>
+          <text x="542" y="174" font-size="9" font-weight="700" fill="#f59e0b" id="vBadgeText">TARGET: CRITICAL LOCOMOTION PID</text>
+        </g>
+
+        <!-- Poisoned link arrow -->
+        <path id="poisonArrow" d="M 487 106 L 525 106" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)" style="display:none;"/>
+      </svg>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-item">
+        <div class="metric-title">오버플로우 바이트</div>
+        <div class="metric-val status-alert" id="mOver">+8 Bytes (OOB)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">Freelist Head 포인터</div>
+        <div class="metric-val status-alert" id="mPtr">Chunk 1 (0x...8308)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">할당 탈취 상태</div>
+        <div class="metric-val status-alert" id="mHijack">침범 진행 중</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">로봇 동역학 상태</div>
+        <div class="metric-val status-alert" id="mDyn">Kp=150 (변조 직전)</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+    let isPlaying = false;
+    let playTimer = null;
+
+    const stepData = [
+      {
+        step: 1,
+        desc: "공격자가 CVE-2022-0185 취약점을 악용하여 활성 청크(Chunk 0)의 128바이트 경계를 초과하는 힙 쓰기를 개시함.",
+        over: "+8 Bytes (OOB)",
+        ptr: "Chunk 1 (정상)",
+        hijack: "경계 침범 시작",
+        dyn: "정상 (Kp=150)",
+        action: () => {
+          document.getElementById('c1Rect').setAttribute('stroke', '#3a506b');
+          document.getElementById('c1Title').textContent = "Chunk 1 [Free Slot]";
+          document.getElementById('c1Title').setAttribute('fill', '#94a3b8');
+          document.getElementById('c1PtrBox').setAttribute('stroke', '#3a506b');
+          document.getElementById('c1PtrVal').textContent = "&Chunk 2 (0x...8388)";
+          document.getElementById('c1PtrVal').setAttribute('fill', '#94a3b8');
+          document.getElementById('poisonArrow').style.display = 'none';
+          document.getElementById('vKp').textContent = "kp_pitch: 150.0 (Nominal)";
+          document.getElementById('vKd').textContent = "kd_pitch: 12.0 (Damping)";
+          document.getElementById('vYaw').textContent = "yaw_rate_limit: 1.2 rad/s";
+          document.getElementById('victimRect').setAttribute('stroke', '#f59e0b');
+          document.getElementById('vBadgeBox').setAttribute('fill', 'rgba(245,158,11,0.15)');
+          document.getElementById('vBadgeBox').setAttribute('stroke', '#f59e0b');
+          document.getElementById('vBadgeText').textContent = "TARGET: CRITICAL LOCOMOTION PID";
+          document.getElementById('vBadgeText').setAttribute('fill', '#f59e0b');
+        }
+      },
+      {
+        step: 2,
+        desc: "1바이트 오버플로우가 인접 미할당 Free Slot 1의 평문 freelist_ptr을 직격하여 희생자 구조체 주소(&victim_gait)로 덮어씀 (Freelist Poisoning).",
+        over: "+8B Overwrite",
+        ptr: "0xFFFF...01B0 (POISONED)",
+        hijack: "Freelist 오염 완료",
+        dyn: "위험 (오염 대기)",
+        action: () => {
+          document.getElementById('c1Rect').setAttribute('stroke', '#ef4444');
+          document.getElementById('c1Title').textContent = "Chunk 1 [POISONED HEAD]";
+          document.getElementById('c1Title').setAttribute('fill', '#ef4444');
+          document.getElementById('c1PtrBox').setAttribute('stroke', '#ef4444');
+          document.getElementById('c1PtrBox').setAttribute('fill', 'rgba(239,68,68,0.2)');
+          document.getElementById('c1PtrVal').textContent = "&victim_gait (0x...01B0)";
+          document.getElementById('c1PtrVal').setAttribute('fill', '#ef4444');
+          document.getElementById('poisonArrow').style.display = 'block';
+        }
+      },
+      {
+        step: 3,
+        desc: "공격자가 다음 kmalloc(128)을 요청하자, 커널 할당자가 오염된 freepointer를 신뢰하여 희생자 gait 구조체 메모리 주소를 할당 청크로 반환함!",
+        over: "Arbitrary Chunk",
+        ptr: "Ret: &victim_gait",
+        hijack: "할당 탈취 성공 (100%)",
+        dyn: "제어권 탈취됨",
+        action: () => {
+          document.getElementById('cacheHeadText').textContent = "Alloc Return: 0xFFFF...01B0!";
+          document.getElementById('victimRect').setAttribute('stroke', '#ef4444');
+          document.getElementById('vBadgeBox').setAttribute('fill', 'rgba(239,68,68,0.25)');
+          document.getElementById('vBadgeBox').setAttribute('stroke', '#ef4444');
+          document.getElementById('vBadgeText').textContent = "HIJACKED: ALLOCATED TO ATTACKER";
+          document.getElementById('vBadgeText').setAttribute('fill', '#ef4444');
+        }
+      },
+      {
+        step: 4,
+        desc: "공격자가 악의적 PID 파라미터 강제 주입: Kp=9500 (공진 폭주), Kd=0.0 (감쇠 무력화), Yaw=32.5 rad/s -> 급격한 회전 및 2족 보행 전도 파괴!",
+        over: "Lethal Overwrite",
+        ptr: "Memory Tampered",
+        hijack: "물리적 전도 파괴",
+        dyn: "공진 폭주 (Kp=9500, Kd=0)",
+        action: () => {
+          document.getElementById('vKp').textContent = "kp_pitch: 9500.0 (RESONANCE RUNAWAY!)";
+          document.getElementById('vKp').setAttribute('fill', '#ef4444');
+          document.getElementById('vKd').textContent = "kd_pitch: 0.0 (ZERO DAMPING: OSCILLATE)";
+          document.getElementById('vKd').setAttribute('fill', '#ef4444');
+          document.getElementById('vYaw').textContent = "yaw_rate_limit: 32.5 rad/s (VIOLENT SPIN)";
+          document.getElementById('vYaw').setAttribute('fill', '#ef4444');
+          document.getElementById('vBadgeText').textContent = "💥 ROBOT BIPEDAL COLLAPSE DETONATED";
+        }
+      }
+    ];
+
+    function renderStep(idx) {
+      currentStep = idx;
+      const data = stepData[idx - 1];
+      document.getElementById('stepIndicator').textContent = `단계 ${data.step} / ${totalSteps}`;
+      document.getElementById('descText').textContent = data.desc;
+      document.getElementById('mOver').textContent = data.over;
+      document.getElementById('mPtr').textContent = data.ptr;
+      document.getElementById('mHijack').textContent = data.hijack;
+      document.getElementById('mDyn').textContent = data.dyn;
+      data.action();
+      reportHeight();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) renderStep(currentStep + 1);
+      else renderStep(1);
+    }
+
+    function prevStep() {
+      if (currentStep > 1) renderStep(currentStep - 1);
+      else renderStep(totalSteps);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.style.background = "#e2e8f0";
+        btn.style.color = "#0f172a";
+        playLoop();
+      } else {
+        btn.textContent = "자동 재생";
+        btn.style.background = "var(--accent-red)";
+        btn.style.color = "#ffffff";
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      nextStep();
+      playTimer = setTimeout(playLoop, 2600);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+      playTimer = setTimeout(playLoop, 2000);
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>
