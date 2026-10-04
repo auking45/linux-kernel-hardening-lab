@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 03 - Phase 2: Fake Object Dereference (Attack without SMAP)</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-red);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .controls { display: flex; gap: 6px; align-items: center; }
+    .btn {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(239, 68, 68, 0.25); border-color: var(--accent-red); }
+    .btn.primary { background: var(--accent-red); color: #ffffff; }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-viewport {
+      width: 100%;
+      height: 240px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: rgba(11, 19, 43, 0.4);
+      position: relative;
+    }
+
+    .svg-canvas { width: 100%; height: 100%; display: block; }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+    }
+
+    .metric-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; }
+    .metric-val { font-size: 0.85rem; font-weight: 700; font-family: monospace; }
+    .metric-val.red { color: var(--accent-red); }
+    .metric-val.yellow { color: var(--accent-yellow); }
+    .metric-val.blue { color: var(--accent-blue); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="phase-badge">PHASE 2 : ATTACK</span>
+        <span style="font-weight: 700; font-size: 0.88rem;">위조 커널 객체 역참조 & 키네마틱 무력화 (SMAP 미적용)</span>
+      </div>
+      <div class="controls">
+        <button class="btn primary" id="playBtn" onclick="togglePlay()">⏸ 일시정지</button>
+        <button class="btn" onclick="prevStep()">⏮ 이전</button>
+        <button class="btn" onclick="nextStep()">⏭ 다음</button>
+        <button class="btn" onclick="resetSim()">↺ 리셋</button>
+        <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="stepDesc">
+      <span style="color: var(--accent-red); font-weight: bold;">[Step 1/3]</span>
+      <span>공격자가 유저 메모리에 위조 안전 객체(토크 650Nm, 레이더 0m)를 구성하고 소켓 UAF로 커널 포인터를 오염시킴.</span>
+    </div>
+
+    <div class="diagram-viewport">
+      <svg class="svg-canvas" viewBox="0 0 900 240" preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 1 L 9 5 L 0 9 z" fill="#ef4444" />
+          </marker>
+        </defs>
+
+        <!-- User Space Box -->
+        <rect x="30" y="25" width="250" height="190" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" />
+        <text x="45" y="50" fill="#ef4444" font-size="13" font-weight="700">USER SPACE (Ring 3 / EL0)</text>
+        <text x="45" y="70" fill="#94a3b8" font-size="10">Fake Object: 0x00405000</text>
+
+        <!-- Fake Policy in User Memory -->
+        <rect id="userFakeBox" x="50" y="90" width="210" height="95" rx="6" fill="#1c2541" stroke="#ef4444" stroke-width="1.5" />
+        <text x="65" y="115" fill="#ef4444" font-size="11" font-weight="bold">HOSTILE FAKE POLICY</text>
+        <text x="65" y="135" fill="#f8fafc" font-size="10">• torque: 650.0 Nm (Lethal!)</text>
+        <text x="65" y="152" fill="#f8fafc" font-size="10">• margin: 0.00 m (Blinded)</text>
+        <text x="65" y="169" fill="#ef4444" font-size="10">• e_stop: 0 (PURGED)</text>
+
+        <!-- Unhardened MMU -->
+        <rect x="330" y="25" width="240" height="190" rx="8" fill="#111827" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,2" />
+        <text x="350" y="50" fill="#ef4444" font-size="13" font-weight="700">UNHARDENED MMU (SMAP=0)</text>
+        <text x="350" y="70" fill="#94a3b8" font-size="10">CR4.SMAP=0 | PAN=0 (Vulnerable)</text>
+
+        <rect id="smapStatusBox" x="350" y="90" width="200" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1" />
+        <text id="smapStatusText" x="365" y="115" fill="#ef4444" font-size="11" font-weight="bold">Data Protection: DISABLED</text>
+
+        <rect id="accessPermBox" x="350" y="145" width="200" height="40" rx="6" fill="#1e293b" stroke="#ef4444" stroke-width="1" />
+        <text id="accessPermText" x="365" y="170" fill="#ef4444" font-size="11" font-weight="bold">Ring 0 Direct Read: ALLOWED</text>
+
+        <!-- Kernel Space Box -->
+        <rect x="620" y="25" width="250" height="190" rx="8" fill="#1e293b" stroke="#ef4444" stroke-width="1.5" />
+        <text x="635" y="50" fill="#ef4444" font-size="13" font-weight="700">KERNEL SPACE (Ring 0 / EL1)</text>
+        <text x="635" y="70" fill="#94a3b8" font-size="10">Locomotion Loop (Confused Deputy)</text>
+
+        <!-- Kernel Policy State -->
+        <rect id="kernelPolicyBox" x="640" y="90" width="210" height="95" rx="6" fill="#1c2541" stroke="#ef4444" stroke-width="1.5" />
+        <text x="655" y="115" fill="#f8fafc" font-size="11" font-weight="bold">Active Safety Policy</text>
+        <text id="kTorqueText" x="655" y="135" fill="#ef4444" font-size="10">• torque: 120.0 Nm</text>
+        <text id="kMarginText" x="655" y="152" fill="#ef4444" font-size="10">• margin: 0.50 m</text>
+        <text id="kStopText" x="655" y="169" fill="#ef4444" font-size="10">• estop: 1 (Normal)</text>
+
+        <!-- Vulnerable Direct Read Arrow -->
+        <path id="pathAttackRead" d="M 640 137 L 550 165 L 350 165 L 260 137" fill="none" stroke="#ef4444" stroke-width="2.5" stroke-dasharray="6,4" marker-end="url(#arrow-red)" />
+      </svg>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-item">
+        <div class="metric-label">Execution Privilege</div>
+        <div class="metric-val red" id="metricMode">Ring 0 (Supervisor)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">CR4.SMAP / PAN State</div>
+        <div class="metric-val red" id="metricSmap">Disabled (0)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Joint Torque Applied</div>
+        <div class="metric-val red" id="metricTorque">650.0 Nm (OVERLOAD)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Safety Status</div>
+        <div class="metric-val red" id="metricStatus">RADAR / E-STOP PURGED</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 3;
+    let isPlaying = true;
+    let playTimer = null;
+
+    const descriptions = [
+      "<span style='color: var(--accent-red); font-weight: bold;'>[Step 1/3]</span> 공격자가 유저 메모리(0x00405000)에 조작된 위조 안전 객체를 주입하고 커널 포인터를 해당 주소로 변조함.",
+      "<span style='color: var(--accent-red); font-weight: bold;'>[Step 2/3]</span> SMAP 방어가 없는 커널(Ring 0)이 유저 메모리 데이터를 직접 역참조(MOV / LDR)하여 악성 파라미터를 그대로 수용함.",
+      "<span style='color: var(--accent-red); font-weight: bold;'>[Step 3/3]</span> 관절 토크가 650Nm로 급상승하고 비상정지 인터록이 해제되어 고속 전복 및 모터 소손 파난이 발생함."
+    ];
+
+    function renderStep(step) {
+      currentStep = step;
+      document.getElementById('stepDesc').innerHTML = descriptions[step - 1];
+
+      const kTorque = document.getElementById('kTorqueText');
+      const kMargin = document.getElementById('kMarginText');
+      const kStop = document.getElementById('kStopText');
+      const pathAttack = document.getElementById('pathAttackRead');
+      const metricTorque = document.getElementById('metricTorque');
+      const metricStatus = document.getElementById('metricStatus');
+
+      if (step === 1) {
+        kTorque.textContent = "• torque: 120.0 Nm (Normal)";
+        kMargin.textContent = "• margin: 0.50 m (Normal)";
+        kStop.textContent = "• estop: 1 (Armed)";
+        pathAttack.setAttribute("stroke-dasharray", "6,4");
+        metricTorque.textContent = "120.0 Nm";
+        metricStatus.textContent = "Pending Exploit";
+      } else if (step === 2) {
+        kTorque.textContent = "• torque: 650.0 Nm (TAMPERED)";
+        kMargin.textContent = "• margin: 0.00 m (DISABLED)";
+        kStop.textContent = "• estop: 0 (PURGED)";
+        pathAttack.setAttribute("stroke-dasharray", "none");
+        metricTorque.textContent = "650.0 Nm (OVERLOAD)";
+        metricStatus.textContent = "TAMPERED IN RING 0";
+      } else if (step === 3) {
+        kTorque.textContent = "• torque: 650.0 Nm [BOIL OUT]";
+        kMargin.textContent = "• margin: 0.00 m [COLLISION]";
+        kStop.textContent = "• estop: 0 [PURGED]";
+        metricTorque.textContent = "BURNOUT HAZARD";
+        metricStatus.textContent = "ROBOT TIP-OVER CRASH";
+      }
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = '⏸ 일시정지';
+        btn.classList.add('primary');
+        playLoop();
+      } else {
+        btn.textContent = '▶ 재생';
+        btn.classList.remove('primary');
+        clearTimeout(playTimer);
+      }
+    }
+
+    function prevStep() {
+      if (isPlaying) togglePlay();
+      renderStep(currentStep > 1 ? currentStep - 1 : totalSteps);
+    }
+
+    function nextStep() {
+      if (isPlaying) togglePlay();
+      renderStep(currentStep < totalSteps ? currentStep + 1 : 1);
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      if (currentStep < totalSteps) {
+        renderStep(currentStep + 1);
+        playTimer = setTimeout(playLoop, 1800);
+      } else {
+        playTimer = setTimeout(() => {
+          if (!isPlaying) return;
+          renderStep(1);
+          playTimer = setTimeout(playLoop, 1800);
+        }, 2200);
+      }
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+      playTimer = setTimeout(playLoop, 1800);
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>

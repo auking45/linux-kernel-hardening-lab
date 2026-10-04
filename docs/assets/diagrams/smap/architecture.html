@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 03: ret2dir & SMAP/PAN Defense Architecture Flow</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --perm-user: #fb923c;
+      --perm-kernel: #38bdf8;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --perm-user: #ea580c;
+      --perm-kernel: #0284c7;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px 16px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-cve {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+      font-weight: 700;
+    }
+
+    .badge-sub {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    /* Sticky Simulation Control Toolbar */
+    .sim-toolbar {
+      position: sticky;
+      top: 10px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 24px;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sim-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sim-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .sim-btn.primary {
+      color: #ffffff;
+    }
+
+    .sim-status {
+      font-size: 0.85rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    /* Vertical Flow Timeline Wrapper */
+    .timeline-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      position: relative;
+    }
+
+    .timeline-flow::before {
+      content: '';
+      position: absolute;
+      top: 40px;
+      bottom: 40px;
+      left: 28px;
+      width: 3px;
+      background: linear-gradient(180deg, var(--accent-blue) 0%, var(--accent-red) 35%, var(--accent-yellow) 65%, var(--accent-green) 100%);
+      border-radius: 2px;
+    }
+
+    /* Phase Step Cards */
+    .phase-card {
+      position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-left: 60px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .phase-card:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .phase-node {
+      position: absolute;
+      left: -60px;
+      top: 20px;
+      width: 58px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .node-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 2px solid var(--accent-blue);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--accent-blue);
+      box-shadow: 0 0 12px var(--glow-blue);
+      z-index: 2;
+    }
+
+    .node-circle.attack {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      box-shadow: 0 0 12px var(--glow-red);
+    }
+
+    .node-circle.trap {
+      border-color: var(--accent-yellow);
+      color: var(--accent-yellow);
+      box-shadow: 0 0 12px var(--glow-yellow);
+    }
+
+    .node-circle.safe {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      box-shadow: 0 0 12px var(--glow-green);
+    }
+
+    .phase-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .phase-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .badge-normal { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+    .badge-attack { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-trap { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+    .badge-safe { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+    .phase-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .embedded-phase {
+      width: 100%;
+      height: 380px;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      background: transparent;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 10px 14px;
+    }
+
+    .metric-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .metric-val {
+      font-size: 0.95rem;
+      font-weight: 700;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    .metric-val.blue { color: var(--accent-blue); }
+    .metric-val.red { color: var(--accent-red); }
+    .metric-val.yellow { color: var(--accent-yellow); }
+    .metric-val.green { color: var(--accent-green); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1><span>🛡️</span> ret2dir / 위조 커널 객체 & SMAP/PAN 방어 흐름도</h1>
+        <span class="badge-cve">CVE-2016-8655</span>
+        <span class="badge-sub">Hardware Data Access Boundary Defense</span>
+      </div>
+      <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()">☀️ 라이트 모드</button>
+    </header>
+
+    <div class="sim-toolbar">
+      <div class="sim-controls">
+        <button class="sim-btn primary" id="playBtn" onclick="togglePlay()">⏸ 일시정지</button>
+        <button class="sim-btn" onclick="resetSim()">↺ 상단 리셋</button>
+      </div>
+      <div class="sim-status">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Simulation Active: 4-Phase Data Boundary Interlock</span>
+      </div>
+    </div>
+
+    <div class="timeline-flow">
+
+      <!-- Phase 1 -->
+      <div class="phase-card" id="card-phase1">
+        <div class="phase-node">
+          <div class="node-circle">01</div>
+        </div>
+        <div class="phase-header">
+          <div class="phase-title">
+            <span>[Phase 1]</span> 정상 유저 복사: STAC / CLAC 하드웨어 윈도우
+          </div>
+          <span class="phase-badge badge-normal">NORMAL USERCOPY</span>
+        </div>
+        <div class="phase-desc">
+          유저 모션 데몬이 <code>ioctl()</code> 시스템 콜로 안전 파라미터 구조체를 전달하면, 커널 <code>copy_from_user()</code>가 <code>stac</code> 명령어로 일시 창구(<code>EFLAGS.AC=1</code>)를 열어 안전 복사를 수행한 뒤 즉시 <code>clac</code>(<code>AC=0</code>)로 창구를 닫음.
+        </div>
+        <iframe src="phase1-normal.html" class="embedded-phase" id="iframe-p1" title="Phase 1"></iframe>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">Access Window</div>
+            <div class="metric-val blue">stac / clac Gated</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Hardware Protection</div>
+            <div class="metric-val green">CR4.SMAP=1 / PAN=1 (Armed)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Joint Torque Bound</div>
+            <div class="metric-val green">120.0 Nm (Safe Verified)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2 -->
+      <div class="phase-card" id="card-phase2">
+        <div class="phase-node">
+          <div class="node-circle attack">02</div>
+        </div>
+        <div class="phase-header">
+          <div class="phase-title">
+            <span style="color: var(--accent-red)">[Phase 2]</span> 위조 커널 객체 역참조 & 키네마틱 무력화 (SMAP 미적용)
+          </div>
+          <span class="phase-badge badge-attack">CONFUSED DEPUTY ATTACK</span>
+        </div>
+        <div class="phase-desc">
+          소켓 UAF 취약점(CVE-2016-8655)을 통해 커널의 안전 정책 포인터가 유저 공간에 배치된 위조 객체(<code>0x00405000</code>)를 가리킴. SMAP가 없는 취약 커널은 유저 메모리를 직접 역참조하여 치명적 토크(650Nm) 및 레이더 가드 해제 명령을 무단 수용함.
+        </div>
+        <iframe src="phase2-attack.html" class="embedded-phase" id="iframe-p2" title="Phase 2"></iframe>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">Fake Object Location</div>
+            <div class="metric-val red">0x00405000 (User Virtual Address)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Dereference Authority</div>
+            <div class="metric-val red">Ring 0 directly reading User Page</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Cyber-Physical Result</div>
+            <div class="metric-val red">Torque 650Nm / Violent Runaway Crash</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 3 -->
+      <div class="phase-card" id="card-phase3">
+        <div class="phase-node">
+          <div class="node-circle trap">03</div>
+        </div>
+        <div class="phase-header">
+          <div class="phase-title">
+            <span style="color: var(--accent-yellow)">[Phase 3]</span> 하드웨어 MMU 트랩: SMAP / PAN 페이지 폴트 (#PF 0x0015)
+          </div>
+          <span class="phase-badge badge-trap">HARDWARE TRAP</span>
+        </div>
+        <div class="phase-desc">
+          하드웨어 보안(<code>CR4.SMAP=1</code>, <code>EFLAGS.AC=0</code>, <code>PSTATE.PAN=1</code>)이 활성화된 환경에서, 커널 워커(Ring 0)가 유저 주소(U/S=1) 데이터를 직접 읽으려는 순간 MMU가 즉시 페이지 폴트(<code>#PF</code> Error Code 0x0015) 예외를 발동하여 읽기를 원천 중단시킴.
+        </div>
+        <iframe src="phase3-trap.html" class="embedded-phase" id="iframe-p3" title="Phase 3"></iframe>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">Exception Fired</div>
+            <div class="metric-val yellow">x86 #PF / ARM64 Data Abort (DFSR)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Fault Error Code</div>
+            <div class="metric-val yellow">0x0015 (Supervisor Data Access Violation)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Data Tampering Block</div>
+            <div class="metric-val green">100% Intercepted (0 Bytes Read)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 4 -->
+      <div class="phase-card" id="card-phase4">
+        <div class="phase-node">
+          <div class="node-circle safe">04</div>
+        </div>
+        <div class="phase-header">
+          <div class="phase-title">
+            <span style="color: var(--accent-green)">[Phase 4]</span> 페일세이프 E-Stop 및 관절 기구 안전 록 (Fail-Safe State)
+          </div>
+          <span class="phase-badge badge-safe">FAIL-SAFE RECOVERY</span>
+        </div>
+        <div class="phase-desc">
+          SMAP 예외 감지 즉시 하드웨어 안전 감시 릴레이가 모터 버스 전원을 0.0V로 완전 차단하고, 무전원 스프링 작동형 파킹 브레이크가 모든 관절을 물리적으로 고정하여 로봇의 기구부 소손 및 전복을 완벽히 방지함.
+        </div>
+        <iframe src="phase4-failsafe.html" class="embedded-phase" id="iframe-p4" title="Phase 4"></iframe>
+        <div class="metrics-grid">
+          <div class="metric-item">
+            <div class="metric-label">Motor Bus Voltage</div>
+            <div class="metric-val green">0.0 V (Relay De-energized)</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Mechanical Brake</div>
+            <div class="metric-val green">Spring-engaged LOCKED</div>
+          </div>
+          <div class="metric-item">
+            <div class="metric-label">Physical Damage</div>
+            <div class="metric-val green">0% (Zero Collision / Stable Halt)</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let isPlaying = true;
+
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      document.getElementById('themeToggle').textContent = next === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+      try { localStorage.setItem('diagram-theme', next); } catch(e){}
+
+      document.querySelectorAll('iframe').forEach(function(iframe) {
+        try {
+          iframe.contentWindow.postMessage({ type: 'set-diagram-theme', theme: next }, '*');
+        } catch(err){}
+      });
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const playBtn = document.getElementById('playBtn');
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+
+      if (isPlaying) {
+        playBtn.textContent = '⏸ 일시정지';
+        playBtn.classList.add('primary');
+        statusDot.style.background = 'var(--accent-green)';
+        statusText.textContent = 'Simulation Active: 4-Phase Data Boundary Interlock';
+      } else {
+        playBtn.textContent = '▶ 재생';
+        playBtn.classList.remove('primary');
+        statusDot.style.background = 'var(--accent-yellow)';
+        statusText.textContent = 'Simulation Paused';
+      }
+
+      document.querySelectorAll('iframe').forEach(function(iframe) {
+        try {
+          const btn = iframe.contentWindow.document.getElementById('playBtn');
+          if (btn) btn.click();
+        } catch(err){}
+      });
+    }
+
+    function resetSim() {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      document.querySelectorAll('iframe').forEach(function(iframe) {
+        try {
+          const resetBtn = iframe.contentWindow.document.querySelector("button[onclick*='resetSim']");
+          if (resetBtn) resetBtn.click();
+        } catch(err){}
+      });
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'diagram-resize') {
+        document.querySelectorAll('iframe').forEach(function(iframe) {
+          if (iframe.contentWindow === e.source) {
+            iframe.style.height = e.data.height + 'px';
+          }
+        });
+      }
+      if (e.data && e.data.type === 'diagram-theme-change') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        const toggleBtn = document.getElementById('themeToggle');
+        if (toggleBtn) toggleBtn.textContent = e.data.theme === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+        document.querySelectorAll('iframe').forEach(function(iframe) {
+          if (iframe.contentWindow !== e.source) {
+            try {
+              iframe.contentWindow.postMessage({ type: 'set-diagram-theme', theme: e.data.theme }, '*');
+            } catch(err){}
+          }
+        });
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        const toggleBtn = document.getElementById('themeToggle');
+        if (toggleBtn) toggleBtn.textContent = savedTheme === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+      }
+    })();
+  </script>
+</body>
+</html>
