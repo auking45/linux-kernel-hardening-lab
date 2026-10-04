@@ -306,6 +306,7 @@
       <button class="btn" style="border-color: var(--accent-red); color: var(--accent-red);" onclick="triggerTest('tampered_cap')">🚨 Capability 변조 (CAP_SETUID 주입)</button>
       <button class="btn" style="border-color: var(--accent-yellow); color: var(--accent-yellow);" onclick="triggerTest('tampered_uid')">⚠️ Inode UID 변조 (UID 0 설정)</button>
       <button class="btn" onclick="resetSim()">↺ 초기화</button>
+      <button class="btn" id="themeToggle" onclick="toggleTheme()">☀️ 테마 전환</button>
     </div>
   </div>
 
@@ -664,6 +665,32 @@
       clearLogs();
       logMessage('[reset] Simulator reset to initial state.', 'log-info');
     }
+  
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = current === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = target === 'light' ? '🌙 테마 전환' : '☀️ 테마 전환';
+    }
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        const btn = document.getElementById('themeToggle');
+        if (btn) btn.textContent = e.data.theme === 'light' ? '🌙 테마 전환' : '☀️ 테마 전환';
+      }
+    });
+    (function() {
+      let saved = 'dark';
+      try { saved = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) saved = 'light';
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+        const btn = document.getElementById('themeToggle');
+        if (btn) btn.textContent = saved === 'light' ? '🌙 테마 전환' : '☀️ 테마 전환';
+      }
+    })();
   </script>
 </body>
 </html>

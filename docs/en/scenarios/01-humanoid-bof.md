@@ -96,7 +96,33 @@ window.addEventListener('message', function(e) {
       }
     });
   }
+  if (e.data && e.data.type === 'diagram-theme-change') {
+    document.querySelectorAll('iframe').forEach(function(iframe) {
+      try {
+        iframe.contentWindow.postMessage({ type: 'set-diagram-theme', theme: e.data.theme }, '*');
+      } catch(err){}
+    });
+  }
 });
+
+// Synchronize MkDocs theme switches to all embedded diagram iframes
+function syncMkDocsThemeToIframes() {
+  const scheme = document.body.getAttribute('data-md-color-scheme');
+  const target = scheme === 'default' ? 'light' : 'dark';
+  document.querySelectorAll('iframe').forEach(function(iframe) {
+    try {
+      iframe.contentWindow.postMessage({ type: 'set-diagram-theme', theme: target }, '*');
+    } catch(err){}
+  });
+}
+const themeObserver = new MutationObserver(function(mutations) {
+  mutations.forEach(function(mutation) {
+    if (mutation.attributeName === 'data-md-color-scheme') {
+      syncMkDocsThemeToIframes();
+    }
+  });
+});
+themeObserver.observe(document.body, { attributes: true, attributeFilter: ['data-md-color-scheme'] });
 </script>
 
 
