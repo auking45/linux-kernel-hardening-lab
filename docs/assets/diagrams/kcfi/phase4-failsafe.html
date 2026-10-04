@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 05 - Phase 4: Hardware Fail-Safe & Safe E-Stop State</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-green);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(34, 197, 94, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--accent-green);
+      border: 1px solid var(--accent-green);
+    }
+
+    .controls { display: flex; gap: 6px; align-items: center; }
+    .btn {
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(34, 197, 94, 0.25); border-color: var(--accent-green); }
+    .btn.primary { background: var(--accent-green); color: #0b132b; }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-viewport {
+      width: 100%;
+      height: 250px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: rgba(11, 19, 43, 0.4);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .svg-canvas { width: 100%; height: 100%; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+    }
+
+    .metric-title { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
+    .metric-val { font-size: 0.85rem; font-weight: 700; color: var(--accent-green); }
+
+    .status-ok { color: var(--accent-green) !important; }
+    .status-alert { color: var(--accent-red) !important; }
+
+    @keyframes safe-pulse {
+      0% { filter: drop-shadow(0 0 2px var(--accent-green)); }
+      50% { filter: drop-shadow(0 0 10px var(--accent-green)); }
+      100% { filter: drop-shadow(0 0 2px var(--accent-green)); }
+    }
+    .pulse-safe { animation: safe-pulse 1.8s infinite; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="phase-badge">Phase 4: 하드웨어 페일세이프 E-Stop 및 관절 긴급 제동</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);" id="stepIndicator">단계 1 / 4</span>
+      </div>
+      <div class="controls">
+        <button class="btn" onclick="prevStep()">◀ 이전</button>
+        <button class="btn" onclick="nextStep()">다음 ▶</button>
+        <button class="btn primary" id="playBtn" onclick="togglePlay()">자동 재생</button>
+        <button class="btn" onclick="resetSim()">초기화</button>
+        <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="descBar">
+      <span id="descIcon">🛑</span>
+      <span id="descText">kCFI #UD 트랩 포획 즉시 물리 안전 감시 장치(Hardware Safety Supervisor)로 긴급 정지 신호가 송신됨.</span>
+    </div>
+
+    <div class="diagram-viewport">
+      <svg class="svg-canvas" viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#22c55e" />
+          </marker>
+          <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
+          </marker>
+        </defs>
+
+        <!-- Kernel Panic / Watchdog Intercept -->
+        <g id="boxPanic">
+          <rect x="25" y="30" width="165" height="165" rx="6" fill="#1c2541" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="35" y="55" font-size="11" font-weight="700" fill="#ef4444">kCFI #UD Exception</text>
+          <text x="35" y="75" font-size="9" fill="#94a3b8">Control Flow Abort</text>
+          <line x1="25" y1="85" x2="190" y2="85" stroke="#3a506b" stroke-width="1"/>
+          <text x="35" y="105" font-size="9.5" fill="#f8fafc">Trap Vector: 0x06 (#UD)</text>
+          <rect x="33" y="120" width="149" height="32" rx="4" fill="rgba(239,68,68,0.15)" stroke="#ef4444"/>
+          <text x="40" y="140" font-size="9" font-weight="700" fill="#ef4444">HW WATCHDOG TRIP</text>
+          <text x="35" y="175" font-size="8.5" fill="#94a3b8">Latency: &lt; 80 μs</text>
+        </g>
+
+        <!-- Safety Relay Module -->
+        <g id="boxRelay">
+          <rect x="235" y="30" width="170" height="165" rx="6" fill="#1c2541" stroke="#f59e0b" stroke-width="1.5" id="relayRect"/>
+          <text x="245" y="55" font-size="11" font-weight="700" fill="#f59e0b">Hardware Safety Relay</text>
+          <text x="245" y="75" font-size="9" fill="#94a3b8">Bus Depower Interrupter</text>
+          <line x1="235" y1="85" x2="405" y2="85" stroke="#3a506b" stroke-width="1"/>
+          <text x="245" y="105" font-size="9.5" fill="#f8fafc" id="relayCoil">Coil State: ENERGIZED</text>
+          <rect x="243" y="120" width="154" height="32" rx="4" fill="rgba(245,158,11,0.15)" stroke="#f59e0b" id="relayBadge"/>
+          <text x="252" y="140" font-size="9" font-weight="700" fill="#f59e0b" id="busVoltage">Motor Bus: 48.0 V</text>
+          <text x="245" y="175" font-size="8.5" fill="#94a3b8">Relay Latency: &lt; 2ms</text>
+        </g>
+
+        <!-- Actuator Parking Brakes -->
+        <g id="boxBrakes">
+          <rect x="450" y="30" width="165" height="165" rx="6" fill="#1c2541" stroke="#3a506b" stroke-width="1.5" id="brakeRect"/>
+          <text x="460" y="55" font-size="11" font-weight="700" fill="#94a3b8" id="brakeTitle">Actuator Brakes</text>
+          <text x="460" y="75" font-size="9" fill="#94a3b8">Spring Parking Clamps</text>
+          <line x1="450" y1="85" x2="615" y2="85" stroke="#3a506b" stroke-width="1"/>
+          <text x="460" y="105" font-size="9.5" fill="#f8fafc" id="brakeState">Clamp: RELEASED</text>
+          <rect x="458" y="120" width="149" height="32" rx="4" fill="rgba(255,255,255,0.05)" stroke="#3a506b" id="brakeBadge"/>
+          <text x="468" y="140" font-size="9" font-weight="700" fill="#94a3b8" id="brakeBadgeText">FREE ROTATION</text>
+          <text x="460" y="175" font-size="8.5" fill="#94a3b8">Clamp Speed: 5ms</text>
+        </g>
+
+        <!-- Final Safe State Result -->
+        <g id="boxResult" class="pulse-safe">
+          <rect x="655" y="30" width="125" height="165" rx="6" fill="#1c2541" stroke="#22c55e" stroke-width="1.8"/>
+          <text x="665" y="55" font-size="10.5" font-weight="700" fill="#22c55e">Safe State</text>
+          <text x="665" y="75" font-size="9" fill="#94a3b8">Zero Hazard</text>
+          <line x1="655" y1="85" x2="780" y2="85" stroke="#3a506b" stroke-width="1"/>
+          <text x="665" y="105" font-size="9" fill="#22c55e">Motor: 0.0 W</text>
+          <text x="665" y="125" font-size="9" fill="#22c55e">Joints: 100% Lock</text>
+          <text x="665" y="145" font-size="9" fill="#22c55e">Gear Dam: 0%</text>
+          <rect x="662" y="160" width="111" height="26" rx="4" fill="rgba(34,197,94,0.2)" stroke="#22c55e"/>
+          <text x="668" y="177" font-size="8.5" font-weight="700" fill="#22c55e">SAFE HALT OK</text>
+        </g>
+
+        <!-- Arrows -->
+        <path d="M 190 112 L 235 112" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+        <path d="M 405 112 L 450 112" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow-green)"/>
+        <path d="M 615 112 L 655 112" stroke="#22c55e" stroke-width="2" marker-end="url(#arrow-green)"/>
+      </svg>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-item">
+        <div class="metric-title">모터 전원 버스</div>
+        <div class="metric-val status-ok" id="mBus">0.0 V (CUT-OFF)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">전자 파킹 브레이크</div>
+        <div class="metric-val status-ok" id="mBrk">LOCKED (100%)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">감속기 치절 파단</div>
+        <div class="metric-val status-ok">0 건 (PREVENTED)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">전체 시스템 상태</div>
+        <div class="metric-val status-ok">SAFE HALT</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+    let isPlaying = false;
+    let playTimer = null;
+
+    const stepData = [
+      {
+        step: 1,
+        desc: "kCFI #UD 트랩 포획 즉시 물리 안전 감시 장치(Hardware Safety Supervisor)로 긴급 정지 신호가 송신됨.",
+        bus: "48.0 V (작동 중)",
+        brk: "RELEASED (회전)",
+        action: () => {
+          document.getElementById('relayRect').setAttribute('stroke', '#f59e0b');
+          document.getElementById('relayCoil').textContent = "Coil State: ENERGIZED";
+          document.getElementById('busVoltage').textContent = "Motor Bus: 48.0 V";
+          document.getElementById('busVoltage').setAttribute('fill', '#f59e0b');
+          document.getElementById('brakeRect').setAttribute('stroke', '#3a506b');
+          document.getElementById('brakeTitle').setAttribute('fill', '#94a3b8');
+          document.getElementById('brakeState').textContent = "Clamp: RELEASED";
+          document.getElementById('brakeBadgeText').textContent = "FREE ROTATION";
+        }
+      },
+      {
+        step: 2,
+        desc: "안전 릴레이 코일의 여자(Energizing)가 차단되어 48V 서보 모터 주 전원 버스가 0.0V로 강제 컷오프됨 (Motor Depower).",
+        bus: "0.0 V (CUT-OFF)",
+        brk: "작동 대기",
+        action: () => {
+          document.getElementById('relayRect').setAttribute('stroke', '#22c55e');
+          document.getElementById('relayCoil').textContent = "Coil State: DE-ENERGIZED";
+          document.getElementById('busVoltage').textContent = "Motor Bus: 0.0 V (CUT)";
+          document.getElementById('busVoltage').setAttribute('fill', '#22c55e');
+        }
+      },
+      {
+        step: 3,
+        desc: "전력 차단과 동시에 무여자 작동형 스프링 파킹 브레이크가 5ms 이내 전 관절(12축)을 기계적으로 물어 고정함 (Joint Lock).",
+        bus: "0.0 V (CUT-OFF)",
+        brk: "LOCKED (100%)",
+        action: () => {
+          document.getElementById('brakeRect').setAttribute('stroke', '#22c55e');
+          document.getElementById('brakeTitle').setAttribute('fill', '#22c55e');
+          document.getElementById('brakeState').textContent = "Clamp: LOCKED (5ms)";
+          document.getElementById('brakeBadgeText').textContent = "12x AXES SECURED";
+          document.getElementById('brakeBadgeText').setAttribute('fill', '#22c55e');
+        }
+      },
+      {
+        step: 4,
+        desc: "모터 회전 운동 에너지가 기구 파손 없이 안전 흡수되어 감속기 치절 파단이 0건으로 완벽 방어되며, 결정론적 안전 정지 상태 유지.",
+        bus: "0.0 V (CUT-OFF)",
+        brk: "LOCKED (100%)",
+        action: () => {
+          // Final state
+        }
+      }
+    ];
+
+    function renderStep(idx) {
+      currentStep = idx;
+      const data = stepData[idx - 1];
+      document.getElementById('stepIndicator').textContent = `단계 ${data.step} / ${totalSteps}`;
+      document.getElementById('descText').textContent = data.desc;
+      document.getElementById('mBus').textContent = data.bus;
+      document.getElementById('mBrk').textContent = data.brk;
+      data.action();
+      reportHeight();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) renderStep(currentStep + 1);
+      else renderStep(1);
+    }
+
+    function prevStep() {
+      if (currentStep > 1) renderStep(currentStep - 1);
+      else renderStep(totalSteps);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.style.background = "#e2e8f0";
+        btn.style.color = "#0f172a";
+        playLoop();
+      } else {
+        btn.textContent = "자동 재생";
+        btn.style.background = "var(--accent-green)";
+        btn.style.color = "#0b132b";
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      nextStep();
+      playTimer = setTimeout(playLoop, 2600);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+      playTimer = setTimeout(playLoop, 2000);
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>

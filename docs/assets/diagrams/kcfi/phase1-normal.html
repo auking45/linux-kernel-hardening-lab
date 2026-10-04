@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 05 - Phase 1: Normal Indirect Branch & kCFI Signature Match</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-blue);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(56, 189, 248, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .controls { display: flex; gap: 6px; align-items: center; }
+    .btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(56, 189, 248, 0.25); border-color: var(--accent-blue); }
+    .btn.primary { background: var(--accent-blue); color: #0b132b; }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-viewport {
+      width: 100%;
+      height: 250px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: rgba(11, 19, 43, 0.4);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .svg-canvas { width: 100%; height: 100%; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+    }
+
+    .metric-title { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
+    .metric-val { font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); }
+
+    .status-ok { color: var(--accent-green) !important; }
+    .status-alert { color: var(--accent-red) !important; }
+
+    @keyframes pulse-node {
+      0% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-blue)); }
+      50% { transform: scale(1.02); filter: drop-shadow(0 0 8px var(--accent-blue)); }
+      100% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-blue)); }
+    }
+    .pulse { animation: pulse-node 1.6s infinite ease-in-out; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="phase-badge">Phase 1: 정상 간접 함수 분기 및 kCFI 타입 시그니처 일치</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);" id="stepIndicator">단계 1 / 4</span>
+      </div>
+      <div class="controls">
+        <button class="btn" onclick="prevStep()">◀ 이전</button>
+        <button class="btn" onclick="nextStep()">다음 ▶</button>
+        <button class="btn primary" id="playBtn" onclick="togglePlay()">자동 재생</button>
+        <button class="btn" onclick="resetSim()">초기화</button>
+        <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="descBar">
+      <span id="descIcon">ℹ️</span>
+      <span id="descText">로봇 관절 제어 드라이버가 ops-&gt;dispatch_fn 함수 포인터를 통해 기구학 연산 루틴을 간접 호출(Indirect Call) 준비함.</span>
+    </div>
+
+    <div class="diagram-viewport">
+      <svg class="svg-canvas" viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#38bdf8" />
+          </marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#22c55e" />
+          </marker>
+        </defs>
+
+        <!-- Caller: Indirect Call Site -->
+        <g id="boxCaller">
+          <rect x="25" y="25" width="210" height="180" rx="6" fill="#1c2541" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="35" y="48" font-size="11" font-weight="700" fill="#38bdf8">Caller: Joint Dispatcher</text>
+          <text x="35" y="66" font-size="9" fill="#94a3b8">Location: drivers/robot/actuator.c</text>
+          <line x1="25" y1="75" x2="235" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="35" y="85" width="190" height="50" rx="4" fill="rgba(56,189,248,0.1)" stroke="#38bdf8"/>
+          <text x="42" y="103" font-size="9" font-family="monospace" fill="#38bdf8">call *%rax</text>
+          <text x="42" y="122" font-size="8.5" fill="#94a3b8">Expected: 0x5A8E3F21 (Hash)</text>
+          <text x="35" y="156" font-size="9" fill="#f8fafc">Actuator: Knee_Pitch (ID: 4)</text>
+          <text x="35" y="180" font-size="9" font-weight="600" fill="#22c55e" id="callerState">STATE: CALL_PREPARED</text>
+        </g>
+
+        <!-- CFI Pre-call Check Intermediary -->
+        <g id="boxCheck">
+          <rect x="275" y="25" width="220" height="180" rx="6" fill="#1c2541" stroke="#3a506b" stroke-width="1.2" id="chkRect"/>
+          <text x="285" y="48" font-size="11" font-weight="700" fill="#94a3b8" id="chkTitle">Clang kCFI &amp; IBT Check</text>
+          <text x="285" y="66" font-size="9" fill="#94a3b8">Preamble Type Verification</text>
+          <line x1="275" y1="75" x2="495" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="285" y="85" width="200" height="50" rx="4" fill="rgba(255,255,255,0.03)" stroke="#3a506b" id="chkInnerBox"/>
+          <text x="295" y="102" font-size="9" fill="#94a3b8">Target Preamble (-4B):</text>
+          <text x="295" y="120" font-size="9.5" font-family="monospace" font-weight="700" fill="#38bdf8" id="chkVal">0x5A8E3F21 (MATCH)</text>
+          <text x="285" y="156" font-size="9" fill="#f8fafc" id="chkLpText">LandingPad: ENDBR64 (OK)</text>
+          <text x="285" y="180" font-size="9" font-weight="600" fill="#22c55e" id="chkVerdict">VERDICT: SIGNATURE VALID</text>
+        </g>
+
+        <!-- Target Function: safe_joint_kinematics -->
+        <g id="boxTarget" class="pulse">
+          <rect x="535" y="25" width="240" height="180" rx="6" fill="#1c2541" stroke="#22c55e" stroke-width="1.5" id="targetRect"/>
+          <text x="545" y="48" font-size="11" font-weight="700" fill="#22c55e">Target: safe_joint_kinematics()</text>
+          <text x="545" y="66" font-size="9" fill="#94a3b8">Function Preamble &amp; Body</text>
+          <line x1="535" y1="75" x2="775" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="545" y="85" width="220" height="42" rx="4" fill="rgba(34,197,94,0.1)" stroke="#22c55e"/>
+          <text x="553" y="101" font-size="8.5" fill="#94a3b8">fn - 4B: TypeID = 0x5A8E3F21</text>
+          <text x="553" y="116" font-size="8.5" font-family="monospace" fill="#22c55e">fn + 0B: endbr64</text>
+          <text x="545" y="148" font-size="9" fill="#f8fafc" id="targetAngle">Target Angle: 0.85 rad</text>
+          <text x="545" y="168" font-size="9" fill="#f8fafc" id="targetVel">Commanded Vel: 1.80 rad/s</text>
+          <text x="545" y="188" font-size="9" font-weight="700" fill="#22c55e">KINEMATICS SAFE</text>
+        </g>
+
+        <!-- Arrows -->
+        <path id="arrCallerToCheck" d="M 235 110 L 275 110" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow-blue)"/>
+        <path id="arrCheckToTarget" d="M 495 110 L 535 110" stroke="#22c55e" stroke-width="2" marker-end="url(#arrow-green)"/>
+      </svg>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-item">
+        <div class="metric-title">kCFI 보호 상태</div>
+        <div class="metric-val status-ok">ACTIVE (CONFIG_CFI)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">타입 해시 대조</div>
+        <div class="metric-val status-ok" id="mType">MATCH (0x5A8E3F21)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">하드웨어 랜딩패드</div>
+        <div class="metric-val status-ok" id="mLp">ENDBR64 / BTI c</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">관절 각속도</div>
+        <div class="metric-val status-ok" id="mVel">1.80 rad/s (정상)</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+    let isPlaying = false;
+    let playTimer = null;
+
+    const stepData = [
+      {
+        step: 1,
+        desc: "로봇 관절 제어 드라이버가 ops->dispatch_fn 함수 포인터를 통해 기구학 연산 루틴을 간접 호출(Indirect Call) 준비함.",
+        type: "대기 중...",
+        lp: "ENDBR64 대기",
+        vel: "0.00 rad/s (정지)",
+        action: () => {
+          document.getElementById('chkRect').setAttribute('stroke', '#3a506b');
+          document.getElementById('chkTitle').setAttribute('fill', '#94a3b8');
+          document.getElementById('chkVal').textContent = "0x5A8E3F21 (대기)";
+          document.getElementById('chkVerdict').textContent = "VERDICT: 대기";
+        }
+      },
+      {
+        step: 2,
+        desc: "Clang kCFI 컴파일러가 간접 분기 직전 대상 함수의 프리앰블(-4바이트)에서 32비트 타입 ID(0x5A8E3F21)를 읽어 프로토타입 대조를 수행함.",
+        type: "대조 중 (0x5A8E3F21)",
+        lp: "검사 통과",
+        vel: "검증 단계",
+        action: () => {
+          document.getElementById('chkRect').setAttribute('stroke', '#38bdf8');
+          document.getElementById('chkTitle').setAttribute('fill', '#38bdf8');
+          document.getElementById('chkVal').textContent = "0x5A8E3F21 (MATCH)";
+          document.getElementById('chkVerdict').textContent = "VERDICT: TYPE MATCHED";
+        }
+      },
+      {
+        step: 3,
+        desc: "CPU 하드웨어 분기 추적기(x86 IBT / ARM64 BTI)가 분기 대상 첫 번째 명령어가 정당한 landing pad(endbr64 / bti c)임을 확인함.",
+        type: "MATCH (0x5A8E3F21)",
+        lp: "VALID (endbr64)",
+        vel: "분기 허가됨",
+        action: () => {
+          document.getElementById('chkLpText').textContent = "LandingPad: ENDBR64 (OK)";
+          document.getElementById('chkVerdict').textContent = "VERDICT: SIGNATURE VALID";
+        }
+      },
+      {
+        step: 4,
+        desc: "소프트웨어 및 하드웨어 이중 검증 통과! 합법적 기구학 연산이 실행되어 무릎 관절이 목표 각도 0.85 rad, 속도 1.80 rad/s로 안전하게 선회함.",
+        type: "MATCH (0x5A8E3F21)",
+        lp: "ENDBR64 / BTI c",
+        vel: "1.80 rad/s (정상)",
+        action: () => {
+          document.getElementById('targetAngle').textContent = "Target Angle: 0.85 rad";
+          document.getElementById('targetVel').textContent = "Commanded Vel: 1.80 rad/s";
+        }
+      }
+    ];
+
+    function renderStep(idx) {
+      currentStep = idx;
+      const data = stepData[idx - 1];
+      document.getElementById('stepIndicator').textContent = `단계 ${data.step} / ${totalSteps}`;
+      document.getElementById('descText').textContent = data.desc;
+      document.getElementById('mType').textContent = data.type;
+      document.getElementById('mLp').textContent = data.lp;
+      document.getElementById('mVel').textContent = data.vel;
+      data.action();
+      reportHeight();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) renderStep(currentStep + 1);
+      else renderStep(1);
+    }
+
+    function prevStep() {
+      if (currentStep > 1) renderStep(currentStep - 1);
+      else renderStep(totalSteps);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.style.background = "#e2e8f0";
+        btn.style.color = "#0f172a";
+        playLoop();
+      } else {
+        btn.textContent = "자동 재생";
+        btn.style.background = "var(--accent-blue)";
+        btn.style.color = "#0b132b";
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      nextStep();
+      playTimer = setTimeout(playLoop, 2600);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+      playTimer = setTimeout(playLoop, 2000);
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 05 - Phase 3: Clang kCFI Type Hash Trap & Hardware IBT/BTI</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-yellow);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(245, 158, 11, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-yellow);
+      border: 1px solid var(--accent-yellow);
+    }
+
+    .controls { display: flex; gap: 6px; align-items: center; }
+    .btn {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(245, 158, 11, 0.25); border-color: var(--accent-yellow); }
+    .btn.primary { background: var(--accent-yellow); color: #0b132b; }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-viewport {
+      width: 100%;
+      height: 250px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: rgba(11, 19, 43, 0.4);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .svg-canvas { width: 100%; height: 100%; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+    }
+
+    .metric-title { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
+    .metric-val { font-size: 0.85rem; font-weight: 700; color: var(--accent-yellow); }
+
+    .status-ok { color: var(--accent-green) !important; }
+    .status-alert { color: var(--accent-red) !important; }
+
+    @keyframes shield-pulse {
+      0% { filter: drop-shadow(0 0 2px var(--accent-yellow)); }
+      50% { filter: drop-shadow(0 0 10px var(--accent-yellow)); }
+      100% { filter: drop-shadow(0 0 2px var(--accent-yellow)); }
+    }
+    .pulse-shield { animation: shield-pulse 1.5s infinite; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="phase-badge">Phase 3: Clang kCFI 타입 해시 불일치 트랩 &amp; 하드웨어 IBT 차단</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);" id="stepIndicator">단계 1 / 4</span>
+      </div>
+      <div class="controls">
+        <button class="btn" onclick="prevStep()">◀ 이전</button>
+        <button class="btn" onclick="nextStep()">다음 ▶</button>
+        <button class="btn primary" id="playBtn" onclick="togglePlay()">자동 재생</button>
+        <button class="btn" onclick="resetSim()">초기화</button>
+        <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="descBar">
+      <span id="descIcon">🛡️</span>
+      <span id="descText">CONFIG_CFI_CLANG=y 활성화: 간접 분기 수행 전 컴파일러가 생성한 프리앰블 타입 검증 루틴이 즉각 개입함.</span>
+    </div>
+
+    <div class="diagram-viewport">
+      <svg class="svg-canvas" viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-yellow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#f59e0b" />
+          </marker>
+          <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
+          </marker>
+        </defs>
+
+        <!-- Corrupted Call Site -->
+        <g id="boxCaller">
+          <rect x="25" y="25" width="210" height="180" rx="6" fill="#1c2541" stroke="#ef4444" stroke-width="1.2"/>
+          <text x="35" y="48" font-size="11" font-weight="700" fill="#ef4444">Corrupted Call Site</text>
+          <text x="35" y="66" font-size="9" fill="#94a3b8">Target: 0x619fe45ae690</text>
+          <line x1="25" y1="75" x2="235" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="35" y="85" width="190" height="45" rx="4" fill="rgba(239,68,68,0.1)"/>
+          <text x="43" y="103" font-size="9" font-family="monospace" fill="#ef4444">call *%rax</text>
+          <text x="43" y="118" font-size="8.5" fill="#f8fafc">Expected Hash: 0x5A8E3F21</text>
+          <text x="35" y="152" font-size="9" fill="#94a3b8">Clang kCFI Injected Check</text>
+          <text x="35" y="178" font-size="9" font-weight="700" fill="#f59e0b">INSPECTION ACTIVE</text>
+        </g>
+
+        <!-- Inspector: Clang kCFI & HW IBT Engine -->
+        <g id="boxInspector">
+          <rect x="260" y="25" width="245" height="180" rx="6" fill="#1c2541" stroke="#f59e0b" stroke-width="1.8" id="inspRect"/>
+          <text x="270" y="48" font-size="11" font-weight="700" fill="#f59e0b">kCFI &amp; HW IBT Inspector</text>
+          <text x="270" y="66" font-size="9" fill="#94a3b8">Preamble &amp; Instruction State</text>
+          <line x1="260" y1="75" x2="505" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="270" y="85" width="225" height="45" rx="4" fill="rgba(245,158,11,0.1)" id="inspBoxInner"/>
+          <text x="278" y="102" font-size="8.5" fill="#94a3b8">Target Preamble (-4B):</text>
+          <text x="278" y="118" font-size="9.5" font-family="monospace" font-weight="700" fill="#ef4444" id="inspHash">0x00000000 (MISMATCH!)</text>
+          <rect x="270" y="138" width="225" height="42" rx="4" fill="rgba(239,68,68,0.15)" stroke="#ef4444"/>
+          <text x="278" y="154" font-size="8.5" fill="#ef4444" id="inspLp">Landing Pad: 0x90909090 (NO ENDBR)</text>
+          <text x="278" y="170" font-size="9" font-weight="700" fill="#ef4444" id="inspVerdict">VIOLATION: #UD &amp; #CP FAULT</text>
+        </g>
+
+        <!-- Neutralized Target Box -->
+        <g id="boxTrap" class="pulse-shield">
+          <rect x="530" y="25" width="245" height="180" rx="6" fill="#1c2541" stroke="#f59e0b" stroke-width="1.8"/>
+          <text x="540" y="48" font-size="11" font-weight="700" fill="#f59e0b">Kernel Oops / Panic Trap</text>
+          <text x="540" y="66" font-size="9" fill="#94a3b8">Subsystem: arch/x86/kernel/traps.c</text>
+          <line x1="530" y1="75" x2="775" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="540" y="85" width="225" height="48" rx="4" fill="rgba(245,158,11,0.15)"/>
+          <text x="548" y="103" font-size="9" font-weight="700" fill="#f59e0b">🛡️ Clang kCFI Trap Triggered</text>
+          <text x="548" y="119" font-size="8.5" fill="#f8fafc">Instruction: ud2 (Undefined Inst)</text>
+          <rect x="540" y="142" width="225" height="48" rx="4" fill="rgba(34,197,94,0.15)" stroke="#22c55e"/>
+          <text x="548" y="160" font-size="9" font-weight="700" fill="#22c55e">DISPATCH BLOCKED (100%)</text>
+          <text x="548" y="176" font-size="8.5" fill="#f8fafc">Hostile Payload Aborted: 0% Run</text>
+        </g>
+
+        <!-- Interception Arrows -->
+        <path d="M 235 110 L 260 110" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow-yellow)"/>
+        <path d="M 505 110 L 530 110" stroke="#f59e0b" stroke-width="2" marker-end="url(#arrow-yellow)"/>
+      </svg>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-item">
+        <div class="metric-title">kCFI 보호 엔진</div>
+        <div class="metric-val status-ok">ENABLED (Clang)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">프리앰블 검증</div>
+        <div class="metric-val status-alert" id="mInspHash">0x00000000 (거부)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">익스플로잇 성공률</div>
+        <div class="metric-val status-ok">0% (원천 차단)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">커널 대응 조치</div>
+        <div class="metric-val status-alert">#UD / Oops Trap</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+    let isPlaying = false;
+    let playTimer = null;
+
+    const stepData = [
+      {
+        step: 1,
+        desc: "CONFIG_CFI_CLANG=y 활성화: 간접 분기 수행 전 컴파일러가 생성한 프리앰블 타입 검증 루틴이 즉각 개입함.",
+        hash: "검사 개시",
+        action: () => {
+          document.getElementById('inspHash').textContent = "0x5A8E3F21 (대기)";
+          document.getElementById('inspHash').setAttribute('fill', '#94a3b8');
+          document.getElementById('inspLp').textContent = "Landing Pad: 검사 대기";
+          document.getElementById('inspVerdict').textContent = "INSPECTION ACTIVE";
+        }
+      },
+      {
+        step: 2,
+        desc: "Clang kCFI가 대상 함수 앞 4바이트(-4B) 프리앰블을 조사: 정상 해시(0x5A8E3F21) 대신 미서명 주소(0x00000000) 발견!",
+        hash: "0x00000000 (불일치)",
+        action: () => {
+          document.getElementById('inspHash').textContent = "0x00000000 (MISMATCH!)";
+          document.getElementById('inspHash').setAttribute('fill', '#ef4444');
+          document.getElementById('inspVerdict').textContent = "VIOLATION: HASH MISMATCH";
+        }
+      },
+      {
+        step: 3,
+        desc: "하드웨어 IBT(x86) / BTI(ARM64) 검사: 대상 함수의 첫 명령어가 ENDBR64가 아닌 0x90909090(NOP)로 확인되어 #CP 예외 동시 발령!",
+        hash: "랜딩패드 부재",
+        action: () => {
+          document.getElementById('inspLp').textContent = "Landing Pad: 0x90909090 (NO ENDBR)";
+          document.getElementById('inspVerdict').textContent = "VIOLATION: #UD & #CP FAULT";
+        }
+      },
+      {
+        step: 4,
+        desc: "소프트웨어 및 하드웨어 이중 위반 포착! ud2 명령어로 즉각 #UD 커널 Oops를 유발하여 악성 페이로드 실행을 0%로 완벽 차단함.",
+        hash: "0% BLOCKED",
+        action: () => {
+          // Complete trap state
+        }
+      }
+    ];
+
+    function renderStep(idx) {
+      currentStep = idx;
+      const data = stepData[idx - 1];
+      document.getElementById('stepIndicator').textContent = `단계 ${data.step} / ${totalSteps}`;
+      document.getElementById('descText').textContent = data.desc;
+      document.getElementById('mInspHash').textContent = data.hash;
+      data.action();
+      reportHeight();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) renderStep(currentStep + 1);
+      else renderStep(1);
+    }
+
+    function prevStep() {
+      if (currentStep > 1) renderStep(currentStep - 1);
+      else renderStep(totalSteps);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.style.background = "#e2e8f0";
+        btn.style.color = "#0f172a";
+        playLoop();
+      } else {
+        btn.textContent = "자동 재생";
+        btn.style.background = "var(--accent-yellow)";
+        btn.style.color = "#0b132b";
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      nextStep();
+      playTimer = setTimeout(playLoop, 2600);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+      playTimer = setTimeout(playLoop, 2000);
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>

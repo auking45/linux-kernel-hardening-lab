@@ -3,38 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Clang kCFI (Kernel Control Flow Integrity) Architecture</title>
+  <title>Scenario 05: Kernel Control Flow Integrity (kCFI & IBT/BTI) Architecture Flow</title>
   <style>
     :root {
-      --bg-color: #0f172a;
-      --card-bg: #1e293b;
-      --card-border: #334155;
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
       --accent-blue: #38bdf8;
       --accent-green: #22c55e;
       --accent-red: #ef4444;
       --accent-purple: #a855f7;
-      --accent-yellow: #eab308;
-      --perm-user: #f97316;
-      --perm-kernel: #38bdf8;
-      --perm-block: #ef4444;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
     }
 
     [data-theme="light"] {
-      --bg-color: #f8fafc;
+      --bg-color: #f1f5f9;
       --card-bg: #ffffff;
-      --card-border: #e2e8f0;
+      --card-border: #cbd5e1;
       --text-main: #0f172a;
       --text-muted: #64748b;
       --accent-blue: #0284c7;
       --accent-green: #16a34a;
       --accent-red: #dc2626;
       --accent-purple: #9333ea;
-      --accent-yellow: #ca8a04;
-      --perm-user: #ea580c;
-      --perm-kernel: #0284c7;
-      --perm-block: #dc2626;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
     }
 
     * {
@@ -47,12 +49,12 @@
     body {
       background-color: var(--bg-color);
       color: var(--text-main);
-      padding: 20px;
+      padding: 24px 16px;
       transition: background-color 0.3s, color 0.3s;
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1100px;
       margin: 0 auto;
     }
 
@@ -60,25 +62,46 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 24px;
+      margin-bottom: 20px;
       padding-bottom: 16px;
       border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
 
     h1 {
-      font-size: 1.5rem;
+      font-size: 1.35rem;
       font-weight: 700;
+      color: var(--accent-blue);
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
-    .badge {
+    .badge-cve {
       font-size: 0.75rem;
       padding: 4px 8px;
-      border-radius: 9999px;
-      background: var(--accent-purple);
-      color: white;
+      border-radius: 4px;
+      background-color: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+      font-weight: 700;
+    }
+
+    .badge-sub {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
     }
 
     .theme-toggle {
@@ -86,13 +109,10 @@
       border: 1px solid var(--card-border);
       color: var(--text-main);
       padding: 8px 16px;
-      border-radius: 8px;
+      border-radius: 6px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.875rem;
-      font-weight: 600;
+      font-weight: 500;
+      font-size: 0.85rem;
       transition: all 0.2s;
     }
 
@@ -100,455 +120,584 @@
       border-color: var(--accent-blue);
     }
 
-    .tabs {
+    .sim-toolbar {
+      position: sticky;
+      top: 10px;
+      z-index: 100;
       display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-      overflow-x: auto;
-      padding-bottom: 4px;
-    }
-
-    .tab-btn {
+      align-items: center;
+      justify-content: space-between;
       background: var(--card-bg);
       border: 1px solid var(--card-border);
-      color: var(--text-muted);
-      padding: 10px 18px;
       border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 24px;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .sim-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
       cursor: pointer;
-      font-size: 0.875rem;
+      font-size: 0.85rem;
       font-weight: 600;
-      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       transition: all 0.2s;
     }
 
-    .tab-btn.active {
-      background: var(--accent-blue);
-      color: #0f172a;
+    .sim-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
       border-color: var(--accent-blue);
     }
 
-    .scene-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 24px;
-      margin-bottom: 20px;
+    .sim-btn.primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
     }
 
-    .scene-title {
-      font-size: 1.25rem;
-      font-weight: 700;
-      margin-bottom: 8px;
-      color: var(--accent-blue);
+    [data-theme="light"] .sim-btn.primary {
+      color: #ffffff;
     }
 
-    .scene-desc {
-      font-size: 0.95rem;
-      color: var(--text-muted);
-      margin-bottom: 24px;
-      line-height: 1.6;
-    }
-
-    .canvas-container {
-      width: 100%;
-      background: rgba(15, 23, 42, 0.4);
-      border: 1px dashed var(--card-border);
-      border-radius: 8px;
-      padding: 24px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 440px;
-    }
-
-    svg {
-      width: 100%;
-      height: 100%;
-      max-width: 1060px;
-    }
-
-    .svg-box {
-      fill: var(--card-bg);
-      stroke: var(--card-border);
-      stroke-width: 2;
-      rx: 8;
-    }
-
-    .svg-box-danger {
-      fill: rgba(239, 68, 68, 0.1);
-      stroke: var(--accent-red);
-      stroke-width: 2;
-      rx: 8;
-    }
-
-    .svg-box-safe {
-      fill: rgba(34, 197, 94, 0.1);
-      stroke: var(--accent-green);
-      stroke-width: 2;
-      rx: 8;
-    }
-
-    .svg-box-highlight {
-      fill: rgba(56, 189, 248, 0.1);
-      stroke: var(--accent-blue);
-      stroke-width: 2;
-      rx: 8;
-    }
-
-    .svg-box-purple {
-      fill: rgba(168, 85, 247, 0.1);
-      stroke: var(--accent-purple);
-      stroke-width: 2;
-      rx: 8;
-    }
-
-    .svg-title {
-      font-size: 14px;
-      font-weight: 700;
-      fill: var(--text-main);
-    }
-
-    .svg-text {
-      font-size: 12px;
-      fill: var(--text-muted);
-    }
-
-    .svg-code {
-      font-family: monospace;
-      font-size: 11px;
-      fill: var(--accent-blue);
-    }
-
-    .svg-arrow {
-      stroke: var(--text-muted);
-      stroke-width: 2;
-      fill: none;
-      marker-end: url(#arrow);
-    }
-
-    .svg-arrow-danger {
-      stroke: var(--accent-red);
-      stroke-width: 2;
-      stroke-dasharray: 4,4;
-      fill: none;
-      marker-end: url(#arrow-danger);
-    }
-
-    .svg-arrow-safe {
-      stroke: var(--accent-green);
-      stroke-width: 2;
-      fill: none;
-      marker-end: url(#arrow-safe);
-    }
-
-    .legend {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
-      margin-top: 20px;
-      padding: 12px;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
+    .sim-status {
       font-size: 0.85rem;
-    }
-
-    .legend-item {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-muted);
       display: flex;
       align-items: center;
       gap: 8px;
     }
 
-    .legend-color {
-      width: 14px;
-      height: 14px;
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .timeline-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      position: relative;
+    }
+
+    .timeline-flow::before {
+      content: '';
+      position: absolute;
+      top: 40px;
+      bottom: 40px;
+      left: 28px;
+      width: 3px;
+      background: linear-gradient(180deg, var(--accent-blue) 0%, var(--accent-red) 35%, var(--accent-yellow) 65%, var(--accent-green) 100%);
+      border-radius: 2px;
+    }
+
+    .phase-card {
+      position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-left: 60px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .phase-card:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .phase-node {
+      position: absolute;
+      left: -60px;
+      top: 20px;
+      width: 58px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .node-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 3px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      z-index: 2;
+      transition: all 0.3s;
+    }
+
+    .active-p1 .node-circle { border-color: var(--accent-blue); box-shadow: 0 0 12px var(--glow-blue); }
+    .active-p2 .node-circle { border-color: var(--accent-red); box-shadow: 0 0 12px var(--glow-red); }
+    .active-p3 .node-circle { border-color: var(--accent-yellow); box-shadow: 0 0 12px var(--glow-yellow); }
+    .active-p4 .node-circle { border-color: var(--accent-green); box-shadow: 0 0 12px var(--glow-green); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-badge {
+      font-size: 0.72rem;
+      padding: 3px 8px;
       border-radius: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-p1 { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+    .badge-p2 { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-p3 { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+    .badge-p4 { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .grid-2col { grid-template-columns: 1fr; }
+    }
+
+    .sub-box {
+      background: rgba(11, 19, 43, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    [data-theme="light"] .sub-box {
+      background: #f8fafc;
+    }
+
+    .sub-box-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .code-box {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px 10px;
+      border-radius: 4px;
+      color: #e2e8f0;
+      line-height: 1.4;
+      border-left: 3px solid var(--accent-blue);
+      overflow-x: auto;
+    }
+
+    [data-theme="light"] .code-box {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .deep-dive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .dive-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .dive-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dive-content {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.5;
     }
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>
-        <span>Clang kCFI (Kernel Control Flow Integrity)</span>
-        <span class="badge">Linux 6.12+</span>
-      </h1>
-      <button class="theme-toggle" onclick="toggleTheme()">
-        <span id="theme-icon">☀️</span> <span id="theme-text">Light Mode</span>
-      </button>
+      <div class="title-group">
+        <h1><span>🎯</span> Scenario 05: 제어 흐름 무결성(kCFI) 및 IBT/BTI 방어 아키텍처</h1>
+        <span class="badge-cve">CVE-2021-4154 Type Confusion</span>
+        <span class="badge-sub">Clang kCFI &amp; x86 IBT / ARM64 BTI</span>
+      </div>
+      <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">☀️ 라이트 모드</button>
     </header>
 
-    <div class="tabs">
-      <button class="tab-btn active" onclick="switchScene(1)">1. 전통적 간접 호출 하이재킹 (Pre-CFI)</button>
-      <button class="tab-btn" onclick="switchScene(2)">2. 컴파일러 Type Hash 주입 (kCFI)</button>
-      <button class="tab-btn" onclick="switchScene(3)">3. 런타임 동기 검증 & Trap 메커니즘</button>
-      <button class="tab-btn" onclick="switchScene(4)">4. Base vs Hardened 종합 비교</button>
-    </div>
-
-    <!-- Scene 1: Pre-CFI Traditional Unchecked Hijack -->
-    <div id="scene-1" class="scene-card">
-      <div class="scene-title">1. 전통적 간접 함수 호출 취약점 (Unchecked Indirect Call Hijacking)</div>
-      <div class="scene-desc">
-        전통적 C 언어 및 베이스라인 리눅스 커널에서는 함수 포인터 간접 호출(<code>(*func_ptr)(arg)</code>) 시 CPU가 해당 레지스터의 메모리 주소로 무조건 분기(<code>call *%reg</code> / <code>blr xN</code>)함. 공격자가 힙 오버플로우나 UAF(Use-After-Free)로 함수 포인터를 임의의 커널 함수나 가젯 주소로 변조하면, CPU는 프로토타입 일치 여부를 검사하지 못하고 제어 흐름이 즉시 탈취됨.
+    <!-- Simulation Toolbar -->
+    <div class="sim-toolbar">
+      <div class="sim-controls">
+        <button class="sim-btn" onclick="goToPhase(1)">Phase 1: 정상 간접 분기</button>
+        <button class="sim-btn" onclick="goToPhase(2)">Phase 2: 함수 포인터 변조</button>
+        <button class="sim-btn" onclick="goToPhase(3)">Phase 3: kCFI / IBT 트랩</button>
+        <button class="sim-btn" onclick="goToPhase(4)">Phase 4: 페일세이프 E-Stop</button>
+        <button class="sim-btn primary" id="playBtn" onclick="togglePlay()">전체 재생</button>
+        <button class="sim-btn" onclick="resetSim()">초기화</button>
       </div>
-      <div class="canvas-container">
-        <svg viewBox="0 0 1000 400">
-          <defs>
-            <marker id="arrow" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
-            </marker>
-            <marker id="arrow-danger" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#ef4444"/>
-            </marker>
-            <marker id="arrow-safe" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-              <path d="M 0 0 L 10 5 L 0 10 z" fill="#22c55e"/>
-            </marker>
-          </defs>
-
-          <!-- Attacker Memory Corruption -->
-          <rect x="50" y="40" width="260" height="150" class="svg-box-danger"/>
-          <text x="70" y="70" class="svg-title" fill="#ef4444">공격자 메모리 오염 (Heap/Stack)</text>
-          <text x="70" y="100" class="svg-text">1. Heap UAF / Out-of-Bounds Write</text>
-          <text x="70" y="125" class="svg-text">2. 함수 포인터 데이터 덮어쓰기</text>
-          <text x="70" y="155" class="svg-code">func_ptr = &hijacked_target;</text>
-
-          <!-- Caller Indirect Call Site -->
-          <rect x="370" y="40" width="280" height="150" class="svg-box"/>
-          <text x="390" y="70" class="svg-title">간접 호출 호출부 (Caller Site)</text>
-          <text x="390" y="95" class="svg-text">기대 시그니처: void (*)(unsigned long)</text>
-          <text x="390" y="125" class="svg-code">x86_64: mov %rax, %r11; call *%r11</text>
-          <text x="390" y="145" class="svg-code">ARM64:  ldr x1, [x0];   blr x1</text>
-          <text x="390" y="170" class="svg-text" fill="#ef4444">타깃 시그니처 검사 없음 (Blind Jump)</text>
-
-          <!-- Arrow from Attacker to Caller -->
-          <path d="M 310 115 L 365 115" class="svg-arrow-danger"/>
-
-          <!-- Target A: Legitimate Function -->
-          <rect x="710" y="30" width="250" height="100" class="svg-box-safe"/>
-          <text x="730" y="60" class="svg-title" fill="#22c55e">정상 대상: legit_target()</text>
-          <text x="730" y="85" class="svg-text">프로토타입: void (unsigned long)</text>
-          <text x="730" y="110" class="svg-text">의도된 정상 커널 실행 경로</text>
-
-          <!-- Target B: Hijacked Function -->
-          <rect x="710" y="170" width="250" height="110" class="svg-box-danger"/>
-          <text x="730" y="200" class="svg-title" fill="#ef4444">탈취 대상: hijacked_target()</text>
-          <text x="730" y="225" class="svg-text">시그니처: void (void) / 임의 가젯</text>
-          <text x="730" y="250" class="svg-text" fill="#ef4444">제어 흐름 탈취 성공 (Privilege Escalation!)</text>
-
-          <!-- Arrows from Caller to Targets -->
-          <path d="M 650 90 L 705 75" class="svg-arrow-safe" stroke-dasharray="2,2"/>
-          <text x="655" y="70" class="svg-text" fill="#22c55e">정상 시</text>
-
-          <path d="M 650 140 L 705 210" class="svg-arrow-danger"/>
-          <text x="655" y="190" class="svg-text" fill="#ef4444">변조 시</text>
-
-          <!-- Bottom Warning Banner -->
-          <rect x="50" y="310" width="910" height="60" class="svg-box-danger"/>
-          <text x="70" y="345" class="svg-title" fill="#ef4444">취약성 결과:</text>
-          <text x="180" y="345" class="svg-text">하드웨어 및 컴파일러 검증 부재로 인하여 유효하지 않은 타입의 임의 커널 함수 실행 허용됨.</text>
-        </svg>
+      <div class="sim-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">System: Ready</span>
       </div>
     </div>
 
-    <!-- Scene 2: Compiler Type Hash Tagging -->
-    <div id="scene-2" class="scene-card" style="display:none;">
-      <div class="scene-title">2. Clang kCFI 컴파일 타임 Type Hash 주입 메커니즘</div>
-      <div class="scene-desc">
-        Clang kCFI(<code>-fsanitize=kcfi</code>)는 LTO(링크 타임 최적화) 없이 동작하는 현대적인 정방향 CFI 기법임. Clang 컴파일러는 각 함수의 선언 시그니처(리턴 타입 및 인자 타입 리스트)를 기반으로 고유한 32비트 정수 해시(Type Hash Tag)를 산출하여, 함수 진입점 직전 4바이트(<code>-4(%reg)</code>)에 프리픽스 데이터로 임베딩함.
+    <!-- Timeline Flow -->
+    <div class="timeline-flow">
+
+      <!-- Phase 1 Card -->
+      <div class="phase-card active-p1" id="cardPhase1">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-blue);">1</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-blue);">
+            <span>📦</span> Phase 1: 정상 간접 함수 분기 및 kCFI 타입 시그니처 일치 (Nominal Flow)
+          </div>
+          <span class="card-badge badge-p1">Baseline Normal</span>
+        </div>
+        <div class="card-desc">
+          디바이스 드라이버나 서브시스템이 함수 포인터 테이블(<code>ops-&gt;dispatch_fn</code>)을 통해 간접 호출을 수행할 때,
+          Clang kCFI는 컴파일 타임에 함수 프로토타입으로부터 계산된 32비트 타입 해시(<code>0x5A8E3F21</code>)를 대상 함수 프리앰블(-4B)에 기록함.
+          호출 지점에서 해시와 하드웨어 랜딩패드(<code>ENDBR64</code> / <code>BTI c</code>)를 대조하여 인가된 경로만 분기함.
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚙️</span> Clang kCFI 프리앰블 구조</div>
+            <div class="code-box">
+__kcfi_typeid_kinematics:
+  .long 0x5a8e3f21   # 32-bit Preamble Tag (-4B)
+safe_joint_kinematics:
+  endbr64            # Hardware Landing Pad (+0B)
+  push %rbp          # Safe Function Body</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🤖</span> 휴머노이드 관절 제어 상태</div>
+            <div class="code-box">
+target_angle = 0.85 rad (정상 궤적)
+commanded_velocity = 1.80 rad/s (허용치)
+Harmonic Drive Stress: Nominal (Safety OK)</div>
+          </div>
+        </div>
       </div>
-      <div class="canvas-container">
-        <svg viewBox="0 0 1000 400">
-          <!-- Function Signature Hash Generator -->
-          <rect x="50" y="40" width="300" height="240" class="svg-box-purple"/>
-          <text x="70" y="70" class="svg-title" fill="#a855f7">Clang AST Type Hash Engine</text>
-          <text x="70" y="100" class="svg-text">함수 프로토타입 시그니처 분석:</text>
-          <text x="70" y="130" class="svg-code">T1: void(unsigned long) -> 0x48a12c3f</text>
-          <text x="70" y="160" class="svg-code">T2: void(int, int, char*) -> 0x9b24e810</text>
-          <text x="70" y="190" class="svg-code">T3: void(void)          -> 0x77c419fa</text>
-          <text x="70" y="230" class="svg-text" fill="#94a3b8">고유 32비트 해시 자동 생성</text>
-          <text x="70" y="255" class="svg-text" fill="#94a3b8">컴파일 타임 정적 심볼 주입</text>
 
-          <!-- Arrow -->
-          <path d="M 350 160 L 410 160" class="svg-arrow"/>
+      <!-- Phase 2 Card -->
+      <div class="phase-card" id="cardPhase2">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-red);">2</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-red);">
+            <span>💥</span> Phase 2: 함수 포인터 변조 &amp; 제어 흐름 하이재킹 공격 (Attack Detonation)
+          </div>
+          <span class="card-badge badge-p2">Vulnerable (CONFIG_CFI=n)</span>
+        </div>
+        <div class="card-desc">
+          <code>CONFIG_CFI=n</code> 환경에서는 간접 분기 명령어(<code>call *%rax</code>)가 대상 주소의 유효성을 검사하지 않음.
+          공격자는 CVE-2021-4154 타입 혼동 취약점을 유발하여 <code>ops-&gt;dispatch_fn</code> 포인터를 악의적 과부하 루틴 또는 임의 커널 함수로 덮어씀.
+          관절 모터 지령 속도가 48.5 rad/s로 폭주하여 하모닉 드라이브 감속기 치절이 전단 파괴됨!
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚠️</span> 함수 포인터 하이재킹</div>
+            <div class="code-box">
+// CVE-2021-4154: ops 포인터 테이블 오염
+ops->dispatch_fn = &malicious_overload;
+// 커널 검증 없이 (*ops->dispatch_fn)() 점프!
+call *%rax  # 임의 악성 코드 무제한 실행</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔴</span> 사이버-물리 파괴 전이: 관절 치절 전단</div>
+            <div class="code-box">
+commanded_velocity = 48.5 rad/s (27배 폭주)
+Harmonic Drive: Mechanical Gear Teeth Sheared!
+Brushless Servo: Stator Coil Burnout!</div>
+          </div>
+        </div>
+      </div>
 
-          <!-- Memory Layout of Target A -->
-          <g transform="translate(420, 40)">
-            <rect x="0" y="0" width="250" height="240" class="svg-box-safe"/>
-            <text x="20" y="30" class="svg-title" fill="#22c55e">Target A: legit_target()</text>
-            <rect x="15" y="45" width="220" height="40" fill="rgba(56, 189, 248, 0.2)" stroke="#38bdf8" rx="4"/>
-            <text x="25" y="70" class="svg-code">Prefix [-4..-1]: 0x48a12c3f</text>
-            <rect x="15" y="95" width="220" height="130" class="svg-box" rx="4"/>
-            <text x="25" y="120" class="svg-title">진입점 (Address %px)</text>
-            <text x="25" y="145" class="svg-code">push %rbp</text>
-            <text x="25" y="170" class="svg-code">mov %rsp, %rbp</text>
-            <text x="25" y="195" class="svg-text">...</text>
-          </g>
+      <!-- Phase 3 Card -->
+      <div class="phase-card" id="cardPhase3">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-yellow);">3</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-yellow);">
+            <span>🛡️</span> Phase 3: Clang kCFI 타입 해시 불일치 트랩 &amp; 하드웨어 IBT 차단 (Hardened Trap)
+          </div>
+          <span class="card-badge badge-p3">Hardened (CONFIG_CFI_CLANG=y)</span>
+        </div>
+        <div class="card-desc">
+          <code>CONFIG_CFI_CLANG=y</code> 및 <code>CONFIG_X86_KERNEL_IBT=y</code>가 적용된 환경에서는 간접 호출 직전
+          컴파일러 생성 체크 코드가 대상 함수의 프리앰블 해시(<code>-4B</code>)를 로드하여 예상 타입(<code>0x5A8E3F21</code>)과 엄격 대조함.
+          변조된 타깃의 해시가 일치하지 않거나 하드웨어 <code>ENDBR64</code> 랜딩패드가 누락된 경우 즉각 <code>ud2</code> 명령어를 실행하여 <code>#UD</code> 예외 발생!
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔐</span> kCFI 인젝션 인라인 검증 코드</div>
+            <div class="code-box">
+movl -4(%rax), %r10d     # 대상 프리앰블 타입 로드
+cmpl $0x5a8e3f21, %r10d  # 기대 프로토타입 대조
+je .Lcall_legit
+ud2                      # 불일치 시 하드웨어 #UD 트랩!
+.Lcall_legit: call *%rax</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🛑</span> 하드웨어 IBT / BTI 랜딩패드 트랩</div>
+            <div class="code-box">
+// 간접 점프 대상 첫 명령어가 ENDBR64가 아닐 시:
+CPU Architecture Trap: #CP (Control Protection)
+Execution Aborted: 0% Run -> Exploit Neutralized</div>
+          </div>
+        </div>
+      </div>
 
-          <!-- Memory Layout of Target B -->
-          <g transform="translate(710, 40)">
-            <rect x="0" y="0" width="250" height="240" class="svg-box-danger"/>
-            <text x="20" y="30" class="svg-title" fill="#ef4444">Target B: mismatch_target()</text>
-            <rect x="15" y="45" width="220" height="40" fill="rgba(239, 68, 68, 0.2)" stroke="#ef4444" rx="4"/>
-            <text x="25" y="70" class="svg-code">Prefix [-4..-1]: 0x9b24e810</text>
-            <rect x="15" y="95" width="220" height="130" class="svg-box" rx="4"/>
-            <text x="25" y="120" class="svg-title">진입점 (Address %px)</text>
-            <text x="25" y="145" class="svg-code">push %rbp</text>
-            <text x="25" y="170" class="svg-code">mov %rsp, %rbp</text>
-            <text x="25" y="195" class="svg-text">...</text>
-          </g>
+      <!-- Phase 4 Card -->
+      <div class="phase-card" id="cardPhase4">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-green);">4</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-green);">
+            <span>🛑</span> Phase 4: 하드웨어 페일세이프 E-Stop 및 관절 긴급 제동 (Deterministic Safe State)
+          </div>
+          <span class="card-badge badge-p4">Safe State</span>
+        </div>
+        <div class="card-desc">
+          kCFI의 <code>#UD</code> 트랩 또는 IBT의 <code>#CP</code> 예외 인터럽트 발생 즉시 하드웨어 안전 감시 장치가 개입함.
+          안전 릴레이 코일의 여자를 해제하여 48V 서보 모터 전원 버스를 0.0V로 강제 컷오프(Depower)하고,
+          스프링 복귀형 전자 파킹 브레이크를 5ms 이내 물리 체결하여 관절 손상을 0건으로 완벽 방어함.
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚡</span> 서보 모터 버스 전원 차단</div>
+            <div class="code-box">
+HW Safety Supervisor Trip: &lt; 80 μs
+Main Relay Coil: De-energized
+Motor Bus: 48.0V -> 0.0V (Depowered)</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔒</span> 전자 파킹 브레이크 체결 (Joint Lock)</div>
+            <div class="code-box">
+12x Actuator Clamps: Mechanical Snap (&lt; 5 ms)
+Kinetic Energy Dissipated Safely
+Damage: 0 Gear Broken (PREVENTED)</div>
+          </div>
+        </div>
+      </div>
 
-          <!-- Explanation Box -->
-          <rect x="50" y="310" width="910" height="60" class="svg-box-highlight"/>
-          <text x="70" y="345" class="svg-title" fill="#38bdf8">핵심 구조:</text>
-          <text x="160" y="345" class="svg-text">모든 함수의 진입 주소 바로 앞(-4바이트)에 프로토타입 해시를 배치하여 호출자가 런타임에 4바이트 역참조만으로 즉각적인 시그니처 검증 가능.</text>
-        </svg>
+    </div>
+
+    <!-- Deep Dive Architecture Grid -->
+    <div class="deep-dive-grid">
+      <div class="dive-card">
+        <div class="dive-title"><span>🧮</span> Forward-Edge kCFI vs Fine-Grained CFI</div>
+        <div class="dive-content">
+          과거 Clang Forward-Edge CFI는 전체 커널 컴파일 시 거대한 점프 테이블(Jump Table)을 빌드하여 런타임 LTO 오버헤드와 모듈 로딩 문제를 유발함. <strong>kCFI(Kernel CFI)</strong>는 각 함수 시작 바로 앞(<code>-4B</code>)에 타입 해시를 독립 배치하여 커널 LTO 없이도 완벽한 모듈 호환성과 1% 미만의 극저부하를 달성함.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>🧱</span> Hardware IBT (Intel CET) & ARM64 BTI</div>
+        <div class="dive-content">
+          x86-64 IBT(Indirect Branch Tracking)는 간접 점프 직후 CPU가 <code>WAIT_FOR_ENDBR</code> 상태로 진입하여 첫 명령어가 <code>ENDBR64</code>가 아닐 경우 즉시 <code>#CP</code> 예외를 발생시킴. ARM64의 BTI(Branch Target Identification) 역시 <code>BTI c</code> 랜딩패드가 누락된 간접 점프를 하드웨어 수준에서 차단함.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>🔙</span> Backward-Edge 보호: Shadow Call Stack & SHSTK</div>
+        <div class="dive-content">
+          kCFI와 IBT가 함수 호출 지점(Forward-Edge: <code>call *%rax</code>)을 보호한다면, <strong>Shadow Call Stack (SCS)</strong> 및 <strong>Intel CET SHSTK</strong>는 함수 반환 주소(Backward-Edge: <code>ret</code>)를 격리된 전용 스택에 이중 보관하여 ROP(Return-Oriented Programming)를 100% 원천 봉쇄함.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>🛡️</span> Defense-in-Depth 제어 흐름 방어 매트릭스</div>
+        <div class="dive-content">
+          1단계 <code>CONFIG_CFI_CLANG</code>(타입 시그니처 검증) + 2단계 <code>CONFIG_X86_KERNEL_IBT</code>(하드웨어 랜딩패드 강제) + 3단계 <code>CONFIG_SHADOW_CALL_STACK</code>(리턴 주소 보호) + 4단계 <code>CONFIG_ARM64_PTR_AUTH</code>(포인터 암호화 서명 PAC)로 모든 제어 흐름 왜곡을 원천 봉쇄함.
+        </div>
       </div>
     </div>
 
-    <!-- Scene 3: Runtime Verification & Trap -->
-    <div id="scene-3" class="scene-card" style="display:none;">
-      <div class="scene-title">3. 런타임 동기 검증 & ud2/brk Trap 메커니즘</div>
-      <div class="scene-desc">
-        Clang kCFI가 활성화되면 컴파일러는 모든 간접 호출 지점에 검증 프롤로그 코드를 자동 삽입함. 대상 함수 포인터에서 4바이트를 거슬러 올라가 읽은 후(<code>-4(%reg)</code>), 기대하는 타입 해시 상수와 비교함. 일치하면 정상 호출하며, 불일치 시 하드웨어 트랩(x86: <code>ud2</code>, ARM64: <code>brk #0x8000</code>)을 발생시켜 커널 예외 처리기로 즉시 제어권을 넘김.
-      </div>
-      <div class="canvas-container">
-        <svg viewBox="0 0 1000 420">
-          <!-- Caller Assembly Logic -->
-          <g transform="translate(50, 30)">
-            <rect x="0" y="0" width="360" height="260" class="svg-box-highlight"/>
-            <text x="20" y="30" class="svg-title" fill="#38bdf8">호출자 간접 호출 프롤로그 (Compiler Injected)</text>
-            <text x="20" y="60" class="svg-text">기대 프로토타입 해시: 0x48a12c3f</text>
-            <rect x="15" y="75" width="330" height="165" class="svg-box" rx="4"/>
-            <text x="25" y="100" class="svg-code"># x86_64 예시 어셈블리</text>
-            <text x="25" y="125" class="svg-code">movl  $-0x48a12c3f, %r10d  ; 기대 해시 보수</text>
-            <text x="25" y="150" class="svg-code">addl  -4(%r11), %r10d     ; 타깃 태그 加산</text>
-            <text x="25" y="175" class="svg-code">je    .Lcall_ok           ; 0이면 일치 (Jump)</text>
-            <text x="25" y="200" class="svg-code" fill="#ef4444">ud2                       ; 불일치 -> TRAP!</text>
-            <text x="25" y="225" class="svg-code">.Lcall_ok: call *%r11     ; 정상 간접 분기</text>
-          </g>
-
-          <!-- Branch Decisions -->
-          <!-- Path A: Matched -->
-          <path d="M 410 180 L 480 180 L 530 100 L 590 100" class="svg-arrow-safe"/>
-          <text x="470" y="120" class="svg-text" fill="#22c55e">해시 일치 (je 분기)</text>
-
-          <g transform="translate(600, 40)">
-            <rect x="0" y="0" width="350" height="110" class="svg-box-safe"/>
-            <text x="20" y="30" class="svg-title" fill="#22c55e">정상 분기: call *%r11 실행</text>
-            <text x="20" y="60" class="svg-text">타깃 함수 legit_target(arg) 정상 진입</text>
-            <text x="20" y="85" class="svg-text">오버헤드: 단순 add/je 2사이클 미만</text>
-          </g>
-
-          <!-- Path B: Mismatched Trap -->
-          <path d="M 410 220 L 480 220 L 530 270 L 590 270" class="svg-arrow-danger"/>
-          <text x="470" y="280" class="svg-text" fill="#ef4444">불일치 (ud2 트랩)</text>
-
-          <g transform="translate(600, 200)">
-            <rect x="0" y="0" width="350" height="150" class="svg-box-danger"/>
-            <text x="20" y="30" class="svg-title" fill="#ef4444">하드웨어 트랩: handle_cfi_failure()</text>
-            <text x="20" y="55" class="svg-text">x86: ud2 (Invalid Opcode) / ARM64: brk</text>
-            <text x="20" y="80" class="svg-text">report_cfi_failure() 호출:</text>
-            <text x="20" y="105" class="svg-code" fill="#ef4444">"CFI failure at %pS (target: %pS; type: 0x...)"</text>
-            <text x="20" y="130" class="svg-text" fill="#ef4444">Strict: Kernel BUG / Permissive: WARN</text>
-          </g>
-
-          <!-- Bottom Footer -->
-          <rect x="50" y="360" width="900" height="40" class="svg-box"/>
-          <text x="70" y="385" class="svg-text">방어 효과: 잘못된 프로토타입이나 임의 가젯으로 분기하기 전에 CPU 명령 레벨에서 즉각적인 실행 중단 및 감사 로그 기록.</text>
-        </svg>
-      </div>
-    </div>
-
-    <!-- Scene 4: Comparative Security Matrix -->
-    <div id="scene-4" class="scene-card" style="display:none;">
-      <div class="scene-title">4. Base vs Hardened 커널 보안 아키텍처 비교</div>
-      <div class="scene-desc">
-        Clang kCFI 비활성화 커널(Base)과 kCFI 활성화 커널(Hardened)의 제어 흐름 보호 특성 및 성능 오버헤드, 모듈 호환성 매트릭스를 대조함.
-      </div>
-      <div class="canvas-container">
-        <svg viewBox="0 0 1000 400">
-          <!-- Vulnerable Baseline Card -->
-          <g transform="translate(50, 30)">
-            <rect x="0" y="0" width="420" height="340" class="svg-box-danger"/>
-            <text x="25" y="40" class="svg-title" fill="#ef4444">베이스라인 커널 (kcfi-disabled)</text>
-            <line x1="25" y1="55" x2="395" y2="55" stroke="#ef4444" stroke-width="1"/>
-            
-            <text x="25" y="85" class="svg-text" font-weight="700">간접 호출 검증: 없음 (Unchecked)</text>
-            <text x="25" y="110" class="svg-text">모든 간접 호출이 대상 주소로 블라인드 점프</text>
-            
-            <text x="25" y="145" class="svg-text" font-weight="700">공격 표면: 치명적 취약성 노출</text>
-            <text x="25" y="170" class="svg-text">- 함수 포인터 변조를 통한 커널 ROP/JOP</text>
-            <text x="25" y="195" class="svg-text">- Type Confusion 악용 권한 상승</text>
-            
-            <text x="25" y="230" class="svg-text" font-weight="700">LKDTM CFI_FORWARD_PROTO 테스트 결과:</text>
-            <text x="25" y="255" class="svg-code" fill="#ef4444">FAIL: survived mismatched prototype call!</text>
-            
-            <text x="25" y="295" class="svg-text" font-weight="700">하드웨어/컴파일러 요구:</text>
-            <text x="25" y="320" class="svg-text">GCC / Clang 기본 빌드</text>
-          </g>
-
-          <!-- Hardened Kernel Card -->
-          <g transform="translate(530, 30)">
-            <rect x="0" y="0" width="420" height="340" class="svg-box-safe"/>
-            <text x="25" y="40" class="svg-title" fill="#22c55e">하드닝 커널 (CONFIG_CFI_CLANG=y)</text>
-            <line x1="25" y1="55" x2="395" y2="55" stroke="#22c55e" stroke-width="1"/>
-            
-            <text x="25" y="85" class="svg-text" font-weight="700">간접 호출 검증: 컴파일러 Type Hash 검증</text>
-            <text x="25" y="110" class="svg-text">호출 직전 -4 오프셋 태그 일치 여부 엄격 검사</text>
-            
-            <text x="25" y="145" class="svg-text" font-weight="700">방어 효과: 제어 흐름 하이재킹 차단</text>
-            <text x="25" y="170" class="svg-text">- 불일치 함수 및 임의 주소 호출 즉각 트랩</text>
-            <text x="25" y="195" class="svg-text">- LTO 불필요로 모듈 컴파일 속도 유지</text>
-            
-            <text x="25" y="230" class="svg-text" font-weight="700">LKDTM CFI_FORWARD_PROTO 테스트 결과:</text>
-            <text x="25" y="255" class="svg-code" fill="#22c55e">CFI failure at ... (type mismatch detected!)</text>
-            
-            <text x="25" y="295" class="svg-text" font-weight="700">하드웨어/컴파일러 요구:</text>
-            <text x="25" y="320" class="svg-text">Clang 18+ (LLVM=1), x86_64 / ARM64 완벽 지원</text>
-          </g>
-        </svg>
-      </div>
-    </div>
-
-    <!-- Legend -->
-    <div class="legend">
-      <div class="legend-item">
-        <div class="legend-color" style="background: var(--accent-green);"></div>
-        <span>정상 간접 호출 (Type Hash Match)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: var(--accent-red);"></div>
-        <span>변조/불일치 호출 트랩 (CFI Failure Trap)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: var(--accent-blue);"></div>
-        <span>런타임 검증 프롤로그 (Compiler Injected Check)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: var(--accent-purple);"></div>
-        <span>컴파일 타임 Type Hash 주입</span>
-      </div>
-    </div>
   </div>
 
   <script>
-    function toggleTheme() {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'light' ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', next);
-      document.getElementById('theme-icon').textContent = next === 'light' ? '🌙' : '☀️';
-      document.getElementById('theme-text').textContent = next === 'light' ? 'Dark Mode' : 'Light Mode';
+    let currentPhase = 1;
+    let isPlaying = false;
+    let playTimer = null;
+
+    function reportHeight() {
+      const h = Math.ceil(document.body.scrollHeight + 20);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
     }
 
-    function switchScene(sceneId) {
-      document.querySelectorAll('.tab-btn').forEach((btn, idx) => {
-        btn.classList.toggle('active', idx + 1 === sceneId);
-      });
-      document.querySelectorAll('.scene-card').forEach((card, idx) => {
-        card.style.display = (idx + 1 === sceneId) ? 'block' : 'none';
-      });
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+      reportHeight();
     }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    function goToPhase(phase) {
+      currentPhase = phase;
+      for (let i = 1; i <= 4; i++) {
+        const card = document.getElementById(`cardPhase${i}`);
+        card.classList.remove(`active-p${i}`);
+        card.style.opacity = '0.5';
+        card.style.transform = 'scale(0.99)';
+      }
+      const activeCard = document.getElementById(`cardPhase${phase}`);
+      activeCard.classList.add(`active-p${phase}`);
+      activeCard.style.opacity = '1';
+      activeCard.style.transform = 'scale(1)';
+
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+
+      if (phase === 1) {
+        statusDot.style.background = 'var(--accent-blue)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-blue)';
+        statusText.textContent = "Phase 1: Valid Indirect Branch & kCFI Signature Match";
+      } else if (phase === 2) {
+        statusDot.style.background = 'var(--accent-red)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-red)';
+        statusText.textContent = "Phase 2: Function Pointer Hijacked & Actuator Overspeed";
+      } else if (phase === 3) {
+        statusDot.style.background = 'var(--accent-yellow)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-yellow)';
+        statusText.textContent = "Phase 3: Clang kCFI Type Hash Abort & Hardware IBT Trap";
+      } else if (phase === 4) {
+        statusDot.style.background = 'var(--accent-green)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-green)';
+        statusText.textContent = "Phase 4: Hardware Depower & Actuator Parking Brake Clamp";
+      }
+
+      reportHeight();
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.classList.remove('primary');
+        playLoop();
+      } else {
+        btn.textContent = "전체 재생";
+        btn.classList.add('primary');
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      currentPhase = (currentPhase % 4) + 1;
+      goToPhase(currentPhase);
+      playTimer = setTimeout(playLoop, 3200);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      goToPhase(1);
+    }
+
+    window.addEventListener('load', () => {
+      goToPhase(1);
+      reportHeight();
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
   </script>
 </body>
 </html>
-
