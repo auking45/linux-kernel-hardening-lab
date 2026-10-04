@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Static Linking & Kernel Direct Loading Architecture</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+    --code-bg: #090d16;
+  }
+  body.light-theme {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --accent-blue: #0284c7;
+    --accent-green: #16a34a;
+    --accent-amber: #d97706;
+    --accent-red: #dc2626;
+    --accent-purple: #9333ea;
+    --code-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h2 { font-size: 1.4rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+  .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent-blue); }
+
+  .timeline-pipeline {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+  .pipe-node {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    width: 22%;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .pipe-node:hover { border-color: var(--accent-blue); transform: translateY(-2px); }
+  .pipe-node.active {
+    border-color: var(--accent-blue);
+    background: rgba(56, 189, 248, 0.12);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
+  }
+  .pipe-arrow { color: var(--accent-blue); font-size: 1.2rem; font-weight: bold; }
+
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .matrix-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.84rem;
+  }
+  .matrix-table th, .matrix-table td {
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  .matrix-table th { background: var(--code-bg); color: var(--accent-blue); }
+
+  .code-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    color: #e2e8f0;
+    line-height: 1.6;
+  }
+  body.light-theme .code-box { color: #0f172a; }
+
+  @media (max-width: 840px) {
+    .timeline-pipeline { flex-direction: column; gap: 10px; }
+    .pipe-node { width: 100%; }
+    .comparison-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2><span>📦</span> 정적 링킹과 커널 직접 로딩 (Static Linking & Loading)</h2>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span> <span id="themeText">Light Mode</span>
+  </button>
+</div>
+
+<div class="timeline-pipeline">
+  <div class="pipe-node active" onclick="setStaticPhase(0)">
+    <div style="font-size:0.75rem; color:var(--accent-blue); font-weight:bold;">Phase 1</div>
+    <div style="font-size:0.85rem; font-weight:600; margin-top:2px;">아카이브(.a) 결합</div>
+  </div>
+  <div class="pipe-arrow">➔</div>
+  <div class="pipe-node" onclick="setStaticPhase(1)">
+    <div style="font-size:0.75rem; color:var(--accent-amber); font-weight:bold;">Phase 2</div>
+    <div style="font-size:0.85rem; font-weight:600; margin-top:2px;">libc.a 자체 내장</div>
+  </div>
+  <div class="pipe-arrow">➔</div>
+  <div class="pipe-node" onclick="setStaticPhase(2)">
+    <div style="font-size:0.75rem; color:var(--accent-purple); font-weight:bold;">Phase 3</div>
+    <div style="font-size:0.85rem; font-weight:600; margin-top:2px;">PT_INTERP 부재 확인</div>
+  </div>
+  <div class="pipe-arrow">➔</div>
+  <div class="pipe-node" onclick="setStaticPhase(3)">
+    <div style="font-size:0.75rem; color:var(--accent-green); font-weight:bold;">Phase 4</div>
+    <div style="font-size:0.85rem; font-weight:600; margin-top:2px;">_start 직접 진입</div>
+  </div>
+</div>
+
+<div class="comparison-grid">
+  <!-- Left Panel: Kernel Loading Flow -->
+  <div class="card">
+    <div class="card-title">
+      <span>⚙️</span> 커널의 정적 바이너리 로딩 파이프라인
+    </div>
+
+    <div class="code-box" id="phaseCodeBox">
+      <!-- Code populated by JS -->
+    </div>
+
+    <div style="font-size:0.88rem; line-height:1.7; color:var(--text-dim);" id="phaseDescBox">
+      <!-- Description populated by JS -->
+    </div>
+  </div>
+
+  <!-- Right Panel: Static vs Dynamic Comparison Matrix -->
+  <div class="card">
+    <div class="card-title">
+      <span>⚖️</span> 정적 링킹 vs 동적 링킹 기술 비교
+    </div>
+
+    <table class="matrix-table">
+      <thead>
+        <tr>
+          <th>평가 항목</th>
+          <th>정적 바이너리 (-static)</th>
+          <th>동적 바이너리 (기본값)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>파일 크기</strong></td>
+          <td>대용량 (약 952 KB, libc 포함)</td>
+          <td>초소형 (약 16 KB)</td>
+        </tr>
+        <tr>
+          <td><strong>외부 의존성</strong></td>
+          <td>없음 (완전 자체 완결형)</td>
+          <td>libc.so.6, ld-linux.so.2 필수</td>
+        </tr>
+        <tr>
+          <td><strong>로딩 속도</strong></td>
+          <td>동적 링커 해석 생략으로 초고속</td>
+          <td>공유 라이브러리 심볼 바인딩 필요</td>
+        </tr>
+        <tr>
+          <td><strong>메모리 공유</strong></td>
+          <td>프로세스마다 복사본 상주</td>
+          <td>코드 페이지(RX) 물리 메모리 공유</td>
+        </tr>
+        <tr>
+          <td><strong>보안 패치</strong></td>
+          <td>libc 취약 시 전체 재컴파일 필요</td>
+          <td>라이브러리 파일만 교체 시 즉시 반영</td>
+        </tr>
+        <tr>
+          <td><strong>공격 내성</strong></td>
+          <td>LD_PRELOAD 인젝션 원천 차단</td>
+          <td>라이브러리 하이재킹 벡터 존재</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const staticPhases = [
+  {
+    code: `
+# 1. 정적 라이브러리 아카이브 생성
+$ ar rcs libops.a libops.o
+# (ar 유틸리티가 여러 .o 파일들을 하나의 인덱스 아카이브로 묶음)
+
+# 2. 링커(ld)의 심볼 추출 규칙:
+- 미해결 심볼(U) 목록: static_multiply, static_power
+- libops.a 내부 인덱스를 뒤져 필요한 .o 멤버만 추출하여 바이너리에 병합
+`,
+    desc: `
+      <strong>Phase 1: 아카이브(.a) 심볼 해결</strong><br>
+      정적 라이브러리는 단순한 파일 묶음(Archive)임. 링커는 라이브러리 전체를 무작정 통째로 복사하는 것이 아니라, 애플리케이션의 <code>extern</code> 심볼을 만족시키는 필요한 오브젝트 모듈만을 선별적으로 추출하여 결합함.
+    `
+  },
+  {
+    code: `
+# 정적 바이너리 컴파일 (-static 플래그)
+$ clang -static app.c -L. -lops -o app_static
+
+# 바이너리 의존성 검사 (ldd)
+$ ldd app_static
+        not a dynamic executable (동적 링커 불필요!)
+`,
+    desc: `
+      <strong>Phase 2: libc.a 및 C 런타임 자체 내장</strong><br>
+      <code>-static</code> 옵션을 주면 컴파일러는 <code>libc.so</code> 대신 시스템 정적 라이브러리인 <code>libc.a</code>와 런타임 기동 코드(<code>crt0.o</code>)를 바이너리 내부에 완전히 구워 넣음(Inlining). 이로 인해 크기는 16KB에서 952KB로 증가하지만 완벽한 독립 실행 능력을 획득함.
+    `
+  },
+  {
+    code: `
+// 리눅스 커널 fs/binfmt_elf.c: load_elf_binary()
+for (i = 0; i < loc->elf_ex.e_phnum; i++) {
+    if (elf_ppnt->p_type == PT_INTERP) {
+        // 동적 바이너리: 인터프리터(ld-linux.so) 로드
+        elf_interpreter = ...;
+    }
+}
+// 정적 바이너리: PT_INTERP 루프 통과 ➔ elf_interpreter == NULL!
+`,
+    desc: `
+      <strong>Phase 3: 커널의 PT_INTERP 검증 생략</strong><br>
+      커널의 <code>load_elf_binary()</code>는 ELF 헤더를 스캔하며 <code>PT_INTERP</code> 세그먼트의 존재 유무를 확인합. 정적 바이너리는 이 세그먼트가 아예 없으므로, 커널은 동적 링커를 호출하는 오버헤드를 건너뜁니다.
+    `
+  },
+  {
+    code: `
+// 커널에서 유저 공간 복귀 직전:
+if (elf_interpreter) {
+    elf_entry = load_elf_interp(...); // ld-linux.so 엔트리로 점프
+} else {
+    elf_entry = loc->elf_ex.e_entry;  // 바이너리 자체 _start로 즉시 점프!
+}
+start_thread(regs, elf_entry, bprm->p);
+`,
+    desc: `
+      <strong>Phase 4: _start 직접 점프 및 실행</strong><br>
+      커널은 사용자 공간(Ring 3)으로 스위칭하면서 CPU의 명령어 포인터(RIP)를 바이너리 자체의 진입점(<code>e_entry</code>, 즉 <code>_start</code>)으로 바로 점프시킴. 동적 라이브러리 로딩 지연이 없어 극도로 빠른 부팅과 환경 비의존적 동작을 보장함.
+    `
+  }
+];
+
+function setStaticPhase(idx) {
+  document.querySelectorAll('.pipe-node').forEach((node, i) => {
+    node.classList.toggle('active', i === idx);
+  });
+  const cur = staticPhases[idx];
+  document.getElementById('phaseCodeBox').innerHTML = cur.code;
+  document.getElementById('phaseDescBox').innerHTML = cur.desc;
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  updateThemeButton(isLight);
+}
+
+function applyTheme(theme) {
+  const isLight = (theme === 'light' || theme === 'default');
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+  const icon = document.getElementById('themeIcon');
+  const text = document.getElementById('themeText');
+  if (isLight) {
+    icon.textContent = '🌙';
+    text.textContent = 'Dark Mode';
+  } else {
+    icon.textContent = '☀️';
+    text.textContent = 'Light Mode';
+  }
+}
+
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'theme-change') {
+    applyTheme(event.data.theme);
+  }
+});
+
+// Default to phase 0
+setStaticPhase(0);
+</script>
+
+</body>
+</html>

@@ -32,15 +32,23 @@ flowchart TD
         T3A --> T3B["05. Classic Stack Buffer Overflow & RIP Hijack"]
     end
 
+    subgraph Track4 ["Track 4: Binary Architecture & Linking Mechanics"]
+        T3B --> T4A["06. Compilation Process & ELF Architecture"]
+        T4A --> T4B["07. Symbols, Resolution & Relocation Mechanics"]
+        T4B --> T4C["08. Static Linking & Binary Loading"]
+        T4C --> T4D["09. Dynamic Linking (PLT/GOT) & Dynamic Loading"]
+    end
+
     subgraph AdvancedTracks ["Planned Future Tracks"]
-        T3B -.-> M1["Track 4: Heap Memory Allocators & UAF Mechanics"]
-        T3B -.-> M2["Track 5: Control Flow Hijacking & ROP Gadget Chains"]
-        T3B -.-> M3["Track 6: Syscall Boundary & Ring Transitions"]
+        T4D -.-> M1["Track 5: Heap Memory Allocators & UAF Mechanics"]
+        T4D -.-> M2["Track 6: Control Flow Hijacking & ROP Gadget Chains"]
+        T4D -.-> M3["Track 7: Syscall Boundary & Ring Transitions"]
     end
 
     style Track1 fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#fff
     style Track2 fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
     style Track3 fill:#1e293b,stroke:#ef4444,stroke-width:2px,color:#fff
+    style Track4 fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
     style AdvancedTracks fill:#0f172a,stroke:#64748b,stroke-width:1px,stroke-dasharray: 5 5,color:#94a3b8
 ```
 
@@ -55,6 +63,10 @@ flowchart TD
 | **03** | **[Stack Frame Mechanics & Calling Convention (ABI)](03-stack-frame-and-abi.md)** | Downward Stack Growth, Prologue (`push rbp; mov rbp, rsp`), Epilogue (`leave; ret`), SFP, RET Address Offset Math | System V AMD64 vs ARM64 AAPCS | <span style="color: #22c55e; font-weight: bold;">Active</span> |
 | **04** | **[Shellcode Architecture & Opcode Engineering](04-shellcode-engineering.md)** | Machine Opcode Structure, `execve("/bin/sh")` Syscall Setup, Null-Byte (`\x00`) Elimination, Position Independence (PIC) | x86_64 & ARM64 Null-Free Shellcode | <span style="color: #22c55e; font-weight: bold;">Active</span> |
 | **05** | **[Classic Stack Buffer Overflow & Control Flow](05-stack-bof-rip.md)** | Unchecked Memory Copying, Buffer ➔ SFP ➔ RET Smash Pipeline, Arbitrary Code Execution & Modern Defense Bridge (Canary, NX, ASLR) | Buffer Overflow Simulator | <span style="color: #22c55e; font-weight: bold;">Active</span> |
+| **06** | **[Compilation Process & ELF Architecture](06-compilation-and-elf.md)** | AST ➔ IR ➔ ASM Pipeline, Linking View vs Execution View, `PT_LOAD`, `PT_INTERP`, `PT_GNU_STACK` | C-based `Elf64_Ehdr` parser | <span style="color: #22c55e; font-weight: bold;">Active</span> |
+| **07** | **[Symbols, Resolution & Relocation Mechanics](07-symbols-and-linking.md)** | Symbol Table (`Elf64_Sym`), Three Rules of Strong vs Weak, Relocation Formula (`S + A - P`) & Instruction Patching | Weak Symbol Override Lab | <span style="color: #22c55e; font-weight: bold;">Active</span> |
+| **08** | **[Static Linking & Binary Loading](08-static-linking-and-loading.md)** | Static Archive (`.a`), Inlined `libc.a`, `PT_INTERP` Absence and Direct Kernel `_start` Jump | Static Archive & Self-Contained Binary | <span style="color: #22c55e; font-weight: bold;">Active</span> |
+| **09** | **[Dynamic Linking (PLT/GOT) & Runtime Loading](09-dynamic-linking-and-loading.md)** | Shared Objects (`.so`), Position-Independent Code (PIC), PLT/GOT Lazy Binding, GOT Overwrite vs Full RELRO, `dlopen` | PLT/GOT Inspector & `dlopen` Plugin | <span style="color: #22c55e; font-weight: bold;">Active</span> |
 
 ---
 

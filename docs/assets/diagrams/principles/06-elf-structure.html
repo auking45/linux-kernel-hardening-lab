@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELF File Format Architecture: Dual Views (Linking vs Execution)</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+    --code-bg: #090d16;
+  }
+  body.light-theme {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --accent-blue: #0284c7;
+    --accent-green: #16a34a;
+    --accent-amber: #d97706;
+    --accent-red: #dc2626;
+    --accent-purple: #9333ea;
+    --code-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h2 { font-size: 1.4rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+  .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent-blue); }
+
+  .view-selector {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .view-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .view-btn.active {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+
+  .grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .panel {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .panel-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .elf-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+  }
+  .elf-box:hover {
+    border-color: var(--accent-blue);
+    transform: translateX(4px);
+  }
+  .elf-box.active {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.3);
+    background: rgba(56, 189, 248, 0.1);
+  }
+  .tag {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .tag-rx { background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); }
+  .tag-rw { background: rgba(251, 191, 36, 0.2); color: var(--accent-amber); }
+  .tag-ro { background: rgba(74, 222, 128, 0.2); color: var(--accent-green); }
+
+  .desc-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+  .code-view {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 10px;
+    border-radius: 6px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.8rem;
+    color: #e2e8f0;
+    margin-top: 10px;
+    border: 1px solid var(--border);
+  }
+  body.light-theme .code-view { background: #e2e8f0; color: #0f172a; }
+
+  @media (max-width: 840px) {
+    .grid-container { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2><span>📄</span> ELF 파일 구조와 이중 뷰 (Dual Views: Linking vs Execution)</h2>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span> <span id="themeText">Light Mode</span>
+  </button>
+</div>
+
+<div class="view-selector">
+  <button class="view-btn active" id="btnDual" onclick="switchView('dual')">이중 뷰 종합 비교 (Dual View)</button>
+  <button class="view-btn" id="btnExec" onclick="switchView('exec')">실행 뷰 중심 (Execution View / Segments)</button>
+  <button class="view-btn" id="btnLink" onclick="switchView('link')">링킹 뷰 중심 (Linking View / Sections)</button>
+</div>
+
+<div class="grid-container">
+  <!-- Left Column: Interactive Layout Structure -->
+  <div class="panel">
+    <div class="panel-title" id="colLeftTitle">
+      <span>⚙️</span> ELF 바이너리 구조 레이아웃 (ELF64)
+    </div>
+
+    <div class="elf-box active" onclick="selectItem('ehdr')">
+      <span><strong>ELF Header</strong> (Elf64_Ehdr, 64 Bytes)</span>
+      <span class="tag tag-ro">Magic: \x7fELF</span>
+    </div>
+
+    <div class="elf-box" onclick="selectItem('phdr')">
+      <span><strong>Program Header Table</strong> (세그먼트 설계도)</span>
+      <span class="tag tag-ro">Execution View</span>
+    </div>
+
+    <div class="elf-box" onclick="selectItem('text_seg')">
+      <span>• <strong>PT_LOAD 1 (Code Segment)</strong></span>
+      <span class="tag tag-rx">R-E (.text, .init, .plt)</span>
+    </div>
+
+    <div class="elf-box" onclick="selectItem('rodata_seg')">
+      <span>• <strong>PT_LOAD 2 (Read-Only Data)</strong></span>
+      <span class="tag tag-ro">R-- (.rodata, .eh_frame)</span>
+    </div>
+
+    <div class="elf-box" onclick="selectItem('data_seg')">
+      <span>• <strong>PT_LOAD 3 (Data/BSS Segment)</strong></span>
+      <span class="tag tag-rw">RW- (.data, .bss, .got)</span>
+    </div>
+
+    <div class="elf-box" onclick="selectItem('interp_seg')">
+      <span>• <strong>PT_INTERP</strong> (/lib64/ld-linux-x86-64.so.2)</span>
+      <span class="tag tag-ro">Interpreter</span>
+    </div>
+
+    <div class="elf-box" onclick="selectItem('gnu_stack')">
+      <span>• <strong>PT_GNU_STACK</strong> (스택 실행 권한 지정)</span>
+      <span class="tag tag-rw">RW- (NX/DEP)</span>
+    </div>
+
+    <div class="elf-box" onclick="selectItem('shdr')">
+      <span><strong>Section Header Table</strong> (섹션 설계도)</span>
+      <span class="tag tag-ro">Linking View</span>
+    </div>
+  </div>
+
+  <!-- Right Column: Inspector & Security Insight -->
+  <div class="panel">
+    <div class="panel-title">
+      <span>🔍</span> 아키텍처 상세 인스펙터 & 보안 분석
+    </div>
+
+    <div class="desc-box" id="detailDesc">
+      <!-- Populated by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+const itemsData = {
+  ehdr: {
+    title: "ELF Header (Elf64_Ehdr)",
+    text: `
+      <p>바이너리의 가장 첫머리(오프셋 0x0)에 위치하는 64바이트 헤더로, 운영체제 커널이 바이너리를 해석하기 위한 핵심 메타데이터를 담고 있음.</p>
+      <div class="code-view">
+e_ident: 7f 45 4c 46 (\\x7fELF)
+e_type : ET_EXEC (실행 파일) 또는 ET_DYN (PIE / 공유 객체)
+e_entry: 0x401130 (CPU가 실행을 시작할 첫 진입점 _start)
+e_phoff: 0x40 (Program Header Table 오프셋)
+e_shoff: 0x3890 (Section Header Table 오프셋)</div>
+      <p style="margin-top:8px;"><strong>보안 함의:</strong> 커널의 <code>load_elf_binary()</code>는 e_ident의 매직 바이트와 타깃 아키텍처(x86_64/ARM64) 일치 여부를 가장 먼저 검증함.</p>
+    `
+  },
+  phdr: {
+    title: "Program Header Table (세그먼트 설계도)",
+    text: `
+      <p><strong>실행 뷰(Execution View)</strong>의 핵심으로, 커널이 바이너리를 메모리에 올릴 때 참조하는 <code>Elf64_Phdr</code> 배열임. 링커가 유사한 권한을 가진 여러 섹션들을 하나의 세그먼트로 묶어놓은 결과물임.</p>
+      <div class="code-view">
+Type       Offset   VirtAddr   MemSize  Flags
+PT_LOAD    0x001000 0x401000   0x000691 R-E
+PT_LOAD    0x002de8 0x403de8   0x0002a8 RW-</div>
+      <p style="margin-top:8px;"><strong>보안 함의:</strong> 커널은 섹션 이름(.text 등)을 일체 보지 않으며, 오직 이 Program Header의 <code>PT_LOAD</code>와 권한 플래그(Flags: R, W, E)만을 보고 페이지 테이블(PTE) 권한을 세팅함.</p>
+    `
+  },
+  text_seg: {
+    title: "PT_LOAD 1: 코드 세그먼트 (R-E)",
+    text: `
+      <p>CPU 기계어 코드가 위치하는 세그먼트로, <code>.init</code>, <code>.plt</code>, <code>.text</code>, <code>.fini</code> 섹션들이 하나의 4KB 페이지 단위로 번들링됨.</p>
+      <div class="code-view">
+권한: PF_R | PF_X (읽기 및 실행 허용, 쓰기 금지)
+매핑: mmap(..., PROT_READ | PROT_EXEC, MAP_PRIVATE, ...)</div>
+      <p style="margin-top:8px;"><strong>보안 함의:</strong> 쓰기 권한이 철저히 박탈되어 있어(W^X 원칙), 런타임에 코드를 덮어쓰는 셀프 모디파잉 코드나 인라인 패치가 하드웨어 수준에서 차단됨.</p>
+    `
+  },
+  rodata_seg: {
+    title: "PT_LOAD 2: 읽기 전용 데이터 (R--)",
+    text: `
+      <p>상수 문자열 리터럴, <code>const</code> 전역 변수, C++ 예외 처리 프레임(<code>.eh_frame</code>)이 위치하는 세그먼트임.</p>
+      <div class="code-view">
+권한: PF_R (읽기 전용)
+포함 섹션: .rodata, .eh_frame_hdr, .eh_frame</div>
+      <p style="margin-top:8px;"><strong>보안 함의:</strong> 포맷 스트링 취약점 공격자가 상수 포맷 문자열을 변조할 수 없도록 메모리 쓰기를 차단함.</p>
+    `
+  },
+  data_seg: {
+    title: "PT_LOAD 3: 읽기/쓰기 데이터 (RW-)",
+    text: `
+      <p>초기화된 전역 변수(<code>.data</code>), 초기화되지 않은 전역 변수(<code>.bss</code>), 그리고 동적 함수 주소 테이블(<code>.got</code>, <code>.got.plt</code>)이 위치함.</p>
+      <div class="code-view">
+권한: PF_R | PF_W (읽기 및 쓰기 허용, 실행 금지)
+포함 섹션: .data, .bss, .got, .dynamic</div>
+      <p style="margin-top:8px;"><strong>보안 함의:</strong> 실행(Execute) 권한이 없으므로 데이터 영역에 주입된 기계어는 실행되지 않음. 단, 쓰기가 가능하므로 함수 포인터 변조 공격의 타깃이 됨.</p>
+    `
+  },
+  interp_seg: {
+    title: "PT_INTERP 세그먼트",
+    text: `
+      <p>동적 링커의 파일 시스템 경로(문자열)를 저장함. 전형적으로 <code>/lib64/ld-linux-x86-64.so.2</code>가 기록됨.</p>
+      <div class="code-view">
+인터프리터 경로: /lib64/ld-linux-x86-64.so.2</div>
+      <p style="margin-top:8px;"><strong>보안 함의:</strong> 정적 링크 바이너리(Static Binary)에는 이 세그먼트가 존재하지 않으며, 커널이 곧바로 바이너리 자체 진입점으로 점프함.</p>
+    `
+  },
+  gnu_stack: {
+    title: "PT_GNU_STACK (스택 실행 권한 지정)",
+    text: `
+      <p>프로세스의 스택 메모리가 실행 가능한지(Executable) 여부를 선언하는 GNU 확장 세그먼트임.</p>
+      <div class="code-view">
+Flags: RW- (Read/Write, Non-Executable) ➔ NX 활성화!
+Flags: RWE (Read/Write/Execute)        ➔ 취약 (-z execstack)</div>
+      <p style="margin-top:8px;"><strong>보안 함의:</strong> 커널의 <code>setup_arg_pages()</code> 함수는 이 세그먼트를 보고 스택 VMA의 <code>VM_EXEC</code> 비트를 제거하여 스택 쉘코드 공격(NX/DEP)을 원천 차단함.</p>
+    `
+  },
+  shdr: {
+    title: "Section Header Table (링킹 뷰 설계도)",
+    text: `
+      <p><strong>링킹 뷰(Linking View)</strong>의 핵심으로, 링커(<code>ld</code>)와 디버거(GDB)가 사용하는 <code>Elf64_Shdr</code> 배열임. 바이너리 내 모든 섹션의 이름, 주소, 크기, 릴로케이션 정보를 기술함.</p>
+      <div class="code-view">
+[Nr] Name      Type      Address  Offset   Size
+[14] .text     PROGBITS  0x4010e0 0x0010e0 0x0005a2
+[16] .rodata   PROGBITS  0x402000 0x002000 0x000580
+[23] .got.plt  PROGBITS  0x403fe8 0x002fe8 0x000070</div>
+      <p style="margin-top:8px;"><strong>보안 함의:</strong> 스트립(<code>strip</code>)된 바이너리는 섹션 헤더 테이블이 완전히 제거되지만, 실행에는 아무런 지장이 없음(커널은 Program Header만 사용하기 때문).</p>
+    `
+  }
+};
+
+function selectItem(key) {
+  document.querySelectorAll('.elf-box').forEach(b => b.classList.remove('active'));
+  const target = event.currentTarget;
+  if (target) target.classList.add('active');
+
+  const d = itemsData[key];
+  document.getElementById('detailDesc').innerHTML = `
+    <h3 style="color:var(--accent-blue); margin-bottom:10px;">${d.title}</h3>
+    ${d.text}
+  `;
+}
+
+function switchView(view) {
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  if (view === 'dual') document.getElementById('btnDual').classList.add('active');
+  if (view === 'exec') document.getElementById('btnExec').classList.add('active');
+  if (view === 'link') document.getElementById('btnLink').classList.add('active');
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  updateThemeButton(isLight);
+}
+
+function applyTheme(theme) {
+  const isLight = (theme === 'light' || theme === 'default');
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+  const icon = document.getElementById('themeIcon');
+  const text = document.getElementById('themeText');
+  if (isLight) {
+    icon.textContent = '🌙';
+    text.textContent = 'Dark Mode';
+  } else {
+    icon.textContent = '☀️';
+    text.textContent = 'Light Mode';
+  }
+}
+
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'theme-change') {
+    applyTheme(event.data.theme);
+  }
+});
+
+// Default to ehdr
+selectItem('ehdr');
+</script>
+
+</body>
+</html>

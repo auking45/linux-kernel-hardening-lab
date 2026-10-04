@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLT/GOT Lazy Binding & Runtime Dynamic Loading (dlopen)</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+    --code-bg: #090d16;
+  }
+  body.light-theme {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --accent-blue: #0284c7;
+    --accent-green: #16a34a;
+    --accent-amber: #d97706;
+    --accent-red: #dc2626;
+    --accent-purple: #9333ea;
+    --code-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h2 { font-size: 1.4rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+  .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent-blue); }
+
+  .mode-tabs {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.88rem;
+    transition: all 0.2s;
+  }
+  .tab-btn.active {
+    background: rgba(56, 189, 248, 0.15);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+  }
+
+  .grid-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .step-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .flow-item {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s;
+  }
+  .flow-item.highlight {
+    border-color: var(--accent-blue);
+    background: rgba(56, 189, 248, 0.1);
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+  }
+
+  .code-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    color: #e2e8f0;
+    line-height: 1.6;
+  }
+  body.light-theme .code-box { color: #0f172a; }
+
+  @media (max-width: 840px) {
+    .grid-layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2><span>⚡</span> 동적 링킹(PLT/GOT)과 런타임 동적 로딩(dlopen)</h2>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span> <span id="themeText">Light Mode</span>
+  </button>
+</div>
+
+<div class="mode-tabs">
+  <button class="tab-btn active" id="btnCall1" onclick="switchMode('call1')">최초 호출: 지연 바인딩 (Lazy Binding)</button>
+  <button class="tab-btn" id="btnCall2" onclick="switchMode('call2')">2회차 이후: GOT 직접 점프</button>
+  <button class="tab-btn" id="btnDlopen" onclick="switchMode('dlopen')">런타임 동적 로딩 (dlopen API)</button>
+</div>
+
+<div class="grid-layout">
+  <!-- Left Panel: Flow diagram -->
+  <div class="card">
+    <div class="card-title" id="flowTitle">
+      <span>🔄</span> PLT ➔ GOT 함수 호출 전이 파이프라인
+    </div>
+
+    <div class="step-flow" id="stepFlowContainer">
+      <!-- Steps populated by JS -->
+    </div>
+  </div>
+
+  <!-- Right Panel: Architectural & Security Deep-Dive -->
+  <div class="card">
+    <div class="card-title">
+      <span>🔒</span> 메커니즘 심층 분석 및 보안 원리
+    </div>
+
+    <div class="code-box" id="insightCodeBox">
+      <!-- Code populated by JS -->
+    </div>
+
+    <div style="font-size:0.86rem; line-height:1.7; color:var(--text-dim);" id="insightDescBox">
+      <!-- Description populated by JS -->
+    </div>
+  </div>
+</div>
+
+<script>
+const modesData = {
+  call1: {
+    title: "1회차 호출: 지연 바인딩 (Lazy Binding 파이프라인)",
+    steps: [
+      { text: "1. call printf@plt", sub: "사용자 코드에서 PLT 스텁 호출" },
+      { text: "2. jmp *printf@got.plt", sub: "GOT 엔트리 참조 (아직 주소 미해결)" },
+      { text: "3. push $0x0; jmp .plt[0]", sub: "심볼 오프셋 푸시 후 링커 스텁으로 점프" },
+      { text: "4. call _dl_runtime_resolve", sub: "동적 링커가 libc.so에서 printf 실제 주소 탐색" },
+      { text: "5. printf@got.plt = 0x7ffff7a01230", sub: "★ 실제 libc 주소를 GOT에 캐싱 기록!" },
+      { text: "6. jmp 0x7ffff7a01230", sub: "실제 printf 함수 실행 시작" }
+    ],
+    code: `
+; [최초 printf@plt 호출 시 디스어셈블리]
+0x401030 &lt;printf@plt&gt;:
+  jmp    *0x2fe2(%rip)    ; ➔ printf@got.plt 참조
+  ; (초기값은 다음 행인 0x401036을 가리킴!)
+0x401036 &lt;printf@plt+6&gt;:
+  push   $0x0             ; 릴로케이션 인덱스 푸시
+  jmp    0x401020         ; .plt[0] (동적 링커 호출기로 점프)
+`,
+    desc: `
+      <strong>지연 바인딩(Lazy Binding)의 목적과 비용:</strong><br>
+      수백 개의 라이브러리 함수 중 실제로 실행 중에 한 번도 호출되지 않는 함수가 많음. 프로그램 시작 시 모든 심볼을 해석하면 기동 시간이 크게 지연되므로, <strong>함수가 최초로 호출되는 순간에만 동적 링커(ld.so)를 깨워 주소를 해석</strong>하고 GOT에 캐싱하는 영리한 최적화 기법임.
+    `
+  },
+  call2: {
+    title: "2회차 이후 호출: 캐시된 GOT 직접 분기",
+    steps: [
+      { text: "1. call printf@plt", sub: "사용자 코드에서 PLT 스텁 재호출" },
+      { text: "2. jmp *printf@got.plt", sub: "GOT 엔트리 참조 (이미 0x7ffff7a01230 기록됨)" },
+      { text: "3. jmp 0x7ffff7a01230 (Direct!)", sub: "★ 동적 링커 개입 없이 1클럭 만에 libc로 즉시 분기!" }
+    ],
+    code: `
+; [2회차 이후 printf@plt 호출 시]
+0x401030 &lt;printf@plt&gt;:
+  jmp    *0x2fe2(%rip)    ; ➔ printf@got.plt 참조
+  ; GOT에 이미 0x7ffff7a01230 (printf 본체)가 들어있음!
+  ; 곧바로 libc 내부로 직행! (링커 오버헤드 0)
+`,
+    desc: `
+      <strong>보안 취약점: GOT Overwrite 공격:</strong><br>
+      지연 바인딩을 지원하기 위해서는 프로그램 실행 중에 GOT 테이블에 쓰기(Write)가 가능해야 함(<code>rw-p</code>). 공격자가 메모리 쓰기 결함(BOF, Format String)을 이용해 <code>printf@got</code> 주소를 <code>system()</code> 주소로 덮어쓰면, 다음 번 <code>printf()</code> 호출 시 임의 명령이 실행되는 치명적 공격이 성립함.<br><br>
+      <strong>🛡️ 완화책: Full RELRO (-Wl,-z,relro,-z,now):</strong><br>
+      프로그램 로딩 시 모든 함수를 즉시 바인딩(Immediate Binding)하고, <code>.got</code> 메모리 페이지를 <code>r--p</code>(읽기 전용)로 잠가버려 GOT Overwrite를 원천 차단함!
+    `
+  },
+  dlopen: {
+    title: "런타임 동적 로딩: dlopen / dlsym API 흐름",
+    steps: [
+      { text: "1. void *h = dlopen(\"./libplugin.so\", RTLD_NOW)", sub: "런타임에 커널 mmap을 호출하여 새 SO를 프로세스 공간에 매핑" },
+      { text: "2. fn = dlsym(h, \"plugin_execute\")", sub: "라이브러리 심볼 테이블에서 함수 포인터 검색" },
+      { text: "3. fn(10)", sub: "로드된 플러그인 함수 실행" },
+      { text: "4. dlclose(h)", sub: "참조 카운트 감소 및 필요 시 munmap으로 메모리 해제" }
+    ],
+    code: `
+// 플러그인 동적 로딩 표준 패턴
+void *handle = dlopen("./libplugin.so", RTLD_NOW);
+if (!handle) { /* dlerror() 처리 */ }
+
+// 함수 포인터 바인딩
+int (*exec_fn)(int) = dlsym(handle, "plugin_execute");
+int ret = exec_fn(10); // 실행!
+
+dlclose(handle); // 안전한 언로드
+`,
+    desc: `
+      <strong>런타임 동적 로딩의 강력함:</strong><br>
+      컴파일 시점에 존재하지 않았던 타사 서드파티 플러그인이나 기능 확장을 <strong>프로그램 재시작 없이 메모리에 동적으로 적재/언로드</strong>할 수 있음. 웹 브라우저, 게임 모드, 데이터베이스 스토리지 엔진 등 확장성이 필수적인 대규모 소프트웨어 아키텍처의 핵심 뼈대임.
+    `
+  }
+};
+
+function switchMode(mode) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  if (mode === 'call1') document.getElementById('btnCall1').classList.add('active');
+  if (mode === 'call2') document.getElementById('btnCall2').classList.add('active');
+  if (mode === 'dlopen') document.getElementById('btnDlopen').classList.add('active');
+
+  const cur = modesData[mode];
+  document.getElementById('flowTitle').innerHTML = `<span>🔄</span> ${cur.title}`;
+
+  const container = document.getElementById('stepFlowContainer');
+  container.innerHTML = cur.steps.map(s => `
+    <div class="flow-item highlight">
+      <span style="font-weight:bold; color:var(--text);">${s.text}</span>
+      <span style="font-size:0.75rem; color:var(--text-dim);">${s.sub}</span>
+    </div>
+  `).join('');
+
+  document.getElementById('insightCodeBox').innerHTML = cur.code;
+  document.getElementById('insightDescBox').innerHTML = cur.desc;
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  updateThemeButton(isLight);
+}
+
+function applyTheme(theme) {
+  const isLight = (theme === 'light' || theme === 'default');
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+  const icon = document.getElementById('themeIcon');
+  const text = document.getElementById('themeText');
+  if (isLight) {
+    icon.textContent = '🌙';
+    text.textContent = 'Dark Mode';
+  } else {
+    icon.textContent = '☀️';
+    text.textContent = 'Light Mode';
+  }
+}
+
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'theme-change') {
+    applyTheme(event.data.theme);
+  }
+});
+
+// Default to call1
+switchMode('call1');
+</script>
+
+</body>
+</html>

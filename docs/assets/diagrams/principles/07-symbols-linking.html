@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Symbol Resolution & Relocation Mechanics</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --text-dim: #94a3b8;
+    --accent-blue: #38bdf8;
+    --accent-green: #4ade80;
+    --accent-amber: #fbbf24;
+    --accent-red: #f87171;
+    --accent-purple: #c084fc;
+    --code-bg: #090d16;
+  }
+  body.light-theme {
+    --bg: #f8fafc;
+    --card-bg: #ffffff;
+    --border: #cbd5e1;
+    --text: #0f172a;
+    --text-dim: #475569;
+    --accent-blue: #0284c7;
+    --accent-green: #16a34a;
+    --accent-amber: #d97706;
+    --accent-red: #dc2626;
+    --accent-purple: #9333ea;
+    --code-bg: #f1f5f9;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 24px;
+    transition: background 0.3s, color 0.3s;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h2 { font-size: 1.4rem; color: var(--accent-blue); display: flex; align-items: center; gap: 8px; }
+  .theme-toggle-btn {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+  }
+  .theme-toggle-btn:hover { border-color: var(--accent-blue); }
+
+  .pipeline-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .step-tab {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .step-tab:hover { border-color: var(--accent-blue); }
+  .step-tab.active { border-color: var(--accent-blue); background: rgba(56, 189, 248, 0.12); }
+  .step-tab .num { font-size: 0.75rem; color: var(--accent-blue); font-weight: bold; }
+  .step-tab .title { font-size: 0.85rem; font-weight: 600; margin-top: 4px; }
+
+  .layout-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--accent-blue);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .sym-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.8rem;
+  }
+  .sym-table th, .sym-table td {
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  .sym-table th { background: var(--code-bg); color: var(--accent-blue); }
+
+  .badge-strong { background: rgba(56, 189, 248, 0.2); color: var(--accent-blue); padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+  .badge-weak { background: rgba(251, 191, 36, 0.2); color: var(--accent-amber); padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+  .badge-unres { background: rgba(248, 113, 113, 0.2); color: var(--accent-red); padding: 2px 6px; border-radius: 4px; font-weight: bold; }
+
+  .code-box {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.82rem;
+    color: #e2e8f0;
+    line-height: 1.6;
+  }
+  body.light-theme .code-box { color: #0f172a; }
+
+  @media (max-width: 840px) {
+    .pipeline-steps { grid-template-columns: 1fr 1fr; }
+    .layout-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h2><span>🔗</span> 심볼 해석과 릴로케이션 메커니즘 (Symbols & Relocation)</h2>
+  <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()">
+    <span id="themeIcon">☀️</span> <span id="themeText">Light Mode</span>
+  </button>
+</div>
+
+<div class="pipeline-steps">
+  <div class="step-tab active" onclick="setSymStep(0)">
+    <div class="num">Step 1</div>
+    <div class="title">미해결 심볼 수집</div>
+  </div>
+  <div class="step-tab" onclick="setSymStep(1)">
+    <div class="num">Step 2</div>
+    <div class="title">Strong vs Weak 해석</div>
+  </div>
+  <div class="step-tab" onclick="setSymStep(2)">
+    <div class="num">Step 3</div>
+    <div class="title">섹션 병합 (Section Merge)</div>
+  </div>
+  <div class="step-tab" onclick="setSymStep(3)">
+    <div class="num">Step 4</div>
+    <div class="title">릴로케이션 패치 (Rela)</div>
+  </div>
+</div>
+
+<div class="layout-grid">
+  <!-- Left Panel: Symbol Table View -->
+  <div class="card">
+    <div class="card-title">
+      <span>📋</span> 오브젝트 심볼 테이블 (.symtab)
+    </div>
+
+    <table class="sym-table">
+      <thead>
+        <tr>
+          <th>Symbol Name</th>
+          <th>Type / Bind</th>
+          <th>Defined In</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="symTableBody">
+        <!-- Rows populated by JS -->
+      </tbody>
+    </table>
+
+    <div class="code-box" id="stepInsight">
+      <!-- Detailed insight -->
+    </div>
+  </div>
+
+  <!-- Right Panel: Relocation Math & Code View -->
+  <div class="card">
+    <div class="card-title">
+      <span>📐</span> 릴로케이션 연산과 바이트 패치 (Relocation Math)
+    </div>
+
+    <div class="code-box" id="relocMathBox">
+      <!-- Relocation calculation -->
+    </div>
+
+    <div style="background:rgba(56,189,248,0.08); border-left:4px solid var(--accent-blue); padding:14px; border-radius:0 6px 6px 0; font-size:0.82rem; line-height:1.6; color:var(--text-dim);">
+      <strong style="color:var(--accent-blue);">💡 릴로케이션 타입 핵심:</strong><br>
+      • <code>R_X86_64_PC32</code>: 현재 명령어(RIP) 기준 32비트 상대 오프셋 계산: <code>S + A - P</code><br>
+      • <code>R_X86_64_64</code>: 64비트 절대 가상 주소 직접 패치: <code>S + A</code><br>
+      • <code>R_X86_64_PLT32</code>: PLT 스텁으로 분기하는 상대 오프셋 계산: <code>L + A - P</code>
+    </div>
+  </div>
+</div>
+
+<script>
+const symSteps = [
+  {
+    table: [
+      { name: "main", type: "FUNC / GLOBAL", def: "main.o", status: "<span class='badge-strong'>STRONG</span>" },
+      { name: "calculate_add", type: "FUNC / GLOBAL", def: "calc.o", status: "<span class='badge-strong'>STRONG</span>" },
+      { name: "custom_hook", type: "FUNC / WEAK", def: "calc.o", status: "<span class='badge-weak'>WEAK</span>" },
+      { name: "g_operation_count", type: "OBJECT / GLOBAL", def: "calc.o", status: "<span class='badge-strong'>STRONG</span>" },
+      { name: "printf", type: "FUNC / GLOBAL", def: "libc.so", status: "<span class='badge-unres'>UNRESOLVED</span>" }
+    ],
+    insight: `
+      <strong>Step 1: 심볼 수집과 분류</strong><br>
+      컴파일러는 각 소스 파일을 독립적으로 컴파일하므로 <code>main.o</code>는 <code>calculate_add</code>나 <code>printf</code>의 실제 메모리 주소를 알지 못함. 이 심볼들을 <code>*UND*</code>(Undefined) 상태로 심볼 테이블에 기록하고 링커에게 해석을 위임함.
+    `,
+    math: `
+; main.o 컴파일 직후의 미완성 기계어 (call 명령어)
+0000000000000021:  e8 00 00 00 00       call   0x26 &lt;main+0x26&gt;
+; ➔ 릴로케이션 엔트리 생성:
+Offset: 0x22, Type: R_X86_64_PC32, Symbol: calculate_add, Addend: -4
+(컴파일러는 오프셋 위치에 00 00 00 00 임시값을 채워 넣음)
+`
+  },
+  {
+    table: [
+      { name: "main", type: "FUNC / GLOBAL", def: "main.o", status: "<span class='badge-strong'>RESOLVED</span>" },
+      { name: "calculate_add", type: "FUNC / GLOBAL", def: "calc.o", status: "<span class='badge-strong'>RESOLVED</span>" },
+      { name: "custom_hook", type: "FUNC / GLOBAL", def: "weak_override.o", status: "<span class='badge-strong'>OVERRIDDEN</span>" },
+      { name: "g_operation_count", type: "OBJECT / GLOBAL", def: "calc.o", status: "<span class='badge-strong'>RESOLVED</span>" }
+    ],
+    insight: `
+      <strong>Step 2: Strong vs Weak 심볼 해석 규칙</strong><br>
+      • <strong>규칙 1</strong>: 복수의 Strong 심볼이 존재하면 링커 에러(multiple definition) 발생.<br>
+      • <strong>규칙 2</strong>: 하나의 Strong 심볼과 여러 Weak 심볼이 있으면 <strong>Strong 심볼이 우선 채택</strong>됨 (weak_override.c의 custom_hook 선택됨).<br>
+      • <strong>규칙 3</strong>: Weak 심볼만 존재하면 임의의 하나를 선택함.
+    `,
+    math: `
+; 심볼 해석 결과:
+1. main.o:calculate_add ➔ calc.o [0x401140]에 바인딩
+2. main.o:custom_hook   ➔ weak_override.o [0x4011e0]에 바인딩!
+   (calc.o 내부의 weak 정의는 무시됨)
+`
+  },
+  {
+    table: [
+      { name: ".text (Merged)", type: "SECTION", def: "0x4010e0 ~ 0x401300", status: "<span class='badge-strong'>MERGED</span>" },
+      { name: ".data (Merged)", type: "SECTION", def: "0x404020 ~ 0x404040", status: "<span class='badge-strong'>MERGED</span>" },
+      { name: ".rodata (Merged)", type: "SECTION", def: "0x402000 ~ 0x402100", status: "<span class='badge-strong'>MERGED</span>" }
+    ],
+    insight: `
+      <strong>Step 3: 섹션 병합과 최종 가상 주소 부여</strong><br>
+      링커는 분산되어 있던 각 오브젝트 파일의 <code>.text</code> 섹션들을 하나로 합치고, <code>.data</code> 섹션들을 하나로 합침. 이 시점에서 각 함수와 변수의 최종 런타임 가상 주소(VMA)가 결정됨.
+    `,
+    math: `
+; 섹션 배치 및 확정된 가상 주소:
+main()            : 0x0000000000401100
+calculate_add()   : 0x0000000000401140
+custom_hook()     : 0x00000000004011e0
+g_operation_count : 0x0000000000404024
+`
+  },
+  {
+    table: [
+      { name: "main ➔ calculate_add", type: "R_X86_64_PC32", def: "Offset 0x401122", status: "<span class='badge-strong'>PATCHED</span>" },
+      { name: "main ➔ custom_hook", type: "R_X86_64_PC32", def: "Offset 0x401138", status: "<span class='badge-strong'>PATCHED</span>" },
+      { name: "main ➔ g_operation_count", type: "R_X86_64_PC32", def: "Offset 0x40114a", status: "<span class='badge-strong'>PATCHED</span>" }
+    ],
+    insight: `
+      <strong>Step 4: 릴로케이션 수식 연산 및 기계어 패치</strong><br>
+      링커는 <code>e8 00 00 00 00</code>으로 비어있던 임시 오프셋 자리에 최종 상대 거리 공식(<code>S + A - P</code>)을 계산하여 실제 바이트를 덮어씀. 이제 CPU는 한 번의 call 명령으로 목표 함수에 정확히 분기할 수 있음.
+    `,
+    math: `
+; [R_X86_64_PC32 연산 공식: S + A - P]
+S (심볼 가상 주소) = 0x401140 (calculate_add)
+A (애드엔드)       = -4
+P (패치 위치 주소) = 0x401121 (call 명령어 오프셋)
+
+Offset = 0x401140 + (-4) - 0x401121 = 0x0000001b (27 바이트)
+
+; 최종 패치된 기계어:
+0x401121:  e8 1b 00 00 00       call 0x401140 &lt;calculate_add&gt;
+`
+  }
+];
+
+function setSymStep(idx) {
+  document.querySelectorAll('.step-tab').forEach((tab, i) => {
+    tab.classList.toggle('active', i === idx);
+  });
+
+  const cur = symSteps[idx];
+  const tbody = document.getElementById('symTableBody');
+  tbody.innerHTML = cur.table.map(r => `
+    <tr>
+      <td style="font-weight:bold; color:var(--text);">${r.name}</td>
+      <td style="color:var(--text-dim);">${r.type}</td>
+      <td style="color:var(--text-dim);">${r.def}</td>
+      <td>${r.status}</td>
+    </tr>
+  `).join('');
+
+  document.getElementById('stepInsight').innerHTML = cur.insight;
+  document.getElementById('relocMathBox').innerHTML = cur.math;
+}
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-theme');
+  updateThemeButton(isLight);
+}
+
+function applyTheme(theme) {
+  const isLight = (theme === 'light' || theme === 'default');
+  document.body.classList.toggle('light-theme', isLight);
+  updateThemeButton(isLight);
+}
+
+function updateThemeButton(isLight) {
+  const icon = document.getElementById('themeIcon');
+  const text = document.getElementById('themeText');
+  if (isLight) {
+    icon.textContent = '🌙';
+    text.textContent = 'Dark Mode';
+  } else {
+    icon.textContent = '☀️';
+    text.textContent = 'Light Mode';
+  }
+}
+
+window.addEventListener('message', function(event) {
+  if (event.data && event.data.type === 'theme-change') {
+    applyTheme(event.data.theme);
+  }
+});
+
+// Default to step 0
+setSymStep(0);
+</script>
+
+</body>
+</html>

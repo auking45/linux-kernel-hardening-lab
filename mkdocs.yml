@@ -109,6 +109,11 @@ nav:
       - Track 3. Memory Exploitation Fundamentals:
           - 04. Shellcode Engineering: principles/04-shellcode-engineering.md
           - 05. Classic Stack BOF & RIP Hijacking: principles/05-stack-bof-rip.md
+      - Track 4. Binary Architecture & Linking:
+          - 06. Compilation & ELF File Format: principles/06-compilation-and-elf.md
+          - 07. Symbols & Relocation Mechanics: principles/07-symbols-and-linking.md
+          - 08. Static Linking & Binary Loading: principles/08-static-linking-and-loading.md
+          - 09. Dynamic Linking & Runtime Loading: principles/09-dynamic-linking-and-loading.md
   - Architecture:
       - Memory & Protection Models: architecture/index.md
   - Attack Scenarios:
