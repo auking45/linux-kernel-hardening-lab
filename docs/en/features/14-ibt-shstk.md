@@ -281,5 +281,5 @@ CONFIG_LKDTM=y
 ## 8. Interactive Architecture Diagram
 
 Inspect the interactive visual simulation of Intel CET state transitions:
-- [Intel CET Architecture Diagram](file:///home/auking45/repos/linux-kernel-hardening-lab/docs/assets/diagrams/ibt-shstk/architecture.html)
+- [Intel CET Architecture Diagram](../../assets/diagrams/ibt-shstk/architecture.html)
 

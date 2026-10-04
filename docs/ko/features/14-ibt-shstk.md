@@ -295,6 +295,6 @@ CONFIG_LKDTM=y
 ## 8. 대화형 아키텍처 다이어그램
 
 본 실습의 4개 시나리오 인터랙티브 시각화 다이어그램은 다음 파일에서 확인할 수 있음:
-- [Intel CET Architecture Diagram](file:///home/auking45/repos/linux-kernel-hardening-lab/docs/assets/diagrams/ibt-shstk/architecture.html)
+- [Intel CET Architecture Diagram](../../assets/diagrams/ibt-shstk/architecture.html)
 - 다크/라이트 모드 지원, IBT CPU 상태 머신 단계별 전이 시뮬레이션, 스택 프레임 vs 섀도 스택 불일치 인터랙션 제공.
 

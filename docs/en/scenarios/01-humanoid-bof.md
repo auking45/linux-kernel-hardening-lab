@@ -236,7 +236,7 @@ This laboratory reproduces the real-world Unitree G1 humanoid robot wireless pro
 
 ### 5.1 Vulnerable Daemon Simulator Implementation (`humanoid_bof_demo.c`)
 
-- Lab Source Code: [`labs/scenarios/01-humanoid-bof/humanoid_bof_demo.c`](file:///home/auking45/repos/linux-kernel-hardening-lab/labs/scenarios/01-humanoid-bof/humanoid_bof_demo.c)
+- **Lab Source Code**: [`humanoid_bof_demo.c`](../../assets/labs/scenarios/01-humanoid-bof/humanoid_bof_demo.c) (Local Raw) | [GitHub Repository :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/scenarios/01-humanoid-bof/humanoid_bof_demo.c)
 - **Memory Layout**: A 500-byte stack buffer (`ssid`) is placed contiguously before the simulated stack canary slot and the event callback function pointer.
 - **Vulnerability Trigger**: Copies a 1,050-byte malicious BLE packet without bounds checking, corrupting adjacent stack slots.
 

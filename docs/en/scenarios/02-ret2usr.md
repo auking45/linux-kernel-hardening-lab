@@ -256,7 +256,7 @@ This lab provides a C simulation (`ret2usr_demo.c`) replicating the socket vulne
 
 ### 5.1 Architecture & Implementation (`ret2usr_demo.c`)
 
-- Code Location: [`labs/scenarios/02-ret2usr/ret2usr_demo.c`](file:///home/auking45/repos/linux-kernel-hardening-lab/labs/scenarios/02-ret2usr/ret2usr_demo.c)
+- **Lab Source Code**: [`ret2usr_demo.c`](../../assets/labs/scenarios/02-ret2usr/ret2usr_demo.c) (Local Raw) | [GitHub Repository :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/scenarios/02-ret2usr/ret2usr_demo.c)
 - **Memory Structure**: The function pointer (`rx_handler`) in `struct mock_packet_sock` is overwritten by the attacker to point to `user_malicious_shellcode`.
 - **MMU Simulation**: Models x86 `CR4.SMEP` and ARM64 `PTE_PXN` bit enforcement to verify whether instruction fetch targets fall within user space (`< TASK_SIZE`).
 

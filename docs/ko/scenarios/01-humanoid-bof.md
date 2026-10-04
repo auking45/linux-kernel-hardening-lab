@@ -247,7 +247,7 @@ Unitree G1 사례와 같은 메모리 오염 기반 RCE는 단일 보안 패치�
 
 ### 5.1 취약 데몬 시뮬레이터 구현 (`humanoid_bof_demo.c`)
 
-- 실습 코드 위치: [`labs/scenarios/01-humanoid-bof/humanoid_bof_demo.c`](file:///home/auking45/repos/linux-kernel-hardening-lab/labs/scenarios/01-humanoid-bof/humanoid_bof_demo.c)
+- **실습 코드**: [`humanoid_bof_demo.c`](../../assets/labs/scenarios/01-humanoid-bof/humanoid_bof_demo.c) (로컬 원본) | [GitHub 소스 코드 저장소 :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/scenarios/01-humanoid-bof/humanoid_bof_demo.c)
 - **메모리 구조**: 500바이트 크기의 스택 버퍼(`ssid`) 뒤에 스택 카나리 및 이벤트 콜백 함수 포인터가 인접 배치됨.
 - **취약점 트리거**: 길이 검증 없이 1,050바이트의 악성 BLE 패킷을 복사하여 스택 슬롯을 파괴함.
 

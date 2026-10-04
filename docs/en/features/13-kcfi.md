@@ -114,13 +114,13 @@ The interactive diagram below illustrates the 4 core phases of indirect call pro
 ## 5. Lab Implementation Details
 
 ### 5.1 Kconfig Configuration Fragments
-- [`configs/features/kcfi.config`](file:///home/auking45/repos/linux-kernel-hardening-lab/configs/features/kcfi.config):
+- [`configs/features/kcfi.config`](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/configs/features/kcfi.config):
   ```kconfig
   CONFIG_CFI_CLANG=y
   CONFIG_CFI_PERMISSIVE=y
   CONFIG_LKDTM=y
   ```
-- [`configs/features/kcfi-disabled.config`](file:///home/auking45/repos/linux-kernel-hardening-lab/configs/features/kcfi-disabled.config):
+- [`configs/features/kcfi-disabled.config`](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/configs/features/kcfi-disabled.config):
   ```kconfig
   # CONFIG_CFI_CLANG is not set
   CONFIG_LKDTM=y

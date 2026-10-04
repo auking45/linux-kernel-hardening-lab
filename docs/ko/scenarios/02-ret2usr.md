@@ -256,7 +256,7 @@ ret2usr 공격은 단일 기술이 아닌 **하드웨어 CPU 확장, 페이지 �
 
 ### 5.1 시뮬레이터 핵심 아키텍처 (`ret2usr_demo.c`)
 
-- 실습 코드 위치: [`labs/scenarios/02-ret2usr/ret2usr_demo.c`](file:///home/auking45/repos/linux-kernel-hardening-lab/labs/scenarios/02-ret2usr/ret2usr_demo.c)
+- **실습 코드**: [`ret2usr_demo.c`](../../assets/labs/scenarios/02-ret2usr/ret2usr_demo.c) (로컬 원본) | [GitHub 소스 코드 저장소 :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/scenarios/02-ret2usr/ret2usr_demo.c)
 - **메모리 구조**: 커널 소켓 구조체(`struct mock_packet_sock`) 내부의 함수 포인터(`rx_handler`)가 공격자에 의해 유저 공간 쉘코드 함수(`user_malicious_shellcode`) 주소로 오염됨.
 - **하드웨어 MMU 시뮬레이션**: x86 `CR4.SMEP` 및 ARM64 `PTE_PXN` 비트를 소프트웨어 MMU 디스패처로 모델링하여 명령어 페치 주소가 유저 가상 주소 영역인지를 검증함.
 

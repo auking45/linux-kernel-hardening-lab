@@ -131,7 +131,7 @@ flowchart LR
 
 아래 링크를 브라우저에서 열어 KPTI의 4가지 동작 시나리오(통합 테이블 취약성, Meltdown 공격 경로, 분리 테이블 방어, CR3 전환 흐름)를 인터랙티브하게 확인할 수 있음:
 
-- [KPTI & Meltdown Mitigation Architecture Diagram](file:///home/auking45/repos/linux-kernel-hardening-lab/docs/assets/diagrams/kpti/architecture.html)
+- [KPTI & Meltdown Mitigation Architecture Diagram](../../assets/diagrams/kpti/architecture.html)
 
 ---
 

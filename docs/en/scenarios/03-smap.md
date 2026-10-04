@@ -252,7 +252,7 @@ This lab models a robot locomotion safety policy corruption scenario ([CVE-2016-
 
 ### 5.1 Architecture & Implementation (`smap_demo.c`)
 
-- Code Location: [`labs/scenarios/03-smap/smap_demo.c`](file:///home/auking45/repos/linux-kernel-hardening-lab/labs/scenarios/03-smap/smap_demo.c)
+- **Lab Source Code**: [`smap_demo.c`](../../assets/labs/scenarios/03-smap/smap_demo.c) (Local Raw) | [GitHub Repository :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/scenarios/03-smap/smap_demo.c)
 - **Memory Structure**: The active safety policy pointer (`g_active_policy`) is redirected to a hostile fake policy (`g_user_fake_policy`) in user space.
 - **MMU Simulation**: Models x86 `CR4.SMAP`, `EFLAGS.AC`, and ARM64 `PSTATE.PAN` to determine whether direct data accesses to user virtual addresses (`< TASK_SIZE`) are permitted in Ring 0.
 

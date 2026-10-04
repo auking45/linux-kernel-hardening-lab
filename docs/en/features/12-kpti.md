@@ -131,7 +131,7 @@ flowchart LR
 
 Open the link below in any modern browser to explore the 4 operational scenarios of KPTI:
 
-- [KPTI & Meltdown Mitigation Architecture Diagram](file:///home/auking45/repos/linux-kernel-hardening-lab/docs/assets/diagrams/kpti/architecture.html)
+- [KPTI & Meltdown Mitigation Architecture Diagram](../../assets/diagrams/kpti/architecture.html)
 
 ---
 

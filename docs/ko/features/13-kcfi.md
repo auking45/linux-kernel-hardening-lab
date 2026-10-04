@@ -114,13 +114,13 @@ Type Hash = Hash(Return_Type, Parameter_Type_List)
 ## 5. 실습 환경 구현 상세
 
 ### 5.1 Kconfig 프래그먼트
-- [`configs/features/kcfi.config`](file:///home/auking45/repos/linux-kernel-hardening-lab/configs/features/kcfi.config):
+- [`configs/features/kcfi.config`](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/configs/features/kcfi.config):
   ```kconfig
   CONFIG_CFI_CLANG=y
   CONFIG_CFI_PERMISSIVE=y
   CONFIG_LKDTM=y
   ```
-- [`configs/features/kcfi-disabled.config`](file:///home/auking45/repos/linux-kernel-hardening-lab/configs/features/kcfi-disabled.config):
+- [`configs/features/kcfi-disabled.config`](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/configs/features/kcfi-disabled.config):
   ```kconfig
   # CONFIG_CFI_CLANG is not set
   CONFIG_LKDTM=y

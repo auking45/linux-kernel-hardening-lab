@@ -252,7 +252,7 @@ themeObserver.observe(document.body, { attributes: true, attributeFilter: ['data
 
 ### 5.1 시뮬레이터 핵심 아키텍처 (`smap_demo.c`)
 
-- 실습 코드 위치: [`labs/scenarios/03-smap/smap_demo.c`](file:///home/auking45/repos/linux-kernel-hardening-lab/labs/scenarios/03-smap/smap_demo.c)
+- **실습 코드**: [`smap_demo.c`](../../assets/labs/scenarios/03-smap/smap_demo.c) (로컬 원본) | [GitHub 소스 코드 저장소 :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/scenarios/03-smap/smap_demo.c)
 - **메모리 구조**: 커널 모션 정책 포인터(`g_active_policy`)가 UAF 결함으로 인해 유저 공간의 위조 정책 객체(`g_user_fake_policy`) 주소로 오염됨.
 - **하드웨어 MMU 시뮬레이션**: x86 `CR4.SMAP`, `EFLAGS.AC`, ARM64 `PSTATE.PAN` 비트를 모델링하여 Ring 0 상태에서 유저 주소(`< TASK_SIZE`) 직접 데이터 접근 시도를 판정함.
 
