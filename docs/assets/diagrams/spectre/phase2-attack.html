@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 06 - Phase 2: Spectre v1 Bounds Bypass & Flush+Reload Side-Channel Leak</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-red);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+    }
+
+    .controls { display: flex; gap: 6px; align-items: center; }
+    .btn {
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(239, 68, 68, 0.25); border-color: var(--accent-red); }
+    .btn.primary { background: var(--accent-red); color: #ffffff; }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-viewport {
+      width: 100%;
+      height: 250px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: rgba(11, 19, 43, 0.4);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .svg-canvas { width: 100%; height: 100%; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+    }
+
+    .metric-title { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
+    .metric-val { font-size: 0.85rem; font-weight: 700; color: var(--accent-red); }
+
+    .status-ok { color: var(--accent-green) !important; }
+    .status-alert { color: var(--accent-red) !important; }
+
+    @keyframes leak-pulse {
+      0% { stroke: #ef4444; stroke-width: 2; }
+      50% { stroke: #ef4444; stroke-width: 4; filter: drop-shadow(0 0 8px #ef4444); }
+      100% { stroke: #ef4444; stroke-width: 2; }
+    }
+    .pulse-leak { animation: leak-pulse 1.3s infinite; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="phase-badge">Phase 2: 분기 예측 오작동 &amp; Flush+Reload 캐시 부채널 유출</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);" id="stepIndicator">단계 1 / 4</span>
+      </div>
+      <div class="controls">
+        <button class="btn" onclick="prevStep()">◀ 이전</button>
+        <button class="btn" onclick="nextStep()">다음 ▶</button>
+        <button class="btn primary" id="playBtn" onclick="togglePlay()">자동 재생</button>
+        <button class="btn" onclick="resetSim()">초기화</button>
+        <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="descBar">
+      <span id="descIcon">⚠️</span>
+      <span id="descText">공격자가 BPU를 훈련시킨 후 경계를 초과하는 인덱스를 주입하여 예측 실행 창에서 기밀 주소를 일시적으로 읽어 들임.</span>
+    </div>
+
+    <div class="diagram-viewport">
+      <svg class="svg-canvas" viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-red" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#ef4444" />
+          </marker>
+        </defs>
+
+        <!-- BPU Misprediction Engine -->
+        <g id="boxCpu">
+          <rect x="25" y="25" width="220" height="180" rx="6" fill="#1c2541" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="35" y="48" font-size="11" font-weight="700" fill="#ef4444">BPU Speculative Window</text>
+          <text x="35" y="66" font-size="9" fill="#94a3b8">CVE-2017-5753 Bounds Bypass</text>
+          <line x1="25" y1="75" x2="245" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="35" y="85" width="200" height="48" rx="4" fill="rgba(239,68,68,0.15)" stroke="#ef4444"/>
+          <text x="43" y="103" font-size="9" font-family="monospace" fill="#ef4444">if (x &lt; 16) [PREDICT: TRUE]</text>
+          <text x="43" y="120" font-size="9" font-family="monospace" fill="#f8fafc">  probe[secret_byte * 512];</text>
+          <text x="35" y="156" font-size="9" fill="#ef4444">OOB Target Index: x = +84B</text>
+          <text x="35" y="180" font-size="9" font-weight="700" fill="#ef4444">MISPREDICTION ACTIVE</text>
+        </g>
+
+        <!-- Secret Enclave Breach Vector -->
+        <path id="leakVector" d="M 245 110 L 280 110" stroke="#ef4444" stroke-width="3" marker-end="url(#arrow-red)" class="pulse-leak"/>
+
+        <!-- Enclave Memory -->
+        <g id="boxMemory">
+          <rect x="280" y="25" width="230" height="180" rx="6" fill="#1c2541" stroke="#ef4444" stroke-width="1.5"/>
+          <text x="290" y="48" font-size="11" font-weight="700" fill="#ef4444">Enclave Secret Accessed</text>
+          <text x="290" y="66" font-size="9" fill="#94a3b8">Transient Read via Speculation</text>
+          <line x1="280" y1="75" x2="510" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="290" y="85" width="210" height="42" rx="4" fill="rgba(239,68,68,0.15)" stroke="#ef4444"/>
+          <text x="298" y="101" font-size="8.5" fill="#ef4444">Target: NAV_SEC_8F3A</text>
+          <text x="298" y="116" font-size="8.5" font-weight="700" fill="#ef4444">Secret Byte Read: 'N' (0x4E)</text>
+          <rect x="290" y="136" width="210" height="42" rx="4" fill="rgba(255,255,255,0.03)" stroke="#3a506b"/>
+          <text x="298" y="152" font-size="8.5" fill="#94a3b8">Architectural State: Squashed</text>
+          <text x="298" y="167" font-size="8.5" fill="#ef4444">Cache Side-Effect: REMAINED!</text>
+        </g>
+
+        <!-- Cache Side-Channel Measurement (Flush+Reload) -->
+        <g id="boxCache">
+          <rect x="545" y="25" width="230" height="180" rx="6" fill="#1c2541" stroke="#ef4444" stroke-width="1.8"/>
+          <text x="555" y="48" font-size="11" font-weight="700" fill="#ef4444">Flush+Reload Side-Channel</text>
+          <text x="555" y="66" font-size="9" fill="#94a3b8">rdtsc Timing Differential</text>
+          <line x1="545" y1="75" x2="775" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="555" y="85" width="210" height="48" rx="4" fill="rgba(239,68,68,0.2)" stroke="#ef4444"/>
+          <text x="563" y="103" font-size="9" font-weight="700" fill="#ef4444">Line #0x4E ('N'): 42 Cycles!</text>
+          <text x="563" y="120" font-size="8.5" fill="#f8fafc">Other Lines: 240+ Cycles (DRAM)</text>
+          <rect x="555" y="142" width="210" height="38" rx="4" fill="#ef4444"/>
+          <text x="565" y="159" font-size="9" font-weight="700" fill="#ffffff">💥 TOKEN RECOVERED: NAV_SEC...</text>
+          <text x="565" y="173" font-size="8" fill="#ffffff">GEOFENCE INTEGRITY COMPROMISED</text>
+        </g>
+
+        <path d="M 510 110 L 545 110" stroke="#ef4444" stroke-width="2" marker-end="url(#arrow-red)"/>
+      </svg>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-item">
+        <div class="metric-title">분기 예측 상태</div>
+        <div class="metric-val status-alert">MISPREDICT (Bypass)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">캐시 적재 측정치</div>
+        <div class="metric-val status-alert">42 Cycles (L1 Hit)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">기밀 탈취율</div>
+        <div class="metric-val status-alert">100% EXFILTRATED</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">사이버-물리 위협</div>
+        <div class="metric-val status-alert">지오펜스 무단 해제</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+    let isPlaying = false;
+    let playTimer = null;
+
+    const stepData = [
+      {
+        step: 1,
+        desc: "공격자가 BPU를 훈련시킨 후 경계를 초과하는 인덱스를 주입하여 예측 실행 창에서 기밀 주소를 일시적으로 읽어 들임.",
+        action: () => {}
+      },
+      {
+        step: 2,
+        desc: "CPU 연산 유닛이 뒤늦게 경계 초과를 감지하여 레지스터 상태를 롤백하지만, probe_array의 L1 캐시 적재 흔적은 지워지지 않음.",
+        action: () => {}
+      },
+      {
+        step: 3,
+        desc: "공격자가 rdtsc 명령어로 256개 캐시 라인을 전수 측정: 'N' (0x4E)에 해당하는 42사이클 L1 캐시 히트 신호 포착!",
+        action: () => {}
+      },
+      {
+        step: 4,
+        desc: "지오펜스 인증 토큰(NAV_SEC_8F3A)이 100% 복원되어 안전 경계가 해제되고 로봇이 위험 구역으로 자율 주행 폭주함.",
+        action: () => {}
+      }
+    ];
+
+    function renderStep(idx) {
+      currentStep = idx;
+      const data = stepData[idx - 1];
+      document.getElementById('stepIndicator').textContent = `단계 ${data.step} / ${totalSteps}`;
+      document.getElementById('descText').textContent = data.desc;
+      data.action();
+      reportHeight();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) renderStep(currentStep + 1);
+      else renderStep(1);
+    }
+
+    function prevStep() {
+      if (currentStep > 1) renderStep(currentStep - 1);
+      else renderStep(totalSteps);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.style.background = "#e2e8f0";
+        btn.style.color = "#0f172a";
+        playLoop();
+      } else {
+        btn.textContent = "자동 재생";
+        btn.style.background = "var(--accent-red)";
+        btn.style.color = "#ffffff";
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      nextStep();
+      playTimer = setTimeout(playLoop, 2600);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+      playTimer = setTimeout(playLoop, 2000);
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>

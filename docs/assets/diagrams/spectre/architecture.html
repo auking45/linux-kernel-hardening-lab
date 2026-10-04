@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 06: Speculative Side-Channel Leaks (Spectre & array_index_nospec) Architecture Flow</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --accent-yellow: #f59e0b;
+      --glow-blue: rgba(56, 189, 248, 0.4);
+      --glow-red: rgba(239, 68, 68, 0.5);
+      --glow-green: rgba(34, 197, 94, 0.4);
+      --glow-yellow: rgba(245, 158, 11, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-purple: #9333ea;
+      --accent-yellow: #d97706;
+      --glow-blue: rgba(2, 132, 199, 0.2);
+      --glow-red: rgba(220, 38, 38, 0.2);
+      --glow-green: rgba(22, 163, 74, 0.2);
+      --glow-yellow: rgba(217, 119, 6, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      padding: 24px 16px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-cve {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(239, 68, 68, 0.15);
+      color: var(--accent-red);
+      border: 1px solid var(--accent-red);
+      font-weight: 700;
+    }
+
+    .badge-sub {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background-color: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .theme-toggle {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-weight: 500;
+      font-size: 0.85rem;
+      transition: all 0.2s;
+    }
+
+    .theme-toggle:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .sim-toolbar {
+      position: sticky;
+      top: 10px;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      margin-bottom: 24px;
+      gap: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      backdrop-filter: blur(8px);
+    }
+
+    .sim-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .sim-btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .sim-btn:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+    }
+
+    .sim-btn.primary {
+      background: var(--accent-blue);
+      color: #0b132b;
+      border-color: var(--accent-blue);
+    }
+
+    [data-theme="light"] .sim-btn.primary {
+      color: #ffffff;
+    }
+
+    .sim-status {
+      font-size: 0.85rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.85); }
+    }
+
+    .timeline-flow {
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+      position: relative;
+    }
+
+    .timeline-flow::before {
+      content: '';
+      position: absolute;
+      top: 40px;
+      bottom: 40px;
+      left: 28px;
+      width: 3px;
+      background: linear-gradient(180deg, var(--accent-blue) 0%, var(--accent-red) 35%, var(--accent-yellow) 65%, var(--accent-green) 100%);
+      border-radius: 2px;
+    }
+
+    .phase-card {
+      position: relative;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 20px;
+      margin-left: 60px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+
+    .phase-card:hover {
+      border-color: var(--accent-blue);
+    }
+
+    .phase-node {
+      position: absolute;
+      left: -60px;
+      top: 20px;
+      width: 58px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .node-circle {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--card-bg);
+      border: 3px solid var(--card-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      z-index: 2;
+      transition: all 0.3s;
+    }
+
+    .active-p1 .node-circle { border-color: var(--accent-blue); box-shadow: 0 0 12px var(--glow-blue); }
+    .active-p2 .node-circle { border-color: var(--accent-red); box-shadow: 0 0 12px var(--glow-red); }
+    .active-p3 .node-circle { border-color: var(--accent-yellow); box-shadow: 0 0 12px var(--glow-yellow); }
+    .active-p4 .node-circle { border-color: var(--accent-green); box-shadow: 0 0 12px var(--glow-green); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-badge {
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-p1 { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); border: 1px solid var(--accent-blue); }
+    .badge-p2 { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid var(--accent-red); }
+    .badge-p3 { background: rgba(245, 158, 11, 0.15); color: var(--accent-yellow); border: 1px solid var(--accent-yellow); }
+    .badge-p4 { background: rgba(34, 197, 94, 0.15); color: var(--accent-green); border: 1px solid var(--accent-green); }
+
+    .card-desc {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .grid-2col { grid-template-columns: 1fr; }
+    }
+
+    .sub-box {
+      background: rgba(11, 19, 43, 0.5);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 12px;
+    }
+
+    [data-theme="light"] .sub-box {
+      background: #f8fafc;
+    }
+
+    .sub-box-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .code-box {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.78rem;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 8px 10px;
+      border-radius: 4px;
+      color: #e2e8f0;
+      line-height: 1.4;
+      border-left: 3px solid var(--accent-blue);
+      overflow-x: auto;
+    }
+
+    [data-theme="light"] .code-box {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .deep-dive-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 32px;
+      padding-top: 24px;
+      border-top: 1px solid var(--card-border);
+    }
+
+    .dive-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .dive-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dive-content {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title-group">
+        <h1><span>⚡</span> Scenario 06: 예측 실행 부채널 유출(Spectre) 및 방어 아키텍처</h1>
+        <span class="badge-cve">CVE-2017-5753 / CVE-2017-5715</span>
+        <span class="badge-sub">array_index_nospec &amp; Retpoline</span>
+      </div>
+      <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()">☀️ 라이트 모드</button>
+    </header>
+
+    <!-- Simulation Toolbar -->
+    <div class="sim-toolbar">
+      <div class="sim-controls">
+        <button class="sim-btn" onclick="goToPhase(1)">Phase 1: 정상 메모리 접근</button>
+        <button class="sim-btn" onclick="goToPhase(2)">Phase 2: Spectre v1 유출</button>
+        <button class="sim-btn" onclick="goToPhase(3)">Phase 3: nospec 마스크 차단</button>
+        <button class="sim-btn" onclick="goToPhase(4)">Phase 4: 세이프 홀드 대응</button>
+        <button class="sim-btn primary" id="playBtn" onclick="togglePlay()">전체 재생</button>
+        <button class="sim-btn" onclick="resetSim()">초기화</button>
+      </div>
+      <div class="sim-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">System: Ready</span>
+      </div>
+    </div>
+
+    <!-- Timeline Flow -->
+    <div class="timeline-flow">
+
+      <!-- Phase 1 Card -->
+      <div class="phase-card active-p1" id="cardPhase1">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-blue);">1</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-blue);">
+            <span>📦</span> Phase 1: 정상 메모리 접근 및 합법적 예측 실행 (Nominal Flow)
+          </div>
+          <span class="card-badge badge-p1">Baseline Normal</span>
+        </div>
+        <div class="card-desc">
+          비전 AI 모듈이 커널 텔레메트리 배열 내 정상 인덱스(<code>idx &lt; 16</code>)를 요청할 때,
+          CPU 분기 예측기(BPU)는 정상적으로 분기 참(Taken)을 예측하고 파이프라인을 확정(Retire)함.
+          캐시에는 합법적 공개 데이터만 적재되며 기밀 영역에 대한 일체 부채널 신호가 발생하지 않음.
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚙️</span> 정상 경계 조건 검사</div>
+            <div class="code-box">
+if (x < array1_size) {
+    y = probe_array[array1[x] * 512];
+}
+// 정규 인덱스(x=5) -> 경계 통과 -> 안전 적재</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🤖</span> 로봇 임무 보안 엔클레이브</div>
+            <div class="code-box">
+geofence_id = "ZONE_RESTRICTED_HUMANOID"
+secret_token = "NAV_SEC_8F3A"
+Status: Fully Isolated (Zero Side-Channel)</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 2 Card -->
+      <div class="phase-card" id="cardPhase2">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-red);">2</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-red);">
+            <span>💥</span> Phase 2: 분기 예측 오작동 &amp; Flush+Reload 캐시 부채널 유출 (Attack Detonation)
+          </div>
+          <span class="card-badge badge-p2">Vulnerable (nospec=n)</span>
+        </div>
+        <div class="card-desc">
+          공격자가 BPU를 유효 훈련 후 경계 초과 인덱스(OOB)를 주입하면, CPU는 조건이 계산되는 동안 일시적으로 예측 참(True)으로 판단하여
+          기밀 엔클레이브 데이터(<code>NAV_SEC_8F3A</code>)를 선행 로드함. 조건 불일치로 롤백되더라도 프로브 배열의 L1 캐시 흔적은 남아 
+          Flush+Reload 타이밍 측정(42사이클 L1 Hit)을 통해 기밀이 100% 탈취되고 안전 지오펜스가 무단 해제됨!
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚠️</span> Spectre Variant 1 취약점</div>
+            <div class="code-box">
+// 훈련된 BPU가 OOB 예측 실행 감행:
+transient_byte = secret_enclave[offset];
+probe_array[transient_byte * 512]; // 캐시 오염!
+// rdtsc 측정: Line #0x4E ('N') = 42 사이클!</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔴</span> 사이버-물리 파괴 전이: 지오펜스 해제</div>
+            <div class="code-box">
+Recovered Secret: "NAV_SEC_8F3A" (100% 유출)
+Geofence Interlock: Disarmed by Attacker!
+Trajectory: Autonomous run into hazard zone!</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 3 Card -->
+      <div class="phase-card" id="cardPhase3">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-yellow);">3</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-yellow);">
+            <span>🛡️</span> Phase 3: array_index_nospec 산술 마스킹 &amp; Retpoline 차단 (Hardened Trap)
+          </div>
+          <span class="card-badge badge-p3">Hardened (nospec=y, Retpoline)</span>
+        </div>
+        <div class="card-desc">
+          <code>array_index_nospec()</code> 매크로는 분기 명령어 없이 산술 마스크(<code>sbb</code> 연산)를 통해
+          경계 초과 인덱스를 0으로 강제 클램핑함. 예측 실행 상태에서도 CPU는 공개 0번 인덱스만 접근하여 기밀 캐시 적재를 원천 봉쇄함.
+          <code>CONFIG_RETPOLINE=y</code>는 Spectre v2 간접 분기 주입 공격을 포즈 루프 트램펄린으로 원천 차단함.
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔐</span> array_index_nospec 마스킹 원리</div>
+            <div class="code-box">
+unsigned long mask = array_index_mask_nospec(idx, sz);
+idx = idx & mask; // 초과 시 mask=0 -> idx=0 클램핑
+// 예측 실행 중에도 OOB 캐시 터치 0% 원천 방지!</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🛑</span> Retpoline 트램펄린 보호</div>
+            <div class="code-box">
+// 간접 점프(*%rax)를 call/ret 루프로 대체:
+call .Lretpoline_target
+.Lpause_loop: pause; jmp .Lpause_loop
+// BPU 추측 엔진을 포즈 루프에 가두어 탈취 방지</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 4 Card -->
+      <div class="phase-card" id="cardPhase4">
+        <div class="phase-node">
+          <div class="node-circle" style="color:var(--accent-green);">4</div>
+        </div>
+        <div class="card-header">
+          <div class="card-title" style="color:var(--accent-green);">
+            <span>🛑</span> Phase 4: 부채널 탐지 격리 및 안전 홀드 자율 대응 (Deterministic Safe State)
+          </div>
+          <span class="card-badge badge-p4">Safe State</span>
+        </div>
+        <div class="card-desc">
+          비정상적인 고주파수 <code>clflush</code> 프로빙 패턴이 감시 워치독에 포착되는 즉시, 보안 엔클레이브가 기밀 키를 소거(Zeroize) 및 동결함.
+          로봇 자율 주행 제어기가 즉각 'Safe Hold Mode'로 전이하여 경로 주행을 중단하고 지정된 안전 복도 내에 안전 정지 상태를 유지함.
+        </div>
+        <div class="grid-2col">
+          <div class="sub-box">
+            <div class="sub-box-title"><span>⚡</span> 기밀 토큰 즉각 소거 (Key Zeroize)</div>
+            <div class="code-box">
+Timing Anomaly Flagged by PMU Monitor
+Active Secret Tokens: Revoked & Cleared
+Geofence Interlock: Tamper-Proof Locked</div>
+          </div>
+          <div class="sub-box">
+            <div class="sub-box-title"><span>🔒</span> 자율 주행 안전 정지 (Safe Hold)</div>
+            <div class="code-box">
+Trajectory Planning: Suspended
+Locomotion: Deterministic Safe Halt
+Physical Boundary: 100% Secured (0 J Damage)</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Deep Dive Architecture Grid -->
+    <div class="deep-dive-grid">
+      <div class="dive-card">
+        <div class="dive-title"><span>🧮</span> array_index_nospec 수학적 마스킹</div>
+        <div class="dive-content">
+          x86-64 어셈블리 <code>cmp %size, %idx; sbb %mask, %mask</code>는 인덱스가 크기보다 작을 때 캐리 플래그를 발생시켜 <code>mask = 0</code>을 만들고, 인덱스가 크거나 같으면 <code>mask = ~0UL</code>을 만듦. 조건부 점프(Jcc)가 전혀 없으므로 BPU가 분기 예측을 수행할 수 없어 투기적 우회가 물리적으로 불가능함.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>🧱</span> Retpoline vs IBRS/IBPB 하드웨어 완화책</div>
+        <div class="dive-content">
+          <strong>Retpoline</strong>은 구형/중간 세대 CPU에서 마이크로코드 업데이트 없이 소프트웨어 컴파일러 수준으로 간접 분기 예측을 무력화함. 최신 프로세서에서는 <strong>eIBRS (Enhanced IBRS)</strong> 및 <strong>IBPB (Indirect Branch Prediction Barrier)</strong> 하드웨어 플래그를 통해 커널-유저 간 예측 상태를 격리함.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>⏱️</span> Flush+Reload vs Prime+Probe 부채널 기법</div>
+        <div class="dive-content">
+          <strong>Flush+Reload</strong>는 공유 메모리 페이지(공유 라이브러리)의 캐시 라인을 <code>clflush</code>로 비운 뒤 상대방이 접근했는지 재적재 시간(rdtsc)을 측정함. 공유 메모리가 없는 경우 공격자는 자신의 캐시 세트를 채운 뒤 퇴출 여부를 관찰하는 <strong>Prime+Probe</strong>를 사용함.
+        </div>
+      </div>
+      <div class="dive-card">
+        <div class="dive-title"><span>🛡️</span> Defense-in-Depth 부채널 방어 계층</div>
+        <div class="dive-content">
+          1단계 <code>array_index_nospec</code>(경계 검사 우회 방어) + 2단계 <code>CONFIG_RETPOLINE</code> & <code>IBRS</code>(분기 대상 주입 방어) + 3단계 <code>KPTI</code>(멜트다운 및 커널 페이지 격리) + 4단계 <code>CONFIG_SPEC_STORE_BYPASS_DISABLE</code>(Speculative Store Bypass 방어)로 마이크로아키텍처 누출을 완벽 통제함.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentPhase = 1;
+    let isPlaying = false;
+    let playTimer = null;
+
+    function reportHeight() {
+      const h = Math.ceil(document.body.scrollHeight + 20);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+      reportHeight();
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크 모드' : '☀️ 라이트 모드';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    function goToPhase(phase) {
+      currentPhase = phase;
+      for (let i = 1; i <= 4; i++) {
+        const card = document.getElementById(`cardPhase${i}`);
+        card.classList.remove(`active-p${i}`);
+        card.style.opacity = '0.5';
+        card.style.transform = 'scale(0.99)';
+      }
+      const activeCard = document.getElementById(`cardPhase${phase}`);
+      activeCard.classList.add(`active-p${phase}`);
+      activeCard.style.opacity = '1';
+      activeCard.style.transform = 'scale(1)';
+
+      const statusDot = document.getElementById('statusDot');
+      const statusText = document.getElementById('statusText');
+
+      if (phase === 1) {
+        statusDot.style.background = 'var(--accent-blue)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-blue)';
+        statusText.textContent = "Phase 1: Normal In-Bounds Memory Access & Clean Retirement";
+      } else if (phase === 2) {
+        statusDot.style.background = 'var(--accent-red)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-red)';
+        statusText.textContent = "Phase 2: Spectre v1 Bounds Bypass & Flush+Reload Leak";
+      } else if (phase === 3) {
+        statusDot.style.background = 'var(--accent-yellow)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-yellow)';
+        statusText.textContent = "Phase 3: array_index_nospec Arithmetic Mask & Retpoline Trap";
+      } else if (phase === 4) {
+        statusDot.style.background = 'var(--accent-green)';
+        statusDot.style.boxShadow = '0 0 8px var(--accent-green)';
+        statusText.textContent = "Phase 4: Side-Channel Probing Quarantined & Safe Mission Hold";
+      }
+
+      reportHeight();
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.classList.remove('primary');
+        playLoop();
+      } else {
+        btn.textContent = "전체 재생";
+        btn.classList.add('primary');
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      currentPhase = (currentPhase % 4) + 1;
+      goToPhase(currentPhase);
+      playTimer = setTimeout(playLoop, 3200);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      goToPhase(1);
+    }
+
+    window.addEventListener('load', () => {
+      goToPhase(1);
+      reportHeight();
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>

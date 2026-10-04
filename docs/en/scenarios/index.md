@@ -24,7 +24,7 @@ While the `Features` tab acts as an encyclopedic specification of 44 hardening f
 | **03** | **[User Data Access (ret2dir / SMAP)](03-smap.md)** | **CVE-2016-8655** (Packet Socket UAF ➔ User Data Tampering) | **SMAP** (x86) & **PAN** (ARM64) | <span style="color: #22c55e; font-weight: bold;">Active</span> |
 | **04** | **[Heap UAF & SLAB Corruption](04-heap-slab.md)** | **CVE-2022-0185** (fs_context Heap BOF ➔ `struct cred` Overwrite) | **SLAB Freelist Hardening** & **KFENCE** | <span style="color: #22c55e; font-weight: bold;">Active</span> |
 | **05** | **[Control Flow Hijacking (CFI)](05-kcfi.md)** | **CVE-2021-4154** (Type Confusion ➔ Indirect Function Pointer Hijack) | **Clang kCFI** & **ARM64 PAC/BTI** | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **06** | **Side-Channel & Speculative Leaks** | **CVE-2018-3646** / **Spectre v1/v2** (AI Vision Accelerator vs CPU Leaks) | **array_index_nospec** & **Retpoline/KPTI** | Planned |
+| **06** | **[Side-Channel & Speculative Leaks](06-spectre.md)** | **CVE-2018-3646** / **Spectre v1/v2** (AI Vision Accelerator vs CPU Leaks) | **array_index_nospec** & **Retpoline/KPTI** | <span style="color: #22c55e; font-weight: bold;">Active</span> |
 
 ---
 

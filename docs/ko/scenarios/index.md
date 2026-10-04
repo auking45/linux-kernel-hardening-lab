@@ -28,7 +28,7 @@
 | **03** | **[유저 데이터 오염 (ret2dir / SMAP)](03-smap.md)** | **CVE-2016-8655** (UAF ➔ 커널 모드 유저 메모리 데이터 변조) | **SMAP** (x86) & **PAN** (ARM64) | <span style="color: #22c55e; font-weight: bold;">완료</span> |
 | **04** | **[힙 UAF & 슬랩 메모리 오염](04-heap-slab.md)** | **CVE-2022-0185** (fs_context Heap BOF ➔ `struct cred` 덮어쓰기) | **SLAB Freelist Hardening** & **KFENCE** | <span style="color: #22c55e; font-weight: bold;">완료</span> |
 | **05** | **[제어 흐름 하이재킹 (CFI)](05-kcfi.md)** | **CVE-2021-4154** (Type Confusion ➔ 간접 함수 포인터 조작) | **Clang kCFI** & **ARM64 PAC/BTI** | <span style="color: #22c55e; font-weight: bold;">완료</span> |
-| **06** | **부채널/예측 실행 정보 유출** | **CVE-2018-3646** / **Spectre v1/v2** (비전 AI 가속기와 CPU 간 누출) | **array_index_nospec** & **Retpoline/KPTI** | 준비 중 |
+| **06** | **[부채널/예측 실행 정보 유출](06-spectre.md)** | **CVE-2018-3646** / **Spectre v1/v2** (비전 AI 가속기와 CPU 간 누출) | **array_index_nospec** & **Retpoline/KPTI** | <span style="color: #22c55e; font-weight: bold;">완료</span> |
 
 ---
 

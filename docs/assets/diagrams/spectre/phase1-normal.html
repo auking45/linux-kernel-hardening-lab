@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scenario 06 - Phase 1: Normal Memory Access & Clean Speculative Execution</title>
+  <style>
+    :root {
+      --bg-color: #0b132b;
+      --card-bg: #1c2541;
+      --card-border: #3a506b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #f59e0b;
+      --accent-purple: #a855f7;
+    }
+
+    [data-theme="light"] {
+      --bg-color: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --accent-blue: #0284c7;
+      --accent-green: #16a34a;
+      --accent-red: #dc2626;
+      --accent-yellow: #d97706;
+      --accent-purple: #9333ea;
+    }
+
+    [data-theme="light"] .step-desc-bar {
+      background: #f8fafc;
+      color: #0f172a;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .metric-item {
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+
+    [data-theme="light"] .svg-canvas rect {
+      fill: #ffffff !important;
+    }
+
+    [data-theme="light"] .svg-canvas text[fill="#94a3b8"] {
+      fill: #64748b !important;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    html, body { background: transparent; color: var(--text-main); overflow: hidden; padding: 4px; }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--accent-blue);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 0 4px 10px rgba(56, 189, 248, 0.15);
+    }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--card-border);
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .phase-badge {
+      font-size: 0.75rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid var(--accent-blue);
+    }
+
+    .controls { display: flex; gap: 6px; align-items: center; }
+    .btn {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+    .btn:hover { background: rgba(56, 189, 248, 0.25); border-color: var(--accent-blue); }
+    .btn.primary { background: var(--accent-blue); color: #0b132b; }
+
+    .step-desc-bar {
+      background: rgba(11, 19, 43, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      margin-bottom: 10px;
+      font-size: 0.82rem;
+      line-height: 1.4;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .diagram-viewport {
+      width: 100%;
+      height: 250px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: rgba(11, 19, 43, 0.4);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .svg-canvas { width: 100%; height: 100%; }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .metric-item {
+      background: rgba(11, 19, 43, 0.8);
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      text-align: center;
+    }
+
+    .metric-title { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; margin-bottom: 2px; }
+    .metric-val { font-size: 0.85rem; font-weight: 700; color: var(--accent-blue); }
+
+    .status-ok { color: var(--accent-green) !important; }
+    .status-alert { color: var(--accent-red) !important; }
+
+    @keyframes pulse-node {
+      0% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-blue)); }
+      50% { transform: scale(1.02); filter: drop-shadow(0 0 8px var(--accent-blue)); }
+      100% { transform: scale(1); filter: drop-shadow(0 0 2px var(--accent-blue)); }
+    }
+    .pulse { animation: pulse-node 1.6s infinite ease-in-out; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="toolbar">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="phase-badge">Phase 1: 정상 메모리 접근 및 합법적 예측 실행</span>
+        <span style="font-size:0.75rem; color:var(--text-muted);" id="stepIndicator">단계 1 / 4</span>
+      </div>
+      <div class="controls">
+        <button class="btn" onclick="prevStep()">◀ 이전</button>
+        <button class="btn" onclick="nextStep()">다음 ▶</button>
+        <button class="btn primary" id="playBtn" onclick="togglePlay()">자동 재생</button>
+        <button class="btn" onclick="resetSim()">초기화</button>
+        <button class="btn" id="themeBtn" onclick="toggleTheme()">☀️ 라이트</button>
+      </div>
+    </div>
+
+    <div class="step-desc-bar" id="descBar">
+      <span id="descIcon">ℹ️</span>
+      <span id="descText">로봇 비전 AI 프로세스가 커널 공개 텔레메트리 배열(idx=5)을 정상 요청함. CPU 분기 예측기가 합법적 경로를 예측함.</span>
+    </div>
+
+    <div class="diagram-viewport">
+      <svg class="svg-canvas" viewBox="0 0 800 240" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrow-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#38bdf8" />
+          </marker>
+          <marker id="arrow-green" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#22c55e" />
+          </marker>
+        </defs>
+
+        <!-- CPU Pipeline & BPU Box -->
+        <g id="boxCpu">
+          <rect x="25" y="25" width="220" height="180" rx="6" fill="#1c2541" stroke="#38bdf8" stroke-width="1.5"/>
+          <text x="35" y="48" font-size="11" font-weight="700" fill="#38bdf8">CPU Core &amp; Branch Predictor</text>
+          <text x="35" y="66" font-size="9" fill="#94a3b8">BPU: Direction History (TAKEN)</text>
+          <line x1="25" y1="75" x2="245" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="35" y="85" width="200" height="48" rx="4" fill="rgba(56,189,248,0.1)" stroke="#38bdf8"/>
+          <text x="43" y="103" font-size="9" font-family="monospace" fill="#38bdf8">if (x &lt; array_size) {</text>
+          <text x="43" y="120" font-size="9" font-family="monospace" fill="#f8fafc">  y = probe[array[x]];</text>
+          <text x="35" y="156" font-size="9" fill="#94a3b8">Index: x = 5 (In-bounds &lt; 16)</text>
+          <text x="35" y="180" font-size="9" font-weight="600" fill="#22c55e" id="cpuState">PREDICTION: TAKEN (CORRECT)</text>
+        </g>
+
+        <!-- Array Memory & Enclave -->
+        <g id="boxMemory">
+          <rect x="280" y="25" width="230" height="180" rx="6" fill="#1c2541" stroke="#3a506b" stroke-width="1.2" id="memRect"/>
+          <text x="290" y="48" font-size="11" font-weight="700" fill="#94a3b8" id="memTitle">Kernel Array &amp; Enclave</text>
+          <text x="290" y="66" font-size="9" fill="#94a3b8">Boundary: size = 16 Bytes</text>
+          <line x1="280" y1="75" x2="510" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="290" y="85" width="210" height="42" rx="4" fill="rgba(34,197,94,0.1)" stroke="#22c55e"/>
+          <text x="298" y="101" font-size="8.5" fill="#22c55e">Public Array [0..15]: In-Bounds</text>
+          <text x="298" y="116" font-size="8.5" fill="#f8fafc">Value read at idx 5: 60</text>
+          <rect x="290" y="136" width="210" height="42" rx="4" fill="rgba(255,255,255,0.03)" stroke="#3a506b"/>
+          <text x="298" y="152" font-size="8.5" fill="#94a3b8">Enclave Secret: NAV_SEC_8F3A</text>
+          <text x="298" y="167" font-size="8.5" fill="#22c55e">Isolation State: UNTOUCHED</text>
+        </g>
+
+        <!-- CPU Cache State (L1/L2) -->
+        <g id="boxCache" class="pulse">
+          <rect x="545" y="25" width="230" height="180" rx="6" fill="#1c2541" stroke="#22c55e" stroke-width="1.5" id="cacheRect"/>
+          <text x="555" y="48" font-size="11" font-weight="700" fill="#22c55e">Microarchitectural Cache</text>
+          <text x="555" y="66" font-size="9" fill="#94a3b8">Probe Array Lines (512B Stride)</text>
+          <line x1="545" y1="75" x2="775" y2="75" stroke="#3a506b" stroke-width="1"/>
+          <rect x="555" y="85" width="210" height="45" rx="4" fill="rgba(34,197,94,0.1)" stroke="#22c55e"/>
+          <text x="563" y="103" font-size="9" fill="#22c55e">Cache Line #60: WARM (Hit)</text>
+          <text x="563" y="120" font-size="8.5" fill="#94a3b8">Access Latency: ~40 cycles</text>
+          <text x="555" y="156" font-size="9" fill="#f8fafc">Secret Line Footprint: 0</text>
+          <text x="555" y="180" font-size="9" font-weight="700" fill="#22c55e">NO SIDE-CHANNEL LEAK</text>
+        </g>
+
+        <!-- Arrows -->
+        <path d="M 245 110 L 280 110" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow-blue)"/>
+        <path d="M 510 110 L 545 110" stroke="#22c55e" stroke-width="2" marker-end="url(#arrow-green)"/>
+      </svg>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-item">
+        <div class="metric-title">메모리 접근 유형</div>
+        <div class="metric-val status-ok">IN-BOUNDS (idx=5)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">BPU 분기 예측</div>
+        <div class="metric-val status-ok">정확 (CORRECT)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">캐시 부채널 신호</div>
+        <div class="metric-val status-ok">0 건 (CLEAN)</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-title">지오펜스 보안 무결성</div>
+        <div class="metric-val status-ok">100% SECURE</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 1;
+    const totalSteps = 4;
+    let isPlaying = false;
+    let playTimer = null;
+
+    const stepData = [
+      {
+        step: 1,
+        desc: "로봇 비전 AI 프로세스가 커널 공개 텔레메트리 배열(idx=5)을 정상 요청함. CPU 분기 예측기가 합법적 경로를 예측함.",
+        access: "IN-BOUNDS (idx=5)",
+        bpu: "정확 (CORRECT)",
+        leak: "0 건 (CLEAN)",
+        sec: "100% SECURE",
+        action: () => {}
+      },
+      {
+        step: 2,
+        desc: "CPU 연산 유닛이 (5 < 16) 경계 검사를 수행하여 조건 참(True)을 확인하고 정규 명령어 파이프라인을 확정(Retire)함.",
+        access: "검증 완료 (In-Bounds)",
+        bpu: "퇴장 확정 (Retired)",
+        leak: "정상 캐시 라인",
+        sec: "엔클레이브 안전",
+        action: () => {}
+      },
+      {
+        step: 3,
+        desc: "probe_array[60 * 512] 캐시 라인이 L1 캐시에 자연스럽게 적재되며, 비밀 데이터 주소 영역은 일체 건드리지 않음.",
+        access: "공개 데이터 로드",
+        bpu: "안정화",
+        leak: "정상 적재 (Line 60)",
+        sec: "비인가 접근 없음",
+        action: () => {}
+      },
+      {
+        step: 4,
+        desc: "정상 텔레메트리가 안전하게 반환되며, 미세아키텍처 수준의 캐시 부채널 정보 누출이 0%로 완벽히 격리 유지됨.",
+        access: "IN-BOUNDS",
+        bpu: "CORRECT",
+        leak: "0건 누출",
+        sec: "100% SECURE",
+        action: () => {}
+      }
+    ];
+
+    function renderStep(idx) {
+      currentStep = idx;
+      const data = stepData[idx - 1];
+      document.getElementById('stepIndicator').textContent = `단계 ${data.step} / ${totalSteps}`;
+      document.getElementById('descText').textContent = data.desc;
+      data.action();
+      reportHeight();
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) renderStep(currentStep + 1);
+      else renderStep(1);
+    }
+
+    function prevStep() {
+      if (currentStep > 1) renderStep(currentStep - 1);
+      else renderStep(totalSteps);
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      const btn = document.getElementById('playBtn');
+      if (isPlaying) {
+        btn.textContent = "일시정지";
+        btn.style.background = "#e2e8f0";
+        btn.style.color = "#0f172a";
+        playLoop();
+      } else {
+        btn.textContent = "자동 재생";
+        btn.style.background = "var(--accent-blue)";
+        btn.style.color = "#0b132b";
+        clearTimeout(playTimer);
+      }
+    }
+
+    function playLoop() {
+      if (!isPlaying) return;
+      nextStep();
+      playTimer = setTimeout(playLoop, 2600);
+    }
+
+    function resetSim() {
+      if (isPlaying) togglePlay();
+      renderStep(1);
+    }
+
+    function reportHeight() {
+      const card = document.querySelector('.card');
+      const h = card ? Math.ceil(card.getBoundingClientRect().height + 16) : Math.ceil(document.body.scrollHeight + 10);
+      window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+    }
+
+    function toggleTheme(forcedTheme) {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const target = forcedTheme || (current === 'light' ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', target);
+      try { localStorage.setItem('diagram-theme', target); } catch(e){}
+      updateThemeBtn(target);
+      try {
+        window.parent.postMessage({ type: 'diagram-theme-change', theme: target }, '*');
+      } catch(e){}
+    }
+
+    function updateThemeBtn(theme) {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.innerHTML = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+    }
+
+    window.addEventListener('message', function(e) {
+      if (e.data && e.data.type === 'set-diagram-theme') {
+        document.documentElement.setAttribute('data-theme', e.data.theme);
+        updateThemeBtn(e.data.theme);
+      }
+    });
+
+    (function() {
+      let savedTheme = 'dark';
+      try { savedTheme = localStorage.getItem('diagram-theme'); } catch(e){}
+      if (!savedTheme && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+        savedTheme = 'light';
+      }
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeBtn(savedTheme);
+      }
+    })();
+
+    window.addEventListener('load', () => {
+      renderStep(1);
+      reportHeight();
+      playTimer = setTimeout(playLoop, 2000);
+    });
+    window.addEventListener('resize', reportHeight);
+    if (window.ResizeObserver) new ResizeObserver(reportHeight).observe(document.body);
+  </script>
+</body>
+</html>
