@@ -14,7 +14,7 @@
       for (var i = 0; i < iframes.length; i++) {
         var iframe = iframes[i];
         if (iframe.contentWindow === event.source) {
-          iframe.style.height = (event.data.height + 24) + 'px';
+          iframe.style.height = Math.ceil(event.data.height) + 'px';
           break;
         }
       }

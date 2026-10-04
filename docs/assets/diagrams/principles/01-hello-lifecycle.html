@@ -33,14 +33,20 @@
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
-    overflow-y: hidden;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: var(--bg);
   }
   body {
-    background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    padding: 24px;
     transition: background 0.3s, color 0.3s;
+  }
+  .diagram-canvas {
+    padding: 20px;
+    box-sizing: border-box;
+    overflow: hidden;
   }
   .header {
     display: flex;
@@ -92,7 +98,7 @@
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 24px;
-    margin-bottom: 24px;
+    margin-bottom: 0;
     position: relative;
     overflow: hidden;
   }
@@ -172,6 +178,7 @@
 </style>
 </head>
 <body>
+<div class="diagram-canvas" id="diagramCanvas">
 
 <div class="header">
   <h2><span>🚀</span> Hello World 실행 라이프사이클 (Program Lifecycle)</h2>
@@ -234,6 +241,7 @@
   <div class="content-grid" id="stepContent">
     <!-- Populated by JavaScript -->
   </div>
+</div>
 </div>
 
 <script>
@@ -385,14 +393,11 @@ function setStep(idx) {
 }
 
 function reportHeight() {
-  const height = Math.max(
-    document.documentElement.scrollHeight,
-    document.body.scrollHeight,
-    document.documentElement.offsetHeight,
-    document.body.offsetHeight
-  );
-  if (window.parent && window.parent !== window) {
-    window.parent.postMessage({ type: 'diagram-resize', height: height }, '*');
+  const canvas = document.getElementById('diagramCanvas');
+  if (!canvas) return;
+  const h = Math.ceil(canvas.getBoundingClientRect().height);
+  if (h > 0 && window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
   }
 }
 
@@ -432,9 +437,12 @@ window.addEventListener('message', function(event) {
 window.addEventListener('load', reportHeight);
 window.addEventListener('resize', reportHeight);
 if (window.ResizeObserver) {
-  new ResizeObserver(function() {
-    reportHeight();
-  }).observe(document.body);
+  const canvas = document.getElementById('diagramCanvas');
+  if (canvas) {
+    new ResizeObserver(function() {
+      reportHeight();
+    }).observe(canvas);
+  }
 }
 
 // Init step 0
