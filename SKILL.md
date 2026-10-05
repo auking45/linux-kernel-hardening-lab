@@ -37,23 +37,28 @@
 
 모든 아티클은 텍스트 중심 서술 이전에 직관적인 시각 자료를 필수로 배치함.
 
-### 1. Archify 인터랙티브 다이어그램 규격 (`tt-a1i/archify`)
+### 1. 인터랙티브 다이어그램 규격 (Archify & Custom HTML Diagrams)
 
-- **용도:** 시스템 전반의 아키텍처 맵, 커널 메모리 레이아웃 구조, 하위 보안 서브시스템 간의 연결 관계 시각화.
-- **배치 방식:**
-  - Archify를 통해 생성된 인터랙티브 HTML 파일은 `docs/assets/diagrams/<feature>/` 디렉터리에 저장함.
-  - 마크다운 본문에서는 iframe 태그를 사용하여 반응형으로 임베드함:
+- **용도:** 시스템 전반의 아키텍처 맵, 커널 메모리 레이아웃 구조, 취약점 공격 제어 흐름 및 하위 보안 서브시스템 간의 연결 관계 시각화.
+- **저장 위치:** `docs/assets/diagrams/<feature>/` 디렉터리에 순수 HTML5/CSS/JS 파일로 보관함.
+- **캔버스 및 높이 측정 필수 규격 (Zero-Void & Zero-Scroll 원칙):**
+  - **독립 캔버스 래핑**: `<body>` 직하위에 `<div class="diagram-canvas" id="diagramCanvas">`를 배치하고 모든 UI 요소를 포함함.
+  - **오버플로우 및 여백 초기화**: `html, body { margin: 0; padding: 0; overflow: hidden; background: var(--bg); }`, `.diagram-canvas { padding: 20px; box-sizing: border-box; overflow: hidden; }` 적용.
+  - **정밀 바운딩 박스 측정**: `reportHeight()`는 `Math.ceil(document.getElementById('diagramCanvas').getBoundingClientRect().height)`로 순수 렌더링 높이를 측정하여 `window.parent.postMessage({ type: 'diagram-resize', height: h }, '*')` 전송함.
+  - **팽창 루프 방지**: `document.documentElement.offsetHeight`나 `scrollHeight`를 측정하거나 `document.body`를 `ResizeObserver`로 관측하는 것을 **엄격히 금지함** (iframe 뷰포트 피드백 루프로 인한 하단 빈 공간 팽창 방지). 반드시 `ResizeObserver`는 `#diagramCanvas`만 관측함.
+- **마크다운 본문 임베드 표준 규격:**
+  - `min-height`를 인위적으로 지정하지 않으며, `onload` 시 `#diagramCanvas` 높이를 즉시 계산하도록 작성함:
     ```html
-    <div class="archify-container">
+    <div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
       <iframe
-        src="../../assets/diagrams/stack-protector/architecture.html"
-        width="100%"
-        height="450px"
-        frameborder="0"
+        src="../../assets/diagrams/<feature>/<name>.html"
+        style="width: 100%; border: none; display: block; overflow: hidden;"
+        scrolling="no"
+        onload="try { const c = this.contentWindow.document.getElementById('diagramCanvas'); if(c) this.style.height = Math.ceil(c.getBoundingClientRect().height) + 'px'; } catch(e){}"
       ></iframe>
     </div>
     ```
-  - 오프라인 또는 이미지 뷰어를 위해 동일한 구조의 SVG/PNG 스냅샷을 함께 보관함.
+- **상세 디자인 및 애니메이션 규격:** [docs/assets/diagrams/STYLE_GUIDE.md](file:///home/auking45/repos/linux-kernel-hardening-lab/docs/assets/diagrams/STYLE_GUIDE.md)를 준수함.
 
 ### 2. Mermaid 다이어그램 규격
 

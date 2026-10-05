@@ -112,3 +112,107 @@ SVG `<animateMotion>`을 활용하여 베지어 곡선 경로를 따라 고속 �
 3. **Tab 3 (Hardware / Kernel Defense)**: 하드닝 활성화 시 하드웨어/메커니즘 차단 및 커널 트랩 동작.
 4. **Tab 4 (Comparison & Matrix)**: 공격 성공률, 런타임 오버헤드, 공격자의 우회 기법 전이 비교.
 
+---
+
+## 6. 캔버스 규격 및 iframe 높이 자동 동기화 표준 (Zero-Void & Zero-Scroll)
+
+다이어그램이 임베드된 문서에서 **내부 세로 스크롤바가 발생하지 않고(Zero-Scroll)**, 카드 하단에 **불필요한 빈 여백 공간이 남지 않도록(Zero-Void)** 다음 아키텍처 규칙을 필수로 준수해야 합니다.
+
+### 6.1 DOM 래퍼 및 CSS 초기화 표준
+- `html, body`는 마진/패딩을 완전히 제거하고 `overflow: hidden` 처리함.
+- 모든 시각적 컨텐츠(헤더, 컨트롤, 캔버스 카드, 설명 박스)는 반드시 `<div class="diagram-canvas" id="diagramCanvas">` 직하위에 포함함.
+- 최하단 요소의 `margin-bottom`이 캔버스 밖으로 여백을 누적시키지 않도록 주의함.
+
+```css
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+body {
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  transition: background 0.3s, color 0.3s;
+}
+.diagram-canvas {
+  padding: 20px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+```
+
+### 6.2 정밀 높이 측정 및 피드백 루프 원천 차단
+- `reportHeight()`는 반드시 `#diagramCanvas`의 순수 렌더링 높이(`getBoundingClientRect().height`)를 측정하여 `window.parent`로 전송함.
+- **절대 금지**: `Math.max(documentElement.scrollHeight, documentElement.offsetHeight, ...)`
+  - iframe 내부에서 `documentElement.offsetHeight`는 **iframe 자체의 현재 뷰포트 높이**를 반환하므로, 부모 창이 여백을 더할 때마다 높이가 끝없이 팽창하는 양의 피드백 루프(Positive Feedback Loop)를 유발함.
+
+```javascript
+function reportHeight() {
+  const canvas = document.getElementById('diagramCanvas');
+  if (!canvas) return;
+  const h = Math.ceil(canvas.getBoundingClientRect().height);
+  if (h > 0 && window.parent && window.parent !== window) {
+    window.parent.postMessage({ type: 'diagram-resize', height: h }, '*');
+  }
+}
+```
+
+### 6.3 관측 대상 격리 (`ResizeObserver`)
+- `ResizeObserver`의 관측 대상은 **반드시 `#diagramCanvas`**여야 함.
+- `document.body`를 관측할 경우, 부모 창의 iframe 크기 변경이 자식 창 body의 resize 이벤트로 전파되어 무한 루프가 발생함.
+- 내부 탭 전환, 스텝 변경, 텍스트 줄바꿈 시 즉시 `reportHeight()`를 호출하거나 `setTimeout(reportHeight, 30)`을 통해 재계산함.
+
+```javascript
+window.addEventListener('load', reportHeight);
+window.addEventListener('resize', reportHeight);
+if (window.ResizeObserver) {
+  const canvas = document.getElementById('diagramCanvas');
+  if (canvas) {
+    new ResizeObserver(function() {
+      reportHeight();
+    }).observe(canvas);
+  }
+}
+```
+
+### 6.4 부모-자식 테마 및 리사이즈 메시지 핸들러
+```javascript
+window.addEventListener('message', function(event) {
+  if (event.data && (event.data.type === 'theme-change' || event.data.type === 'set-diagram-theme')) {
+    applyTheme(event.data.theme);
+  } else if (event.data && event.data.type === 'request-resize') {
+    reportHeight();
+  }
+});
+```
+
+### 6.5 마크다운 문서 내 iframe 임베드 표준 템플릿
+- 인위적인 `min-height`를 지정하지 않아야 컨텐츠 크기에 맞게 자동으로 수축/팽창함.
+- `onload` 시점에도 `#diagramCanvas` 높이를 즉시 바인딩하도록 인라인 스크립트를 포함함.
+
+```html
+<div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
+  <iframe
+    src="../../assets/diagrams/<feature>/<name>.html"
+    style="width: 100%; border: none; display: block; overflow: hidden;"
+    scrolling="no"
+    onload="try { const c = this.contentWindow.document.getElementById('diagramCanvas'); if(c) this.style.height = Math.ceil(c.getBoundingClientRect().height) + 'px'; } catch(e){}"
+  ></iframe>
+</div>
+```
+
+---
+
+## 7. 다이어그램 작성 시 안티패턴 체크리스트 (Anti-Patterns Checklist)
+
+| 금지 사항 (Anti-Pattern) | 원인 및 문제점 | 올바른 표준 (Standard) |
+| :--- | :--- | :--- |
+| `min-height: 680px` 또는 `height: 450px` 강제 | 컴팩트한 다이어그램 하단에 불필요한 거대 공백 형성 | 고정/최소 높이 제거, `#diagramCanvas` 순수 높이 동기화 |
+| `documentElement.offsetHeight` 측정 | iframe 뷰포트 높이가 반환되어 지속적인 높이 팽창 루프 유발 | `diagramCanvas.getBoundingClientRect().height` 측정 |
+| `ResizeObserver(document.body)` | 부모 창의 리사이즈가 body 리사이즈를 트리거하여 재귀 루프 발생 | `ResizeObserver(diagramCanvas)`로 내부 컨텐츠 변화만 감지 |
+| 부모 `iframe-resizer.js`에서 임의의 패딩 가산 (`+ 24px`) | 다이어그램 하단에 오차 여백 누적 | `Math.ceil(event.data.height) + 'px'` 정확한 픽셀 단위 매핑 |
+| 외부 무거운 JS 라이브러리(D3/Three.js) 의존 | 로딩 지연 및 MkDocs 정적 빌드 충돌 가능성 | 순수 HTML5 + SVG + 바닐라 JavaScript 독립 구동 |
+
+
