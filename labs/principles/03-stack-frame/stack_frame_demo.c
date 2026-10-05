@@ -59,10 +59,17 @@ void target_function(uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4,
     intptr_t offset_to_ret = (uintptr_t)((uintptr_t *)frame_addr + 1) - (uintptr_t)&local_buffer[0];
 
     printf("[Buffer Overflow Math]\n");
+#if defined(__x86_64__)
     printf("  * Distance from local_buffer[0] to Saved RBP (SFP) : %ld bytes\n", offset_to_sfp);
     printf("  * Distance from local_buffer[0] to Return Address  : %ld bytes\n", offset_to_ret);
     printf("  => To smash Return Address: Provide [%ld bytes of padding] + [8 bytes of target address]\n",
            offset_to_ret);
+#elif defined(__aarch64__)
+    printf("  * Distance from local_buffer[0] to Saved FP (X29)  : %ld bytes\n", offset_to_sfp);
+    printf("  * Distance from local_buffer[0] to Saved LR (X30)  : %ld bytes\n", offset_to_ret);
+    printf("  => In AAPCS64, Saved FP/LR sit at [sp] (lower address than local variables).\n");
+    printf("  => An upward stack buffer overflow corrupts adjacent variables or CALLER's frame!\n");
+#endif
     printf("============================================================\n");
 }
 

@@ -1,22 +1,22 @@
-# 03. Stack Frame Mechanics and Calling Conventions (Stack Frame & ABI)
+# 03. Stack Frame Anatomy and Calling Convention (Stack Frame & ABI)
 
-Dissecting the byte-by-byte mechanics of **stack frame creation and teardown**, along with the **calling conventions (System V AMD64 ABI vs ARM64 AAPCS)** that orchestrate function calls on modern 64-bit microprocessors.
+A byte-level architectural dissection of **Stack Frame generation and teardown** during function invocation, alongside calling conventions under **AArch64 (AAPCS64)** and **x86_64 (System V AMD64 ABI)**.
 
 ---
 
 ## 1. Learning Objectives & Overview
 
-- Understand why stacks grow downward from high memory to low memory.
-- Analyze how the `call` instruction pushes the Return Address (RET) onto the stack.
-- Trace register alterations during function prologues (`push rbp; mov rsp, rbp`) and epilogues (`leave; ret`).
-- Compare integer and pointer argument delivery between the System V AMD64 ABI and ARM64 AAPCS.
-- Calculate exact memory distances between local input buffers and the saved Return Address.
+- Understand the physical mechanics of why stack memory grows downward from high to low memory addresses.
+- Contrast AArch64's Link Register (`X30 / LR`) return mechanism with x86_64's automatic stack push (`call`).
+- Analyze AArch64 AAPCS64 prologue (`stp x29, x30, [sp, #-N]!`) and epilogue (`ldp x29, x30, [sp], #N; ret`) execution.
+- Dissect the architectural difference in stack layout (frame record placement versus local variable offsets) between AArch64 and x86_64.
+- Grasp the security implications of hardware-enforced 16-byte stack pointer alignment.
 
 ---
 
-## 2. Interactive Stack Frame Generation & Teardown
+## 2. Interactive Stack Frame Lifecycle Diagram
 
-Step through the phases below to observe memory allocations and register states during function execution:
+Click through the interactive steps below to observe parameter passing, branch linking, prologue setup, local allocations, and epilogue teardown across memory and CPU registers:
 
 <div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
   <iframe src="../../assets/diagrams/principles/03-stack-frame.html" style="width: 100%; border: none; display: block; overflow: hidden;" scrolling="no" onload="try { const c = this.contentWindow.document.getElementById('diagramCanvas'); if(c) this.style.height = Math.ceil(c.getBoundingClientRect().height) + 'px'; } catch(e){}"></iframe>
@@ -24,105 +24,172 @@ Step through the phases below to observe memory allocations and register states 
 
 ---
 
-## 3. Byte-Level Stack Frame Anatomy
+## 3. Architecture Stack Frame Anatomy
 
-During execution, a function stack frame follows a strict contiguous layout:
+=== "AArch64 (AAPCS64 - Default Target)"
+    On AArch64, function calls store return addresses directly into the Link Register (`X30 / LR`) rather than pushing them to the stack:
 
-```
-[High Memory]
-─────────────────────────────────────────────────────────────
-  +0x18(%rbp)  │ Caller Stack Frame (Spilled arguments > 6)
-─────────────────────────────────────────────────────────────
-  +0x08(%rbp)  │ Return Address (RET)  Pushed automatically by CALL
-─────────────────────────────────────────────────────────────
-   0x00(%rbp)  │ Saved Frame Pointer (SFP)  Caller's backed-up RBP
-─────────────────────────────────────────────────────────────
-  -0x20(%rbp)  │ Local Buffer [char buf[32]]  Local array buffer
-─────────────────────────────────────────────────────────────
-  -0x28(%rbp)  │ Local Variable (uint64_t val)  Current %rsp bottom
-─────────────────────────────────────────────────────────────
-[Low Memory (RSP grows downward)]
-```
+    ```
+    [High Memory]
+    ─────────────────────────────────────────────────────────────
+      [sp, #0x50]  │ Caller Frame / Stack Arguments (args 9+)
+    ─────────────────────────────────────────────────────────────
+      [sp, #0x20]  │ Local Buffer [char buf[32]] (Higher offset)
+    ─────────────────────────────────────────────────────────────
+      [sp, #0x18]  │ Local Variable (uint64_t val)
+    ─────────────────────────────────────────────────────────────
+      [sp, #0x08]  │ Saved LR (X30)  Return address backup
+    ─────────────────────────────────────────────────────────────
+      [sp, #0x00]  │ Saved FP (X29)  Frame Pointer Record
+    ─────────────────────────────────────────────────────────────
+    [Low Memory (Current SP position)]
+    ```
 
-### 3.1 Function Prologue Assembly
+    #### AArch64 Prologue & Epilogue
+    ```assembly
+    // [Prologue] Decrement SP by 64 bytes and save FP/LR pair at the bottom of the frame
+    stp    x29, x30, [sp, #-64]!
+    mov    x29, sp
 
-Instructions establishing a new execution frame upon entry:
+    // [Epilogue] Restore FP and LR, deallocate 64 bytes, and branch to LR
+    ldp    x29, x30, [sp], #64
+    ret
+    ```
 
-```nasm
-push   %rbp         ; Back up caller's base pointer to stack (SFP, consumes 8 bytes)
-mov    %rsp, %rbp   ; Set current top of stack as new base pointer (RBP)
-sub    $0x30, %rsp  ; Decrement RSP by 48 bytes to allocate local variables
-```
+    > [!IMPORTANT]
+    > **AArch64 Stack Buffer Overflow Characteristics**:
+    > In AArch64 AAPCS64, the frame record (`X29`/`X30`) is stored at the base of the allocated stack frame (`[sp]`), while local variables are located at higher offsets (`[sp + 0x20]`, etc.). Therefore, an upward buffer overflow within the current function's local array overflows toward **higher addresses** (into adjacent variables or the caller's stack frame), rather than the current function's saved FP/LR.
 
-### 3.2 Function Epilogue Assembly
+=== "x86_64 (System V AMD64 ABI - Comparative Target)"
+    On x86_64, the hardware `call` instruction pushes the Return Address directly onto the stack:
 
-Instructions cleaning up the frame and returning execution safely:
+    ```
+    [High Memory]
+    ─────────────────────────────────────────────────────────────
+      +0x18(%rbp)  │ Caller Stack Frame (Stack Arguments 7+)
+    ─────────────────────────────────────────────────────────────
+      +0x08(%rbp)  │ Return Address (RET)  Hardware pushed by CALL
+    ─────────────────────────────────────────────────────────────
+       0x00(%rbp)  │ Saved Frame Pointer (SFP)  Previous RBP backup
+    ─────────────────────────────────────────────────────────────
+      -0x20(%rbp)  │ Local Buffer [char buf[32]]  Negative offset
+    ─────────────────────────────────────────────────────────────
+      -0x28(%rbp)  │ Local Variable (uint64_t val)  %rsp location
+    ─────────────────────────────────────────────────────────────
+    [Low Memory (Current RSP position)]
+    ```
 
-```nasm
-leave               ; mov %rbp, %rsp && pop %rbp (restores caller's RBP)
-ret                 ; pop %rip (pops Return Address into Instruction Pointer)
-```
+    #### x86_64 Prologue & Epilogue
+    ```nasm
+    // [Prologue] Save RBP, establish frame anchor, subtract stack pointer
+    push   %rbp
+    mov    %rsp, %rbp
+    sub    $0x40, %rsp
+
+    // [Epilogue] Release local space, restore RBP, and pop return address into RIP
+    leave
+    ret
+    ```
 
 ---
 
-## 4. Architectural Calling Convention Comparison: x86_64 vs ARM64
+## 4. Comprehensive Calling Convention (ABI) Comparison
 
-| Evaluation Criteria | x86_64 (System V AMD64 ABI) | ARM64 (AAPCS64) |
+| Feature | AArch64 (AAPCS64 - Default) | x86_64 (System V AMD64 ABI) |
 | :--- | :--- | :--- |
-| **Argument Registers** | `RDI`, `RSI`, `RDX`, `RCX`, `R8`, `R9` (Up to 6) | `X0` through `X7` (Up to 8) |
-| **Return Value Register** | `RAX` (Auxiliary: `RDX`) | `X0` (Auxiliary: `X1`) |
-| **Return Address Storage** | Automatically pushed to stack by `call` | Stored in Link Register `LR (X30)` by `bl` |
-| **Frame Pointer** | `RBP` | `X29 (FP)` |
-| **Stack Alignment** | 16-byte alignment before `call` | 16-byte alignment hardware enforced |
+| **Integer / Pointer Argument Registers** | `X0` – `X7` (Up to 8 arguments) | `RDI`, `RSI`, `RDX`, `RCX`, `R8`, `R9` (Up to 6) |
+| **Return Value Registers** | `X0` (Secondary: `X1`) | `RAX` (Secondary: `RDX`) |
+| **Return Address Storage** | Link Register `LR (X30)` (`bl`) | Pushed directly to stack (`call`) |
+| **Frame Pointer Register** | `X29 (FP)` | `RBP` |
+| **Stack Pointer Alignment** | Hardware-enforced 16-byte alignment on SP dereference | 16-byte alignment required before `call` |
+| **Temporary Scratch Registers** | `X9` – `X15` (Caller-saved) | `R10`, `R11` (Caller-saved) |
 
 ---
 
-## 5. Lab Source Code & Offset Calculation
+## 5. Lab Source Code & Assembly Inspection
 
 - **Lab Source Code**: [`stack_frame_demo.c`](../../assets/labs/principles/03-stack-frame/stack_frame_demo.c) (Local Asset) | [GitHub Source Code Repository :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/principles/03-stack-frame/stack_frame_demo.c)
 - **Dedicated Makefile**: [`Makefile`](../../assets/labs/principles/03-stack-frame/Makefile)
 
-### 5.1 Running the Lab
+### 5.1 Running the Stack Frame Analysis
 
-```bash
-cd labs/principles/03-stack-frame
-make run
-```
+=== "AArch64 (Default Target)"
+    ```bash
+    cd labs/principles/03-stack-frame
+    make run
+    ```
 
-```
-============================================================
- Stack Frame Anatomical Analysis (target_function)
-============================================================
-[ABI] Architecture: x86_64 (System V AMD64 ABI)
-      Register Args: a1(RDI)=0x11, a2(RSI)=0x22, a3(RDX)=0x33
-                     a4(RCX)=0x44, a5(R8)=0x55,  a6(R9)=0x66
-      Stack Args   : a7=0x7ffe723a1a60 (0x77), a8=0x7ffe723a1a68 (0x88)
-------------------------------------------------------------
-[Stack Frame Memory Layout from Low to High Addresses]
-  [Low Addr]  local_buffer[0]      : 0x7ffe723a1a20
-              local_buffer[31]     : 0x7ffe723a1a3f
-              local_var            : 0x7ffe723a1a18 (val=0xdeadbeefcafebabe)
-              Saved Frame Pointer  : 0x7ffe723a1a40 (points to caller's frame)
-  [High Addr] Return Address (RET) : 0x7ffe723a1a48 (caller: 0x55dc98a21182)
-------------------------------------------------------------
-[Buffer Overflow Math]
-  * Distance from local_buffer[0] to Saved RBP (SFP) : 32 bytes
-  * Distance from local_buffer[0] to Return Address  : 40 bytes
-  => To smash Return Address: Provide [40 bytes of padding] + [8 bytes of target address]
-============================================================
-```
+    ```
+    === Running stack_frame_demo on aarch64 ===
+    qemu-aarch64 -L /usr/aarch64-linux-gnu ./stack_frame_demo
+    [+] Calling target_function from main() (main=0x7e183c860a08)...
 
-### 5.2 Disassembling Prologue and Epilogue
+    ============================================================
+     Stack Frame Anatomical Analysis (target_function)
+    ============================================================
+    [ABI] Architecture: ARM64 (AAPCS64)
+          Register Args: a1(X0)=0x11, a2(X1)=0x22, a3(X2)=0x33
+                         a4(X3)=0x44, a5(X4)=0x55, a6(X5)=0x66
+                         a7(X6)=0x77, a8(X7)=0x88
+    ------------------------------------------------------------
+    [Stack Frame Memory Layout from Low to High Addresses]
+      [Low Addr]  local_buffer[0]      : 0x4000007fed80
+                  local_buffer[31]     : 0x4000007fed9f
+                  local_var            : 0x4000007fed78 (val=0xdeadbeefcafebabe)
+                  Saved Frame Pointer  : 0x4000007fed20 (points to caller's frame)
+      [High Addr] Return Address (RET) : 0x4000007fed28 (caller: 0x7e183c860a48)
+    ------------------------------------------------------------
+    [Buffer Overflow Math]
+      * Distance from local_buffer[0] to Saved FP (X29)  : -96 bytes
+      * Distance from local_buffer[0] to Saved LR (X30)  : -88 bytes
+      => In AAPCS64, Saved FP/LR sit at [sp] (lower address than local variables).
+      => An upward stack buffer overflow corrupts adjacent variables or CALLER's frame!
+    ============================================================
+    ```
+
+=== "x86_64 (Comparative Target)"
+    ```bash
+    cd labs/principles/03-stack-frame
+    make ARCH=x86_64 run
+    ```
+
+    ```
+    === Running stack_frame_demo on x86_64 ===
+    ============================================================
+     Stack Frame Anatomical Analysis (target_function)
+    ============================================================
+    [ABI] Architecture: x86_64 (System V AMD64 ABI)
+          Register Args: a1(RDI)=0x11, a2(RSI)=0x22, a3(RDX)=0x33
+                         a4(RCX)=0x44, a5(R8)=0x55,  a6(R9)=0x66
+          Stack Args   : a7=0x7ffe723a1a60 (0x77), a8=0x7ffe723a1a68 (0x88)
+    ------------------------------------------------------------
+    [Stack Frame Memory Layout from Low to High Addresses]
+      [Low Addr]  local_buffer[0]      : 0x7ffe723a1a20
+                  local_buffer[31]     : 0x7ffe723a1a3f
+                  local_var            : 0x7ffe723a1a18 (val=0xdeadbeefcafebabe)
+                  Saved Frame Pointer  : 0x7ffe723a1a40 (points to caller's frame)
+      [High Addr] Return Address (RET) : 0x7ffe723a1a48 (caller: 0x55dc98a21182)
+    ------------------------------------------------------------
+    [Buffer Overflow Math]
+      * Distance from local_buffer[0] to Saved RBP (SFP) : 32 bytes
+      * Distance from local_buffer[0] to Return Address  : 40 bytes
+      => To smash Return Address: Provide [40 bytes of padding] + [8 bytes of target address]
+    ============================================================
+    ```
+
+### 5.2 Disassembly Verification
 
 ```bash
 make disasm
 ```
 
-- Inspect raw assembly generated for `target_function`, noting the prologue and epilogue sequences.
+- AArch64: Inspect `stp x29, x30, [sp, #-N]!` prologue and `ldp x29, x30, [sp], #N; ret` epilogue.
+- x86_64: Inspect `push %rbp`, `leave`, and `ret`.
 
 ---
 
 ## 6. Summary & Next Chapter
 
-- Because return addresses sit above local buffers in memory, omitting input bounds checks exposes execution control to memory overwrite.
-- In the next chapter, we investigate the weaponized machine payload designed to be invoked upon hijacking: **[04. Shellcode Architecture and Opcode Engineering](04-shellcode-engineering.md)**.
+- On x86_64, `call` pushes the return address right above the local frame, making upward stack overflows directly smash RET.
+- On AArch64, `bl` uses the Link Register and stores the frame record (`X29`/`X30`) at the bottom of the allocated stack frame, steering memory corruption attacks toward adjacent function pointers or caller frames.
+- In the next chapter, we investigate the byte-level construction of injected code: **[04. Shellcode Engineering and Assembly Generation](04-shellcode-engineering.md)**.
