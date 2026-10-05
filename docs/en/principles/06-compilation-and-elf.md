@@ -1,21 +1,21 @@
-# 06. Compilation Process and ELF Architecture (Compilation & ELF File Format)
+# 06. Compilation Pipeline & ELF File Format Deep Dive
 
-Investigating the low-level toolchain pipeline converting source text into machine code, and the **Dual View architecture (Linking View vs Execution View)** governing the Executable and Linkable Format (ELF).
+In-depth analysis of the low-level compiler toolchain pipeline converting C source code into CPU machine code, and the dual-view architecture (**Linking View vs. Execution View**) of the Linux standard executable specification: **ELF (Executable and Linkable Format)**.
 
 ---
 
 ## 1. Learning Objectives & Overview
 
-- Understand how C code progresses through lexical analysis, syntax parsing, intermediate representation (IR), and assembly into an ELF binary.
-- Examine why the ELF specification provides both a **Linking View (Section Header oriented)** for static linkers and an **Execution View (Program Header oriented)** for operating system loaders.
-- Analyze the 64-byte `Elf64_Ehdr` structure and the kernel's validation of magic bytes (`\x7fELF`).
-- Parse key program segments (`PT_LOAD`, `PT_INTERP`, `PT_GNU_STACK`) referenced by the Linux kernel when materializing virtual memory areas (VMAs).
+- Trace the step-by-step compilation pipeline from C source code through preprocessor (`cpp`), compiler engine (`cc1`), assembler (`as`), and linker (`ld`), inspecting intermediate artifacts (`.i`, `.s`, `.o`).
+- Perform a comparative analysis of the **ELF header (`Elf64_Ehdr`) and metadata** between relocatable object files (`.o`) and final executable binaries.
+- Analyze the dual architectural design of ELF: **Linking View (Section-oriented, Section Header Table)** vs. **Execution View (Segment-oriented, Program Header Table)**.
+- Verify compiler optimization behaviors such as function substitution (`printf` ➔ `puts`), section partitioning (`.rodata`, `.data`, `.bss`), and DWARF debug information placement (`.debug_*`).
 
 ---
 
-## 2. Interactive ELF Architecture & Dual View Diagram
+## 2. Interactive ELF File Structure & Dual-View Diagram
 
-Explore the dual view mapping and W^X memory permissions through the interactive diagram below:
+Interact with the diagram below to explore the mapping relationships between the ELF header, segments, sections, and W^X memory permission flags:
 
 <div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
   <iframe src="../../assets/diagrams/principles/06-elf-structure.html" style="width: 100%; border: none; display: block; overflow: hidden;" scrolling="no" onload="try { const c = this.contentWindow.document.getElementById('diagramCanvas'); if(c) this.style.height = Math.ceil(c.getBoundingClientRect().height) + 'px'; } catch(e){}"></iframe>
@@ -23,111 +23,149 @@ Explore the dual view mapping and W^X memory permissions through the interactive
 
 ---
 
-## 3. Toolchain Code Transformation Pipeline
+## 3. Compiler Toolchain Pipeline & Intermediate Artifacts
 
-High-level C syntax is downgraded to CPU opcodes across several compiler phases:
+Lowering high-level C code to native CPU machine code proceeds through four sequential toolchain invocations:
 
 ```mermaid
 flowchart LR
-    A["C Source Code"] --> B["Lexical Analysis (Lexer)"]
-    B --> C["Syntax Analysis (Parser: AST)"]
-    C --> D["Intermediate Representation (LLVM IR)"]
-    D --> E["Optimization Passes"]
-    E --> F["Code Generation (ASM: .s)"]
-    F --> G["Assembler (as ➔ .o)"]
-    G --> H["Linker (ld ➔ ELF64)"]
+    A["vault_core.c<br/>(C Source)"] -->|cpp / cc1 -E| B["vault_core.i<br/>(Preprocessed C)"]
+    B -->|cc1 -O2| C["vault_core.s<br/>(Assembly Text)"]
+    C -->|as| D["vault_core.o<br/>(Relocatable Object)"]
+    D -->|collect2 / ld| E["vault_core<br/>(Executable ELF64)"]
 
     style A fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#fff
-    style D fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
-    style H fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
+    style B fill:#1e293b,stroke:#94a3b8,stroke-width:2px,color:#fff
+    style C fill:#1e293b,stroke:#a855f7,stroke-width:2px,color:#fff
+    style D fill:#1e293b,stroke:#f59e0b,stroke-width:2px,color:#fff
+    style E fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff
 ```
 
-1. **Lexical and Syntax Parsing**:
-   - Tokenizes raw characters into syntax tokens, building an Abstract Syntax Tree (AST).
-2. **Intermediate Representation & Optimization**:
-   - Generates architecture-neutral IR (LLVM IR) for optimization passes (dead code elimination, loop unrolling).
-3. **Code Generation & Assembly**:
-   - Emits target assembly instructions, mapped 1:1 into relocatable object files (`.o`).
+### 3.1 Preserving Intermediate Artifacts via `-v --save-temps`
+
+Passing `-v --save-temps` to GCC instructs the compiler to retain all intermediate pipeline files and print internal toolchain invocations:
+
+![Compiler Pipeline Terminal Analysis](../../assets/images/principles/06-compiler-pipeline.svg)
+
+```bash
+gcc-13 -v --save-temps -O2 -g vault_core.c -o vault_core 2> gcc_verbose.log
+file vault_core.* vault_core
+```
+
+```
+vault_core.i: C source, Unicode text, UTF-8 text
+vault_core.s: assembler source, ASCII text
+vault_core.o: ELF 64-bit LSB relocatable, x86-64, version 1 (SYSV), with debug_info
+vault_core:   ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked
+```
+
+- **Pass 1: Preprocessing (`cpp / cc1 -E`)**: Expands macros (`#define`), evaluates conditional compilation directives (`#ifdef`), and inlines header files (`#include <stdio.h>`), generating over 55,000 lines of expanded C source code in `vault_core.i`.
+- **Pass 2: Compilation (`cc1`)**: Parses the syntax tree (AST), optimizes intermediate representations (GIMPLE/RTL), and outputs target-specific x86_64 assembly text in `vault_core.s`.
+- **Pass 3: Assembly (`as`)**: Encodes assembly instructions into binary machine code, outputting the relocatable ELF object file `vault_core.o`.
+- **Pass 4: Linking (`collect2 / ld`)**: Resolves external symbol references, merges sections, and links C runtime startup files (`crt1.o`, `crti.o`, `crtn.o`) and shared libraries (`libc.so`) to construct the final executable `vault_core`.
 
 ---
 
-## 4. Dual View Architecture: Linking vs Execution
+## 4. ELF Header Comparison: Relocatable (`.o`) vs. Executable
 
-The ELF specification serves two separate consumers across the binary lifecycle:
+The kernel loader and static linker determine the binary format and file layout by reading the 64-byte **ELF Header (`Elf64_Ehdr`)** located at offset 0:
 
-```
-[ Linking View: Section Focused ]               [ Execution View: Segment Focused ]
-  (Used by ld and GDB)                            (Used by kernel load_elf_binary)
-┌─────────────────────────┐                   ┌─────────────────────────┐
-│       ELF Header        │                   │       ELF Header        │
-├─────────────────────────┤                   ├─────────────────────────┤
-│  Program Header Table   │ (Optional)        │  Program Header Table   │ (Required!)
-├─────────────────────────┤                   ├─────────────────────────┤
-│  .text / .init / .plt   │ ──(Bundling)────> │  PT_LOAD 1 (RX)         │ (Code Segment)
-├─────────────────────────┤                   ├─────────────────────────┤
-│  .rodata / .eh_frame    │ ──(Bundling)────> │  PT_LOAD 2 (R--)        │ (Read-Only Segment)
-├─────────────────────────┤                   ├─────────────────────────┤
-│  .data / .bss / .got    │ ──(Bundling)────> │  PT_LOAD 3 (RW-)        │ (Data Segment)
-├─────────────────────────┤                   ├─────────────────────────┤
-│  Section Header Table   │ (Required!)       │  Section Header Table   │ (Optional / Strippable)
-└─────────────────────────┘                   └─────────────────────────┘
+![ELF Header Comparison Terminal](../../assets/images/principles/06-readelf-headers.svg)
+
+```bash
+# Inspect Relocatable Object Header
+readelf -h vault_core.o
+
+# Inspect Final Executable Binary Header
+readelf -h vault_core
 ```
 
-### 4.1 Key ELF Header Fields (`Elf64_Ehdr`)
+### 4.1 Comparative Header Field Analysis
 
-| Field Name | Type | Purpose & Security Implications |
-| :--- | :--- | :--- |
-| `e_ident[EI_MAG0..3]` | `unsigned char[4]` | ELF Magic bytes (`\x7fELF`). Validated first by the kernel |
-| `e_type` | `Elf64_Half` | `ET_EXEC` (Fixed address executable) or `ET_DYN` (PIE / Shared object) |
-| `e_machine` | `Elf64_Half` | Target architecture (`EM_X86_64 = 62`, `EM_AARCH64 = 183`) |
-| `e_entry` | `Elf64_Addr` | Virtual memory address of initial execution entry point (`_start`) |
-| `e_phoff` / `e_phnum` | `Elf64_Off / Half` | Offset and count of Program Header Table entries |
-| `e_shoff` / `e_shnum` | `Elf64_Off / Half` | Offset and count of Section Header Table entries |
+| ELF Header Field (`Elf64_Ehdr`) | `vault_core.o` (Relocatable) | `vault_core` (Executable Binary) | Architectural Significance |
+| :--- | :--- | :--- | :--- |
+| **`e_ident[EI_MAG0..3]`** | `\x7fELF` | `\x7fELF` | Magic bytes validated by the Linux kernel (`load_elf_binary`) |
+| **`e_type`** | `ET_REL` (Relocatable) | `ET_DYN` (PIE Executable) | Non-executable object module vs. ASLR-supported standalone executable |
+| **`e_entry`** | `0x0` (Undefined) | `0x1190` (`_start`) | Relocatable objects have no entry point; executables define `_start` |
+| **`e_phoff` / `e_phnum`** | `0` (0 entries) | `64` (13 entries) | Program Headers (memory segments) exist only in loadable executables |
+| **`e_shoff` / `e_shnum`** | `9816` (24 entries) | `16832` (39 entries) | Section Headers used by linkers; expanded in executables with runtime metadata |
 
 ---
 
-## 5. Lab Source Code & Direct ELF Parsing
+## 5. Section Header Table & Compiler Optimization Analysis
 
-- **Lab Source Code**: [`elf_inspector.c`](../../assets/labs/principles/06-elf-structure/elf_inspector.c) (Local Asset) | [GitHub Source Code Repository :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/principles/06-elf-structure/elf_inspector.c)
-- **Dedicated Makefile**: [`Makefile`](../../assets/labs/principles/06-elf-structure/Makefile)
+The **Section Header Table** defines how individual chunks of code, data, and metadata are segregated for linker processing:
 
-### 5.1 Building and Running the Parser
+![Section & Symbol Analysis with puts Optimization Terminal](../../assets/images/principles/06-readelf-symbols-opt.svg)
+
+```bash
+readelf -s vault_core.o
+```
+
+```
+Symbol table '.symtab' contains 24 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+    18: 0000000000000000   272 FUNC    GLOBAL DEFAULT    6 main
+    19: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND puts
+    20: 0000000000000000     8 OBJECT  GLOBAL DEFAULT    8 g_banner
+    21: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND __printf_chk
+    22: 0000000000000000   256 OBJECT  GLOBAL DEFAULT    3 g_session_token
+    23: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    2 g_vault_status
+```
+
+### 5.1 Symbol Resolution & Optimization Mechanics
+
+1. **Automatic Optimization: `printf` ➔ `puts`**:
+   - For calls like `printf("Security Vault Active\n")` containing only a constant string and trailing newline, the compiler (`cc1 -O2`) replaces the invocation with `puts()` (Ndx=UND) to eliminate format string parsing overhead.
+   - Formatted strings with format specifiers are dispatched to `__printf_chk`, leveraging glibc's built-in stack fortification.
+2. **Section Placement Rules**:
+   - `g_vault_status = 1` (Initialized Global): Assigned to `.data` (Ndx=2, writable data).
+   - `g_session_token[256]` (Uninitialized Buffer): Assigned to `.bss` (Ndx=3, NOBITS), consuming zero bytes in the on-disk ELF file.
+   - `g_banner = "..."` (String Constant): Placed in `.rodata` (read-only segment).
+
+```bash
+# Dump string constants from .rodata
+readelf -p .rodata vault_core
+
+# Inspect compiler toolchain version string (.comment section)
+readelf -p .comment vault_core
+```
+
+---
+
+## 6. Practical Lab Source Code & Verification
+
+- **Lab Source Code**: [`vault_core.c`](../../assets/labs/principles/06-elf-structure/vault_core.c) | [`elf_inspector.c`](../../assets/labs/principles/06-elf-structure/elf_inspector.c)
+- **Lab Makefile**: [`Makefile`](../../assets/labs/principles/06-elf-structure/Makefile)
+
+### 6.1 Building and Inspecting Artifacts
 
 ```bash
 cd labs/principles/06-elf-structure
-make inspect-self
-```
 
-```
-============================================================
- 64-bit ELF Header Inspection: elf_inspector
-============================================================
-[1] Magic Bytes      : 7f 45 4c 46 (ASCII: \x7fELF)
-[2] Architecture     : ELF64 (64-bit)
-[3] Data Encoding    : 2's complement, Little Endian
-[4] Entry Point      : 0x401130
-[5] Program Headers  : Offset 0x40 (13 entries, size 56 bytes)
-[6] Section Headers  : Offset 0x3890 (30 entries, size 64 bytes)
-============================================================
+# 1. Generate compilation pipeline intermediate files (.i, .s, .o)
+make pipeline
 
-=== [Execution View] Program Headers (Segments) ===
-Type               Offset     VirtAddr           MemSize    Flags 
------------------------------------------------------------------
-PT_PHDR            0x40       0x400040           0x2d8      R--
-PT_INTERP          0x318      0x400318           0x1c       R--
-PT_LOAD            0x0        0x400000           0x780      R--
-PT_LOAD            0x1000     0x401000           0x691      R-E
-PT_LOAD            0x2000     0x402000           0x6cc      R--
-PT_LOAD            0x2de8     0x403de8           0x2a8      RW-
-PT_GNU_STACK       0x0        0x0                0x0        RW-
-PT_GNU_RELRO       0x2de8     0x403de8           0x218      R--
-```
+# 2. Compare ELF headers (vault_core.o vs. vault_core)
+make inspect-header
 
-- Confirm separation of permissions across segments: `PT_LOAD R-E` for text, `PT_LOAD RW-` for data, and `PT_GNU_STACK RW-` indicating NX/DEP enforcement.
+# 3. Inspect section headers (.text, .rodata, .data, .bss)
+make inspect-sections
+
+# 4. Dump string contents (.rodata, .comment)
+make inspect-strings
+
+# 5. Check symbol table and compiler puts optimization
+make inspect-symbols
+
+# 6. Verify DWARF debug sections (-g)
+make inspect-debug
+```
 
 ---
 
-## 6. Summary & Next Chapter
+## 7. Summary & Next Module
 
-- ELF binaries present dual perspectives: sections for linking and segments for execution.
-- In the next chapter, we investigate how symbols are bound and addresses resolved: **[07. Symbols, Resolution, and Relocation Mechanics](07-symbols-and-linking.md)**.
+- The compiler pipeline progressively refines code across 4 stages: preprocessing (`.i`), assembly text (`.s`), relocatable object (`.o`), and final executable.
+- Relocatable objects (`.o`) contain only Section Headers for linkers, while executables add Program Headers (Segments) required by the Linux kernel loader.
+- Next, explore how linkers resolve names across multiple object modules in **[07. Symbol Resolution and Linking Mechanism](07-symbols-and-linking.md)**.

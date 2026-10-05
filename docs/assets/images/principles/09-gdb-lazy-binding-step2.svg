@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 348" width="100%" height="348" style="background: transparent; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">
+  <defs>
+    <linearGradient id="termGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#0b1120" />
+    </linearGradient>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="108%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <rect x="2" y="2" width="836" height="344" rx="12" fill="url(#termGrad)" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
+  <path d="M 2 14 C 2 7.37 7.37 2 14 2 L 826 2 C 832.63 2 838 7.37 838 14 L 838 36 L 2 36 Z" fill="#1e293b" />
+  <line x1="2" y1="36" x2="838" y2="36" stroke="#334155" stroke-width="1" />
+  <circle cx="22" cy="19" r="6" fill="#ef4444" />
+  <circle cx="40" cy="19" r="6" fill="#f59e0b" />
+  <circle cx="58" cy="19" r="6" fill="#10b981" />
+  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">GDB Tracing Lazy Binding [Step 2]: GOT Overwritten with Target Function</text>
+  <text x="24" y="62" font-size="12.5" xml:space="preserve">
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#94a3b8">:</tspan>
+    <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ continue  # (Executes 1st call to verify_token, invoking dynamic linker)</tspan>
+  </text>
+  <text x="24" y="82" fill="#cbd5e1" font-size="12" xml:space="preserve">[*] [Call 1] Invoking verify_token() for the first time...</text>
+  <text x="24" y="102" fill="#34d399" font-size="12" xml:space="preserve">[+] [Call 1 Result] AUTHORIZED</text>
+  <text x="24" y="122" fill="#cbd5e1" font-size="12" xml:space="preserve">Breakpoint 2, main () at secvault_dyn.c:28 (Before Call 2)</text>
+  <text x="24" y="162" fill="#38bdf8" font-size="12" font-weight="bold" xml:space="preserve">=== [Step 2: AFTER 1st Call to verify_token] ===</text>
+  <text x="24" y="182" font-size="12.5" xml:space="preserve">
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#94a3b8">:</tspan>
+    <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ x/gx &amp;verify_token@got.plt</tspan>
+  </text>
+  <text x="24" y="202" fill="#34d399" font-size="12" xml:space="preserve">0x555555558020 &lt;verify_token@got.plt&gt;:    0x00007ffff7fb9119</text>
+  <text x="24" y="242" font-size="12.5" xml:space="preserve">
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#94a3b8">:</tspan>
+    <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ info symbol 0x00007ffff7fb9119</tspan>
+  </text>
+  <text x="24" y="262" fill="#34d399" font-size="12" xml:space="preserve">verify_token in section .text of ./libsecure.so</text>
+  <text x="24" y="302" fill="#64748b" font-size="12" xml:space="preserve"># Crucial Finding: _dl_runtime_resolve updated GOT with actual virtual address!</text>
+  <text x="24" y="322" fill="#64748b" font-size="12" xml:space="preserve"># 2nd call to verify_token will branch DIRECTLY to 0x7ffff7fb9119 without linker intervention.</text>
+</svg>

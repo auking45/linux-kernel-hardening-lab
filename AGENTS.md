@@ -70,3 +70,4 @@
 
 - 종합 엔지니어링 표준: [SKILL.md](file:///home/auking45/repos/linux-kernel-hardening-lab/SKILL.md)
 - 다이어그램 디자인 시스템 가이드: [docs/assets/diagrams/STYLE_GUIDE.md](file:///home/auking45/repos/linux-kernel-hardening-lab/docs/assets/diagrams/STYLE_GUIDE.md)
+

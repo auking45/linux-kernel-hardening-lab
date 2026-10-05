@@ -1,22 +1,23 @@
-# 09. Dynamic Linking and Runtime Loading (Dynamic Linking & Loading)
+# 09. Dynamic Linking & Runtime Dynamic Loading (Dynamic Linking & Loading)
 
-Investigating how **Dynamic Linking** and Shared Objects (`.so`) optimize memory, the mechanics of **PLT (Procedure Linkage Table)** and **GOT (Global Offset Table)** during **Lazy Binding**, and runtime plugin architectures via the **`dlopen` API**.
+In-depth analysis of **Dynamic Linking (Shared Objects)** enabling physical memory deduplication and live patching across Linux processes, the low-level **PLT / GOT Lazy Binding** dispatch mechanism, and runtime on-demand module loading via the **`dlopen` API**.
 
 ---
 
 ## 1. Learning Objectives & Overview
 
-- Understand why **Position-Independent Code (PIC, `-fPIC`)** is essential for sharing physical code pages across multiple processes.
-- Trace how the dynamic linker (`ld-linux.so`) cooperates with the **PLT and GOT** to resolve symbols at runtime.
-- Contrast the first execution (lazy binding resolution) with subsequent calls (direct dispatch).
-- Analyze the **GOT Overwrite vulnerability** and the **Full RELRO (`-z relro -z now`)** mitigation.
-- Build and execute dynamic plugins using `dlopen()`, `dlsym()`, and `dlclose()`.
+- Understand **Position-Independent Code (PIC)** and indirect data addressing mechanisms enabling shared objects (`.so`) to share physical executable pages (RX) across independent processes.
+- Inspect the `.dynamic` section and identify runtime library dependencies cataloged under `DT_NEEDED` tags.
+- Trace the low-level collaboration between the **Procedure Linkage Table (PLT)** and **Global Offset Table (GOT)** across 1st-call lazy binding resolution and 2nd-call direct caching using GDB.
+- Deconstruct the `Elf64_Rela` relocation entry byte structure for `R_X86_64_JUMP_SLOT`.
+- Analyze security implications including **GOT Overwrite attacks** and mitigation mechanisms enforced by **Full RELRO (`-z relro -z now`)**.
+- Implement modular dynamic loading workflows using the C `dlopen()`, `dlsym()`, and `dlclose()` APIs.
 
 ---
 
-## 2. Interactive PLT/GOT & dlopen Diagram
+## 2. Interactive PLT/GOT & dlopen Architecture Diagram
 
-Step through the three modes (Lazy Binding, Direct Jump, dlopen API) below:
+Interact with the 3 modes below to trace 1st-call lazy binding resolution, 2nd-call direct branch execution, and runtime `dlopen` plugin loading:
 
 <div style="width: 100%; margin: 24px 0; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; overflow: hidden;">
   <iframe src="../../assets/diagrams/principles/09-dynamic-linking.html" style="width: 100%; border: none; display: block; overflow: hidden;" scrolling="no" onload="try { const c = this.contentWindow.document.getElementById('diagramCanvas'); if(c) this.style.height = Math.ceil(c.getBoundingClientRect().height) + 'px'; } catch(e){}"></iframe>
@@ -24,108 +25,194 @@ Step through the three modes (Lazy Binding, Direct Jump, dlopen API) below:
 
 ---
 
-## 3. Position-Independent Code (PIC) & The GOT
+## 3. Position-Independent Code (PIC) & Dynamic Linker Metadata
 
-Shared library text (`libc.so`) must remain identical across processes even when mapped to varying virtual addresses (ASLR):
+Under ASLR, shared libraries (`libsecure.so`) may be loaded into completely different virtual memory addresses across different process address spaces:
 
-- As a result, code pages cannot contain hardcoded absolute addresses.
-- All global data and external function references are dispatched indirectly through the **Global Offset Table (GOT)**, located at a known relative offset from the code.
+- Code segments cannot contain hardcoded absolute addresses. Instead, all external functions and global data are accessed indirectly via the **Global Offset Table (GOT)** located in the writable data segment (`-fPIC`).
+- ELF binaries specify the dynamic linker (`ld-linux-x86-64.so.2`) via the `PT_INTERP` segment and catalog dependency shared libraries under `DT_NEEDED` tags in the `.dynamic` section.
 
----
+```bash
+# Inspect dynamic interpreter path
+readelf -p .interp secvault_dyn
 
-## 4. PLT / GOT Lazy Binding Pipeline
+# Inspect dynamic dependencies (DT_NEEDED)
+readelf -d secvault_dyn | grep -E 'NEEDED|RPATH|RUNPATH'
+```
 
-When an application invokes an external library function such as `printf()`:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant App as User Code (main)
-    participant PLT as printf@plt
-    participant GOT as printf@got.plt
-    participant Linker as Dynamic Linker (_dl_runtime_resolve)
-    participant Libc as libc.so (printf body)
-
-    Note over App,Libc: [1st Call: Initial Lazy Binding]
-    App->>PLT: call printf@plt
-    PLT->>GOT: jmp *printf@got.plt
-    Note over GOT: Unresolved!<br/>Points back to push stub in PLT
-    GOT-->>PLT: Return (push reloc_arg)
-    PLT->>Linker: jmp _dl_runtime_resolve
-    Linker->>Linker: Look up printf address in libc.so (0x7f..1230)
-    Linker->>GOT: Record printf@got.plt = 0x7f..1230!
-    Linker->>Libc: Execute printf()
-
-    Note over App,Libc: [2nd Call: Direct Jump]
-    App->>PLT: call printf@plt
-    PLT->>GOT: jmp *printf@got.plt
-    Note over GOT: 0x7f..1230 cached!
-    GOT->>Libc: Dispatches directly to printf() in 1 clock cycle!
+```
+ 0x0000000000000001 (NEEDED)             Shared library: [libsecure.so]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x000000000000001d (RUNPATH)            Library runpath: [.]
 ```
 
 ---
 
-## 5. Security: GOT Overwrite vs Full RELRO
+## 4. Low-Level Lazy Binding Pipeline Mechanics
 
-- **GOT Overwrite Exploit**:
-  - To permit lazy binding, `.got.plt` must remain writable (`rw-p`) throughout execution.
-  - Attackers exploiting arbitrary write flaws can overwrite `printf@got` with `system()`, executing shell commands upon subsequent `printf()` calls.
-- **Defense: Full RELRO (Read-Only Relocations)**:
-  - Compile with `-Wl,-z,relro,-z,now`.
-  - Resolves all external symbols at startup (Immediate Binding), then marks `.got` strictly **Read-Only (`r--p`)**, permanently blocking overwrites.
+While modern compilers frequently default to Full RELRO, classic Unix systems and high-throughput environments rely on **Lazy Binding (`-Wl,-z,lazy`)** to defer symbol resolution until a function is explicitly invoked:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as Caller (secvault_dyn)
+    participant PLT_SEC as verify_token@plt (0x10d0)
+    participant GOT as verify_token@got.plt (0x4020)
+    participant PLT_0 as .plt Trampoline (0x1020)
+    participant Linker as Dynamic Linker (_dl_runtime_resolve)
+    participant Lib as libsecure.so (Target Routine)
+
+    Note over App,Lib: [1st Call: Initial Lazy Resolution]
+    App->>PLT_SEC: call verify_token@plt
+    PLT_SEC->>GOT: jmp *verify_token@got.plt
+    Note over GOT: Unresolved!<br/>Contains internal .plt fallback stub (0x1070)
+    GOT-->>PLT_0: Branch to 0x1070 (push reloc_idx=0x4 ➔ jmp 0x1020)
+    PLT_0->>Linker: push link_map ➔ jmp _dl_runtime_resolve
+    Linker->>Linker: Locate symbol 'verify_token' across loaded libraries
+    Linker->>GOT: Overwrite GOT[0x4020] with 0x7ffff7fb9119!
+    Linker->>Lib: Transfer control & execute verify_token()
+
+    Note over App,Lib: [2nd Call: Cached Direct Branch]
+    App->>PLT_SEC: call verify_token@plt
+    PLT_SEC->>GOT: jmp *verify_token@got.plt
+    Note over GOT: 0x7ffff7fb9119 already cached!
+    GOT->>Lib: Direct branch with zero linker overhead!
+```
 
 ---
 
-## 6. Runtime Dynamic Loading (`dlopen` / `dlsym`)
+## 5. Live GDB Tracing: Observing Lazy Binding State Transitions
 
-Loading shared objects programmatically on demand:
+Tracing `secvault_dyn` with GDB provides concrete evidence of how the GOT entry at `0x555555558020` transitions across two successive calls to `verify_token()`:
+
+### 5.1 Step 1: Before the 1st Call (Unresolved State)
+
+Prior to the initial invocation, the GOT slot points directly back to the `.plt` trampoline stub:
+
+![GDB Lazy Binding Step 1 Terminal](../../assets/images/principles/09-gdb-lazy-binding-step1.svg)
+
+```bash
+gdb -q -nx ./secvault_dyn
+(gdb) b main && run
+(gdb) x/gx &verify_token@got.plt
+0x555555558020 <verify_token@got.plt>:    0x0000555555555070
+
+(gdb) x/2i 0x0000555555555070
+   0x555555555070:  endbr64
+   0x555555555074:  push   $0x4        # Slot index in .rela.plt
+   0x555555555079:  jmp    0x555555555020 # .plt header (_dl_runtime_resolve)
+```
+
+### 5.2 Step 2: After the 1st Call (Resolved State)
+
+The dynamic resolver (`_dl_runtime_resolve`) overwrites the GOT entry with the genuine target address:
+
+![GDB Lazy Binding Step 2 Terminal](../../assets/images/principles/09-gdb-lazy-binding-step2.svg)
+
+```bash
+(gdb) continue # Execute 1st call
+[*] [Call 1] Invoking verify_token() for the first time...
+[+] [Call 1 Result] AUTHORIZED
+
+(gdb) x/gx &verify_token@got.plt
+0x555555558020 <verify_token@got.plt>:    0x00007ffff7fb9119
+
+(gdb) info symbol 0x00007ffff7fb9119
+verify_token in section .text of ./libsecure.so
+```
+
+- Subsequent invocations skip the resolver entirely, jumping directly to `0x7ffff7fb9119` in `libsecure.so`.
+
+---
+
+## 6. Dynamic Relocation Table & `Elf64_Rela` Structure
+
+The dynamic linker inspects relocation entries in `.rela.plt` to link unresolved symbols to GOT addresses:
+
+![Relocation Table and Elf64_Rela Terminal Analysis](../../assets/images/principles/09-relocation-byte-analysis.svg)
+
+```bash
+readelf -r secvault_dyn
+```
+
+```
+Relocation section '.rela.plt' at offset 0x668 contains 5 entries:
+  Offset          Info           Type           Sym. Value        Sym. Name + Addend
+  000000004020  000500000007 R_X86_64_JUMP_SLOT 0000000000000000 verify_token + 0
+```
+
+### 6.1 `Elf64_Rela` Byte Breakdown
+
+```c
+typedef struct {
+    Elf64_Addr   r_offset; /* 0x00004020 : Target GOT slot offset to overwrite (8B) */
+    Elf64_Xword  r_info;   /* 0x000500000007 : Symbol Index (High 32b) + Reloc Type (Low 32b) (8B) */
+    Elf64_Sxword r_addend; /* 0x00000000 : Explicit addend value (8B) */
+} Elf64_Rela; /* Total 24 bytes */
+```
+
+- **`r_offset = 0x4020`**: Memory address of `verify_token`'s GOT entry relative to `_GLOBAL_OFFSET_TABLE_`.
+- **`r_info = 0x000500000007`**:
+  - High 32 bits (`0x5`): Index 5 within the dynamic symbol table (`.dynsym`).
+  - Low 32 bits (`0x7`): Relocation identifier `R_X86_64_JUMP_SLOT`.
+
+---
+
+## 7. Security Implications: GOT Overwrite vs. Full RELRO
+
+- **GOT Overwrite Vulnerability**:
+  - Because lazy binding requires in-flight updates to `.got.plt`, the GOT region remains writable (`rw-p`).
+  - Memory corruption exploits (format string bugs, heap overflows) can overwrite a GOT pointer with an arbitrary address (such as `system()`), hijacking control flow upon the next function invocation.
+- **Defense Mechanism: Full RELRO (`-Wl,-z,relro,-z,now`)**:
+  - Eliminates lazy binding by forcing the dynamic linker to resolve all imported symbols during process initialization.
+  - Immediately marks the entire GOT region as **read-only (`r--p`) via `mprotect`**, permanently preventing runtime pointer modification.
+
+---
+
+## 8. Runtime Dynamic Loading API (`dlopen` / `dlsym`)
+
+Standard C interface for on-demand shared object loading without static link-time declarations:
 
 ```c
 #include <dlfcn.h>
 
 void *handle = dlopen("./libplugin.so", RTLD_NOW);
-int (*run)(int) = dlsym(handle, "plugin_execute");
-run(42);
+int (*exec)(int) = dlsym(handle, "plugin_execute");
+exec(42);
 dlclose(handle);
 ```
 
 ---
 
-## 7. Lab Source Code & Verification
+## 9. Practical Lab Source Code & Verification
 
-- **Lab Source Code**: [`dlopen_demo.c`](../../assets/labs/principles/09-dynamic-linking-loading/dlopen_demo.c) (Local Asset) | [GitHub Source Code Repository :octicons-mark-github-16:](https://github.com/auking45/linux-kernel-hardening-lab/blob/main/labs/principles/09-dynamic-linking-loading/dlopen_demo.c)
-- **Dedicated Makefile**: [`Makefile`](../../assets/labs/principles/09-dynamic-linking-loading/Makefile)
-
-### 7.1 Running Runtime `dlopen` Demo
+- **Lab Source Code**: [`secvault_dyn.c`](../../assets/labs/principles/09-dynamic-linking-loading/secvault_dyn.c) | [`libsecure.c`](../../assets/labs/principles/09-dynamic-linking-loading/libsecure.c) | [`dlopen_demo.c`](../../assets/labs/principles/09-dynamic-linking-loading/dlopen_demo.c) | [`plugin.c`](../../assets/labs/principles/09-dynamic-linking-loading/plugin.c) | [`trace_got.gdb`](../../assets/labs/principles/09-dynamic-linking-loading/trace_got.gdb)
+- **Lab Makefile**: [`Makefile`](../../assets/labs/principles/09-dynamic-linking-loading/Makefile)
 
 ```bash
 cd labs/principles/09-dynamic-linking-loading
+
+# 1. Execute dynamically linked binary
+make run
+
+# 2. Run runtime dlopen dynamic plugin execution
 make run-dlopen
-```
 
-```
-=== [1] Running Runtime Dynamic Loading (dlopen) ===
-./dlopen_demo
-============================================================
- Runtime Dynamic Loading (dlopen / dlsym Demonstration)
-============================================================
-[+] Opening shared library at runtime: ./libplugin.so
-[+] Library mapped into address space! Handle: 0x3b0326d0
-[+] Resolved symbol 'plugin_name'    at address: 0x7fa7329a5110
-[+] Resolved symbol 'plugin_execute' at address: 0x7fa7329a5120
+# 3. Inspect PT_INTERP and DT_NEEDED dependencies
+make inspect-interp
+make inspect-dynamic
 
-[*] Plugin Name Result  : High-Precision Telemetry Sensor Plugin v1.0
-[libplugin.so] Executing telemetry calculation on input=10...
-[*] Plugin Execute Result: 427
+# 4. Examine PLT stubs and GOT relocation entries
+make inspect-got
 
-[+] Calling dlclose(0x3b0326d0) to unmap library...
-[+] Library safely unmapped from process memory.
-============================================================
+# 5. Execute automated GDB script tracing lazy binding GOT updates
+make trace-lazy-binding
 ```
 
 ---
 
-## 8. Summary & Curriculum Bridge
+## 10. Summary & Transition to Hardening Modules
 
-- Dynamic linking maximizes memory efficiency and enables modular extension via `dlopen`.
-- With these fundamentals mastered, explore kernel-level protections in the **[Hardening Features Reference](../features/index.md)** and full exploit chains in **[Attack Scenarios](../scenarios/index.md)**.
+- Dynamic linking maximizes memory reuse across processes via Position-Independent Code (PIC) and PLT/GOT indirection.
+- Lazy binding resolves functions on the initial call and branches directly on subsequent invocations.
+- Having mastered fundamental system principles, proceed to the **[Kernel Hardening Features Reference](../features/index.md)** and hands-on **[Attack Scenarios](../scenarios/index.md)** to explore real-world mitigation architectures.

@@ -1,38 +1,61 @@
-CC ?= clang
-CFLAGS ?= -O2 -Wall -Wextra
+CC = gcc-13
+CFLAGS ?= -Wall -Wextra
 
-TARGET_DEFAULT = sym_demo_default
-TARGET_OVERRIDE = sym_demo_override
+TARGET_DEFAULT = auth_demo
+TARGET_OVERRIDE = auth_override
 
-.PHONY: all run run-override inspect-symbols inspect-reloc clean
+.PHONY: all run run-override demo-conflict demo-local inspect-symbols demo-strip clean
 
 all: $(TARGET_DEFAULT) $(TARGET_OVERRIDE)
 
-# Build without override (Weak symbol used)
-$(TARGET_DEFAULT): main.c calc.c
-	$(CC) $(CFLAGS) $^ -o $@
+# 1. Normal link (Weak symbol in token_validator.c used)
+$(TARGET_DEFAULT): auth_main.c token_validator.c
+	$(CC) $(CFLAGS) -O2 $^ -o $@
 
-# Build with override (Strong symbol in weak_override.c replaces weak in calc.c)
-$(TARGET_OVERRIDE): main.c calc.c weak_override.c
-	$(CC) $(CFLAGS) $^ -o $@
+# 2. Override link (Strong symbol in auth_hook.c replaces weak symbol)
+$(TARGET_OVERRIDE): auth_main.c token_validator.c auth_hook.c
+	$(CC) $(CFLAGS) -O2 $^ -o $@
 
 run: $(TARGET_DEFAULT)
-	@echo "=== [1] Running Default Build (Weak Symbol in effect) ==="
+	@echo "=== [1] Running Default Build (Weak Logger) ==="
 	./$(TARGET_DEFAULT)
 
 run-override: $(TARGET_OVERRIDE)
-	@echo "=== [2] Running Override Build (Strong Symbol overrides Weak) ==="
+	@echo "=== [2] Running Hardened Override Build (Strong Logger) ==="
 	./$(TARGET_OVERRIDE)
 
-inspect-symbols: calc.c
-	$(CC) $(CFLAGS) -c calc.c -o calc.o
-	@echo "=== Symbol Table of calc.o (W indicates WEAK, T indicates TEXT/GLOBAL) ==="
-	nm calc.o
+# 3. Deliberately trigger Strong-Strong symbol collision
+demo-conflict:
+	@echo "=== [3] Deliberate Symbol Conflict (Multiple Definition) ==="
+	-$(CC) $(CFLAGS) auth_main.c token_validator.c token_conflict.c -o test_conflict 2>&1
 
-inspect-reloc: main.c
-	$(CC) $(CFLAGS) -c main.c -o main.o
-	@echo "=== Relocation Entries of main.o (readelf -r) ==="
-	readelf -r main.o
+# 4. Deliberately trigger undefined reference due to static LOCAL scoping
+demo-local:
+	@echo "=== [4] Deliberate Undefined Reference (Static Scoping) ==="
+	-$(CC) $(CFLAGS) auth_main.c token_local.c -o test_local 2>&1
+
+inspect-symbols:
+	@echo "=== [5] Inspecting Symbol Binding (GLOBAL vs LOCAL) ==="
+	$(CC) $(CFLAGS) -c token_validator.c -o token_validator.o
+	$(CC) $(CFLAGS) -c token_local.c -o token_local.o
+	@echo "--- token_validator.o (g_auth_counter = GLOBAL) ---"
+	readelf -s token_validator.o | grep g_auth_counter
+	@echo "--- token_local.o (g_auth_counter = LOCAL) ---"
+	readelf -s token_local.o | grep g_auth_counter
+
+demo-strip: $(TARGET_DEFAULT)
+	@echo "=== [6] Symbol Stripping Demonstration (.symtab vs .dynsym) ==="
+	@echo "[+] Symbol count BEFORE strip:"
+	readelf -S $(TARGET_DEFAULT) | grep -E '\.symtab|\.dynsym'
+	@echo "[+] Executing program before strip:"
+	./$(TARGET_DEFAULT) > /dev/null && echo "    -> Executed successfully!"
+	@echo "[+] Stripping non-dynamic symbols (strip --strip-all)..."
+	cp $(TARGET_DEFAULT) $(TARGET_DEFAULT)_stripped
+	strip --strip-all $(TARGET_DEFAULT)_stripped
+	@echo "[+] Section headers AFTER strip (.symtab is gone, .dynsym remains):"
+	readelf -S $(TARGET_DEFAULT)_stripped | grep -E '\.symtab|\.dynsym' || true
+	@echo "[+] Executing stripped binary:"
+	./$(TARGET_DEFAULT)_stripped > /dev/null && echo "    -> Executed successfully without .symtab!"
 
 clean:
-	rm -f $(TARGET_DEFAULT) $(TARGET_OVERRIDE) *.o
+	rm -f $(TARGET_DEFAULT) $(TARGET_OVERRIDE) $(TARGET_DEFAULT)_stripped test_conflict test_local *.o
