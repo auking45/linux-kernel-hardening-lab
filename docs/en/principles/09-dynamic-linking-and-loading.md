@@ -1,17 +1,17 @@
 # 09. Dynamic Linking & Runtime Dynamic Loading (Dynamic Linking & Loading)
 
-In-depth analysis of **Dynamic Linking (Shared Objects)** enabling physical memory deduplication and live patching across Linux processes, the low-level **PLT / GOT Lazy Binding** dispatch mechanism, and runtime on-demand module loading via the **`dlopen` API**.
+In-depth analysis of **Dynamic Linking (Shared Objects)** enabling physical memory deduplication across Linux processes, the low-level **PLT / GOT Lazy Binding** dispatch mechanism, and runtime module loading via the **`dlopen` API**, featuring **AArch64 as the primary default architecture**.
 
 ---
 
 ## 1. Learning Objectives & Overview
 
 - Understand **Position-Independent Code (PIC)** and indirect data addressing mechanisms enabling shared objects (`.so`) to share physical executable pages (RX) across independent processes.
-- Inspect the `.dynamic` section and identify runtime library dependencies cataloged under `DT_NEEDED` tags.
-- Trace the low-level collaboration between the **Procedure Linkage Table (PLT)** and **Global Offset Table (GOT)** across 1st-call lazy binding resolution and 2nd-call direct caching using GDB.
-- Deconstruct the `Elf64_Rela` relocation entry byte structure for `R_X86_64_JUMP_SLOT`.
-- Analyze security implications including **GOT Overwrite attacks** and mitigation mechanisms enforced by **Full RELRO (`-z relro -z now`)**.
-- Implement modular dynamic loading workflows using the C `dlopen()`, `dlsym()`, and `dlclose()` APIs.
+- Inspect the `.dynamic` section and identify runtime library dependencies cataloged under `DT_NEEDED` tags in `ld-linux-aarch64.so.1`.
+- Trace the architectural differences between **AArch64 PLT indirect branching (`adrp` + `ldr` + `br x17`)** and x86_64 indirect jumping (`jmp *GOT`).
+- Investigate the **`.plt0` trampoline** preserving the GOT slot pointer (`x16`) and Link Register return address (`x30`) via `stp x16, x30, [sp, #-16]!`.
+- Deconstruct the `Elf64_Rela` relocation entry byte structure for `R_AARCH64_JUMP_SLOT`.
+- Analyze security implications including **GOT Overwrite attacks**, mitigations enforced by **Full RELRO (`-z relro -z now`)**, and ARMv8.5+ **BTI / PAC** hardware guardrails.
 
 ---
 
@@ -30,14 +30,14 @@ Interact with the 3 modes below to trace 1st-call lazy binding resolution, 2nd-c
 Under ASLR, shared libraries (`libsecure.so`) may be loaded into completely different virtual memory addresses across different process address spaces:
 
 - Code segments cannot contain hardcoded absolute addresses. Instead, all external functions and global data are accessed indirectly via the **Global Offset Table (GOT)** located in the writable data segment (`-fPIC`).
-- ELF binaries specify the dynamic linker (`ld-linux-x86-64.so.2`) via the `PT_INTERP` segment and catalog dependency shared libraries under `DT_NEEDED` tags in the `.dynamic` section.
+- ELF binaries specify the dynamic linker via `PT_INTERP` and catalog dependency shared libraries under `DT_NEEDED` tags in `.dynamic`.
 
 ```bash
-# Inspect dynamic interpreter path
-readelf -p .interp secvault_dyn
+# Inspect dynamic interpreter path (AArch64)
+aarch64-linux-gnu-readelf -p .interp secvault_dyn
 
 # Inspect dynamic dependencies (DT_NEEDED)
-readelf -d secvault_dyn | grep -E 'NEEDED|RPATH|RUNPATH'
+aarch64-linux-gnu-readelf -d secvault_dyn | grep -E 'NEEDED|RPATH|RUNPATH'
 ```
 
 ```
@@ -50,78 +50,74 @@ readelf -d secvault_dyn | grep -E 'NEEDED|RPATH|RUNPATH'
 
 ## 4. Low-Level Lazy Binding Pipeline Mechanics
 
-While modern compilers frequently default to Full RELRO, classic Unix systems and high-throughput environments rely on **Lazy Binding (`-Wl,-z,lazy`)** to defer symbol resolution until a function is explicitly invoked:
+While modern compilers default to Full RELRO, classic high-throughput environments utilize **Lazy Binding (`-Wl,-z,lazy`)** to defer symbol resolution until explicit function invocation:
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant App as Caller (secvault_dyn)
-    participant PLT_SEC as verify_token@plt (0x10d0)
-    participant GOT as verify_token@got.plt (0x4020)
-    participant PLT_0 as .plt Trampoline (0x1020)
+    participant PLT_SEC as verify_token@plt
+    participant GOT as verify_token@got.plt
+    participant PLT_0 as .plt Trampoline
     participant Linker as Dynamic Linker (_dl_runtime_resolve)
     participant Lib as libsecure.so (Target Routine)
 
     Note over App,Lib: [1st Call: Initial Lazy Resolution]
-    App->>PLT_SEC: call verify_token@plt
-    PLT_SEC->>GOT: jmp *verify_token@got.plt
-    Note over GOT: Unresolved!<br/>Contains internal .plt fallback stub (0x1070)
-    GOT-->>PLT_0: Branch to 0x1070 (push reloc_idx=0x4 ➔ jmp 0x1020)
-    PLT_0->>Linker: push link_map ➔ jmp _dl_runtime_resolve
+    App->>PLT_SEC: bl verify_token@plt
+    PLT_SEC->>GOT: adrp x16, page + ldr x17, [x16, offset] + br x17
+    Note over GOT: Unresolved!<br/>Branches to .plt0 trampoline
+    GOT-->>PLT_0: stp x16, x30, [sp, #-16]! (Save GOT slot & LR)
+    PLT_0->>Linker: br x17 (_dl_runtime_resolve invoked)
     Linker->>Linker: Locate symbol 'verify_token' across loaded libraries
-    Linker->>GOT: Overwrite GOT[0x4020] with 0x7ffff7fb9119!
+    Linker->>GOT: Overwrite GOT slot with target virtual address!
     Linker->>Lib: Transfer control & execute verify_token()
 
     Note over App,Lib: [2nd Call: Cached Direct Branch]
-    App->>PLT_SEC: call verify_token@plt
-    PLT_SEC->>GOT: jmp *verify_token@got.plt
-    Note over GOT: 0x7ffff7fb9119 already cached!
+    App->>PLT_SEC: bl verify_token@plt
+    PLT_SEC->>GOT: adrp x16, page + ldr x17, [x16, offset] + br x17
+    Note over GOT: Function address already cached!
     GOT->>Lib: Direct branch with zero linker overhead!
 ```
 
 ---
 
-## 5. Live GDB Tracing: Observing Lazy Binding State Transitions
+## 5. AArch64 vs. x86_64 PLT Disassembly Comparison
 
-Tracing `secvault_dyn` with GDB provides concrete evidence of how the GOT entry at `0x555555558020` transitions across two successive calls to `verify_token()`:
+![AArch64 PLT Stub Disassembly Terminal](../../assets/images/principles/09-gdb-lazy-binding-step1.svg)
 
-### 5.1 Step 1: Before the 1st Call (Unresolved State)
+=== "AArch64 (Default - Device)"
+    ```armasm
+    ; 1. Individual Function PLT Stub (verify_token@plt)
+    0000000000000780 <verify_token@plt>:
+     780:  90000110  adrp  x16, 20000        ; Compute 4KB page of GOT via PC-relative
+     784:  f9402211  ldr   x17, [x16, #64]   ; Load address from GOT[verify_token]
+     788:  91010210  add   x16, x16, #0x40   ; Place relocation slot pointer in x16
+     78c:  d61f0220  br    x17               ; Branch indirectly to x17
 
-Prior to the initial invocation, the GOT slot points directly back to the `.plt` trampoline stub:
+    ; 2. Common PLT Header (.plt0 Trampoline)
+    00000000000006e0 <.plt>:
+     6e0:  a9bf7bf0  stp   x16, x30, [sp, #-16]! ; Push GOT slot (x16) & return address (LR x30)
+     6e4:  f00000f0  adrp  x16, 1f000            ; Resolver page address
+     6e8:  f947fe11  ldr   x17, [x16, #4088]     ; Load _dl_runtime_resolve address
+     6ec:  913fe210  add   x16, x16, #0xff8
+     6f0:  d61f0220  br    x17                   ; Direct jump to dynamic resolver
+    ```
 
-![GDB Lazy Binding Step 1 Terminal](../../assets/images/principles/09-gdb-lazy-binding-step1.svg)
+=== "x86_64 (Server/Legacy)"
+    ```nasm
+    ; 1. Individual Function PLT Stub (verify_token@plt.sec)
+    00000000000010d0 <verify_token@plt>:
+      10d0: endbr64
+      10d4: jmp    *0x2f46(%rip)        ; Direct indirect jump via GOT slot (0x4020)
 
-```bash
-gdb -q -nx ./secvault_dyn
-(gdb) b main && run
-(gdb) x/gx &verify_token@got.plt
-0x555555558020 <verify_token@got.plt>:    0x0000555555555070
+    ; 2. Common PLT Header (.plt)
+    0000000000001020 <.plt>:
+      1020: push   0x2fca(%rip)         ; Push link_map
+      1026: jmp    *0x2fcc(%rip)        ; Jump to _dl_runtime_resolve
+    ```
 
-(gdb) x/2i 0x0000555555555070
-   0x555555555070:  endbr64
-   0x555555555074:  push   $0x4        # Slot index in .rela.plt
-   0x555555555079:  jmp    0x555555555020 # .plt header (_dl_runtime_resolve)
-```
-
-### 5.2 Step 2: After the 1st Call (Resolved State)
-
-The dynamic resolver (`_dl_runtime_resolve`) overwrites the GOT entry with the genuine target address:
-
-![GDB Lazy Binding Step 2 Terminal](../../assets/images/principles/09-gdb-lazy-binding-step2.svg)
-
-```bash
-(gdb) continue # Execute 1st call
-[*] [Call 1] Invoking verify_token() for the first time...
-[+] [Call 1 Result] AUTHORIZED
-
-(gdb) x/gx &verify_token@got.plt
-0x555555558020 <verify_token@got.plt>:    0x00007ffff7fb9119
-
-(gdb) info symbol 0x00007ffff7fb9119
-verify_token in section .text of ./libsecure.so
-```
-
-- Subsequent invocations skip the resolver entirely, jumping directly to `0x7ffff7fb9119` in `libsecure.so`.
+- **AArch64 Architectural Advantage**: AArch64 uses `adrp` and `ldr` with 4KB page granularity, enabling precise PC-relative displacement control.
+- **Hardware Guards**: In AArch64, indirect branch targets (`br x17`) are guarded by **BTI (`bti c`)**, trapping illegal landing branches with hardware SIGILL exceptions.
 
 ---
 
@@ -129,90 +125,86 @@ verify_token in section .text of ./libsecure.so
 
 The dynamic linker inspects relocation entries in `.rela.plt` to link unresolved symbols to GOT addresses:
 
-![Relocation Table and Elf64_Rela Terminal Analysis](../../assets/images/principles/09-relocation-byte-analysis.svg)
+![AArch64 Relocation Table Terminal Analysis](../../assets/images/principles/09-relocation-byte-analysis.svg)
 
 ```bash
-readelf -r secvault_dyn
+aarch64-linux-gnu-readelf -r secvault_dyn
 ```
 
 ```
-Relocation section '.rela.plt' at offset 0x668 contains 5 entries:
-  Offset          Info           Type           Sym. Value        Sym. Name + Addend
-  000000004020  000500000007 R_X86_64_JUMP_SLOT 0000000000000000 verify_token + 0
+Relocation section '.rela.plt' at offset 0x5e8 contains 9 entries:
+  Offset          Info           Type           Sym. Value    Sym. Name + Addend
+000000020040  000d00000402 R_AARCH64_JUMP_SL 0000000000000000 verify_token + 0
 ```
 
-### 6.1 `Elf64_Rela` Byte Breakdown
+### 6.1 `Elf64_Rela` Byte Breakdown (AArch64)
 
 ```c
 typedef struct {
-    Elf64_Addr   r_offset; /* 0x00004020 : Target GOT slot offset to overwrite (8B) */
-    Elf64_Xword  r_info;   /* 0x000500000007 : Symbol Index (High 32b) + Reloc Type (Low 32b) (8B) */
-    Elf64_Sxword r_addend; /* 0x00000000 : Explicit addend value (8B) */
+    Elf64_Addr   r_offset; /* 0x000000020040 : Target GOT entry address to overwrite (8B) */
+    Elf64_Xword  r_info;   /* 0x000d00000402 : Symbol Index (High 32b) + Reloc Type (Low 32b) (8B) */
+    Elf64_Sxword r_addend; /* 0x000000000000 : Explicit addend value (8B) */
 } Elf64_Rela; /* Total 24 bytes */
 ```
 
-- **`r_offset = 0x4020`**: Memory address of `verify_token`'s GOT entry relative to `_GLOBAL_OFFSET_TABLE_`.
-- **`r_info = 0x000500000007`**:
-  - High 32 bits (`0x5`): Index 5 within the dynamic symbol table (`.dynsym`).
-  - Low 32 bits (`0x7`): Relocation identifier `R_X86_64_JUMP_SLOT`.
+- **`r_offset = 0x20040`**: Memory address of `verify_token`'s GOT entry.
+- **`r_info = 0x000d00000402`**:
+  - High 32 bits (`0xd = 13`): Index 13 within `.dynsym` (`verify_token`).
+  - Low 32 bits (`0x402 = 1026`): Relocation identifier `R_AARCH64_JUMP_SLOT`.
 
 ---
 
-## 7. Security Implications: GOT Overwrite vs. Full RELRO
+## 7. Security Implications: GOT Overwrite vs. Full RELRO & BTI/PAC
 
 - **GOT Overwrite Vulnerability**:
   - Because lazy binding requires in-flight updates to `.got.plt`, the GOT region remains writable (`rw-p`).
-  - Memory corruption exploits (format string bugs, heap overflows) can overwrite a GOT pointer with an arbitrary address (such as `system()`), hijacking control flow upon the next function invocation.
-- **Defense Mechanism: Full RELRO (`-Wl,-z,relro,-z,now`)**:
-  - Eliminates lazy binding by forcing the dynamic linker to resolve all imported symbols during process initialization.
+  - Memory corruption exploits can overwrite a GOT pointer with an arbitrary address, hijacking control flow upon the next invocation.
+- **Defense 1: Full RELRO (`-Wl,-z,relro,-z,now`)**:
+  - Eliminates lazy binding by forcing the dynamic linker to resolve all imported symbols on startup.
   - Immediately marks the entire GOT region as **read-only (`r--p`) via `mprotect`**, permanently preventing runtime pointer modification.
+- **Defense 2: ARM64 Hardware Guardrails (BTI & PAC)**:
+  - **BTI (Branch Target Identification)**: Verifies that indirect branch targets (`br x17`) land strictly on valid `bti c` landing pads.
+  - **PAC (Pointer Authentication)**: Signs the Link Register (`x30`) saved on the stack with cryptographic PAC keys (`paciasp`/`autiasp`), preventing ROP exploitation.
 
 ---
 
-## 8. Runtime Dynamic Loading API (`dlopen` / `dlsym`)
-
-Standard C interface for on-demand shared object loading without static link-time declarations:
-
-```c
-#include <dlfcn.h>
-
-void *handle = dlopen("./libplugin.so", RTLD_NOW);
-int (*exec)(int) = dlsym(handle, "plugin_execute");
-exec(42);
-dlclose(handle);
-```
-
----
-
-## 9. Practical Lab Source Code & Verification
+## 8. Practical Lab Source Code & Verification (Dual-Architecture)
 
 - **Lab Source Code**: [`secvault_dyn.c`](../../assets/labs/principles/09-dynamic-linking-loading/secvault_dyn.c) | [`libsecure.c`](../../assets/labs/principles/09-dynamic-linking-loading/libsecure.c) | [`dlopen_demo.c`](../../assets/labs/principles/09-dynamic-linking-loading/dlopen_demo.c) | [`plugin.c`](../../assets/labs/principles/09-dynamic-linking-loading/plugin.c) | [`trace_got.gdb`](../../assets/labs/principles/09-dynamic-linking-loading/trace_got.gdb)
 - **Lab Makefile**: [`Makefile`](../../assets/labs/principles/09-dynamic-linking-loading/Makefile)
 
-```bash
-cd labs/principles/09-dynamic-linking-loading
+=== "AArch64 (Default - Device)"
+    ```bash
+    cd labs/principles/09-dynamic-linking-loading
 
-# 1. Execute dynamically linked binary
-make run
+    # 1. Execute AArch64 dynamic binary via QEMU
+    make run
 
-# 2. Run runtime dlopen dynamic plugin execution
-make run-dlopen
+    # 2. Run runtime dlopen dynamic plugin execution
+    make run-dlopen
 
-# 3. Inspect PT_INTERP and DT_NEEDED dependencies
-make inspect-interp
-make inspect-dynamic
+    # 3. Inspect PT_INTERP and DT_NEEDED dependencies
+    make inspect-interp
+    make inspect-dynamic
 
-# 4. Examine PLT stubs and GOT relocation entries
-make inspect-got
+    # 4. Examine PLT stubs and GOT relocation entries
+    make inspect-got
 
-# 5. Execute automated GDB script tracing lazy binding GOT updates
-make trace-lazy-binding
-```
+    # 5. Inspect AArch64 PLT indirect branch structure
+    make trace-lazy-binding
+    ```
+
+=== "x86_64 (Server/Legacy)"
+    ```bash
+    # Execute natively and run batch GDB tracing on x86_64
+    make run ARCH=x86_64
+    make trace-lazy-binding ARCH=x86_64
+    ```
 
 ---
 
-## 10. Summary & Transition to Hardening Modules
+## 9. Summary & Transition to Hardening Modules
 
 - Dynamic linking maximizes memory reuse across processes via Position-Independent Code (PIC) and PLT/GOT indirection.
-- Lazy binding resolves functions on the initial call and branches directly on subsequent invocations.
+- AArch64 dispatches indirect branches via `adrp` and `br x17`, reinforced by BTI and PAC hardware protection.
 - Having mastered fundamental system principles, proceed to the **[Kernel Hardening Features Reference](../features/index.md)** and hands-on **[Attack Scenarios](../scenarios/index.md)** to explore real-world mitigation architectures.

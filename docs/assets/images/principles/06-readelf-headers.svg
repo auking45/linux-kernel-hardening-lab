@@ -14,33 +14,33 @@
   <circle cx="22" cy="19" r="6" fill="#ef4444" />
   <circle cx="40" cy="19" r="6" fill="#f59e0b" />
   <circle cx="58" cy="19" r="6" fill="#10b981" />
-  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">ELF Header Comparison: Relocatable (.o) vs Executable (readelf -h)</text>
+  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">AArch64 ELF Header Comparison: Relocatable vs Executable (readelf -h)</text>
   <text x="24" y="62" font-size="12.5" xml:space="preserve">
-    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@arm64</tspan>
     <tspan fill="#94a3b8">:</tspan>
     <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
-    <tspan fill="#f1f5f9" font-weight="bold">$ readelf -h vault_core.o</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ aarch64-linux-gnu-readelf -h vault_core.o</tspan>
   </text>
-  <text x="24" y="82" fill="#38bdf8" font-size="12" font-weight="bold" xml:space="preserve">ELF Header (Relocatable Object File):</text>
+  <text x="24" y="82" fill="#38bdf8" font-size="12" font-weight="bold" xml:space="preserve">ELF Header (AArch64 Relocatable Object File):</text>
   <text x="24" y="102" fill="#cbd5e1" font-size="12" xml:space="preserve">  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00</text>
   <text x="24" y="122" fill="#cbd5e1" font-size="12" xml:space="preserve">  Class:                             ELF64</text>
   <text x="24" y="142" fill="#cbd5e1" font-size="12" xml:space="preserve">  Data:                              2&#x27;s complement, little endian</text>
   <text x="24" y="162" fill="#fbbf24" font-size="12" xml:space="preserve">  Type:                              REL (Relocatable file)</text>
-  <text x="24" y="182" fill="#64748b" font-size="12" xml:space="preserve">  Entry point address:               0x0  &lt;-- [No entry point defined yet!]</text>
-  <text x="24" y="202" fill="#64748b" font-size="12" xml:space="preserve">  Start of program headers:          0 (bytes into file) &lt;-- [No Program Headers!]</text>
-  <text x="24" y="222" fill="#cbd5e1" font-size="12" xml:space="preserve">  Start of section headers:          9816 (bytes into file)</text>
-  <text x="24" y="242" fill="#cbd5e1" font-size="12" xml:space="preserve">  Number of section headers:         24</text>
+  <text x="24" y="182" fill="#c084fc" font-size="12" font-weight="bold" xml:space="preserve">  Machine:                           AArch64 (EM_AARCH64 = 183)</text>
+  <text x="24" y="202" fill="#64748b" font-size="12" xml:space="preserve">  Entry point address:               0x0  &lt;-- [No entry point defined yet!]</text>
+  <text x="24" y="222" fill="#64748b" font-size="12" xml:space="preserve">  Start of program headers:          0 (bytes into file) &lt;-- [0 Segments]</text>
+  <text x="24" y="242" fill="#cbd5e1" font-size="12" xml:space="preserve">  Number of section headers:         29</text>
   <text x="24" y="282" font-size="12.5" xml:space="preserve">
-    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@arm64</tspan>
     <tspan fill="#94a3b8">:</tspan>
     <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
-    <tspan fill="#f1f5f9" font-weight="bold">$ readelf -h vault_core</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ aarch64-linux-gnu-readelf -h vault_core</tspan>
   </text>
-  <text x="24" y="302" fill="#38bdf8" font-size="12" font-weight="bold" xml:space="preserve">ELF Header (Position-Independent Executable):</text>
+  <text x="24" y="302" fill="#38bdf8" font-size="12" font-weight="bold" xml:space="preserve">ELF Header (AArch64 Position-Independent Executable):</text>
   <text x="24" y="322" fill="#cbd5e1" font-size="12" xml:space="preserve">  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00</text>
   <text x="24" y="342" fill="#34d399" font-size="12" xml:space="preserve">  Type:                              DYN (Position-Independent Executable file)</text>
-  <text x="24" y="362" fill="#34d399" font-size="12" xml:space="preserve">  Entry point address:               0x1190  &lt;-- [_start in .text]</text>
-  <text x="24" y="382" fill="#34d399" font-size="12" xml:space="preserve">  Start of program headers:          64 (bytes into file)  &lt;-- [13 Segments for Kernel Loader]</text>
-  <text x="24" y="402" fill="#cbd5e1" font-size="12" xml:space="preserve">  Start of section headers:          16832 (bytes into file)</text>
-  <text x="24" y="422" fill="#cbd5e1" font-size="12" xml:space="preserve">  Number of section headers:         39</text>
+  <text x="24" y="362" fill="#c084fc" font-size="12" font-weight="bold" xml:space="preserve">  Machine:                           AArch64 (EM_AARCH64 = 183)</text>
+  <text x="24" y="382" fill="#34d399" font-size="12" xml:space="preserve">  Entry point address:               0x7c0  &lt;-- [_start in .text]</text>
+  <text x="24" y="402" fill="#34d399" font-size="12" xml:space="preserve">  Start of program headers:          64 (bytes into file)  &lt;-- [9 Program Headers]</text>
+  <text x="24" y="422" fill="#cbd5e1" font-size="12" xml:space="preserve">  Number of section headers:         36</text>
 </svg>

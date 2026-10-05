@@ -1,6 +1,6 @@
 # 07. Symbol Tables & Relocation Mechanisms (Symbols & Relocation)
 
-In-depth analysis of how independent object modules (`.o`) are combined into a coherent executable binary through **Symbol Resolution** (binding variable and function names to memory addresses) and **Relocation** (patching instruction operand offsets).
+In-depth analysis of how independent object modules (`.o`) are combined into a cohesive binary through **Symbol Resolution** (binding identifiers to memory addresses) and **Relocation** (patching instruction operands), featuring **AArch64 as the primary default architecture**.
 
 ---
 
@@ -8,9 +8,9 @@ In-depth analysis of how independent object modules (`.o`) are combined into a c
 
 - Deconstruct the byte fields of the ELF symbol table structure (`Elf64_Sym`) and understand symbol binding attributes (`GLOBAL`, `LOCAL`, `WEAK`).
 - Analyze how the `static` keyword enforces `LOCAL` binding, isolating translation units and triggering linker `undefined reference` errors.
-- Investigate the linker's **Three Golden Rules for Strong vs. Weak Symbol Resolution** and reproduce fatal duplicate definition conflicts (`multiple definition`).
-- Demonstrate the runtime distinction between static symbols (`.symtab`) and dynamic symbols (`.dynsym`) through binary **Symbol Stripping (`strip`)**.
-- Calculate low-level instruction operand patches using PC-relative relocation arithmetic (`S + A - P`).
+- Investigate the linker's **Three Golden Rules for Strong vs. Weak Symbol Resolution** across AArch64 and x86_64 environments.
+- Demonstrate the runtime distinction between static symbols (`.symtab`) and dynamic symbols (`.dynsym`) through binary **Symbol Stripping (`strip`)** and QEMU execution.
+- Calculate low-level AArch64 PC-relative relocations (`R_AARCH64_ADR_PREL_PG_HI21`, `R_AARCH64_ADD_ABS_LO12_NC`, `R_AARCH64_CALL26`).
 
 ---
 
@@ -43,25 +43,34 @@ typedef struct {
 
 Declaring a variable or helper function as `static` instructs the compiler to emit the symbol with `STB_LOCAL` binding:
 
-![Undefined Reference Error due to LOCAL Binding Terminal](../../assets/images/principles/07-symbol-local-error.svg)
+![AArch64 Undefined Reference Error Terminal](../../assets/images/principles/07-symbol-local-error.svg)
 
-```bash
-gcc-13 -Wall -Wextra auth_main.c token_local.c -o test_local
-```
+=== "AArch64 (Default - Device)"
+    ```bash
+    aarch64-linux-gnu-gcc auth_main.c token_local.c -o test_local
+    ```
+    ```
+    /usr/bin/aarch64-linux-gnu-ld: in function 'main':
+    auth_main.c:(.text+0x74): undefined reference to 'g_auth_counter'
+    collect2: error: ld returned 1 exit status
+    ```
+    ```bash
+    aarch64-linux-gnu-readelf -s token_local.o | grep g_auth_counter
+         5: 0000000000000000     4 OBJECT  LOCAL  DEFAULT    4 g_auth_counter
+    ```
 
-```
-/usr/bin/ld: in function 'main':
-auth_main.c:(.text+0x82): undefined reference to 'g_auth_counter'
-collect2: error: ld returned 1 exit status
-```
-
-```bash
-readelf -s token_local.o | grep g_auth_counter
-     4: 0000000000000000     4 OBJECT  LOCAL  DEFAULT    4 g_auth_counter
-```
+=== "x86_64 (Server/Legacy)"
+    ```bash
+    gcc-13 auth_main.c token_local.c -o test_local_x86
+    ```
+    ```
+    /usr/bin/ld: in function 'main':
+    auth_main.c:(.text+0x82): undefined reference to 'g_auth_counter'
+    collect2: error: ld returned 1 exit status
+    ```
 
 - In `token_local.c`, `static int g_auth_counter` is constrained to `LOCAL` binding, making it invisible outside its translation unit.
-- Even though `auth_main.c` declares `extern int g_auth_counter;`, the static linker cannot locate it in the global symbol pool, aborting with a fatal `undefined reference` error.
+- Even though `auth_main.c` declares `extern int g_auth_counter;`, the static linker cannot locate it in the global symbol pool, aborting with a fatal `undefined reference` error across both architectures.
 
 ---
 
@@ -78,14 +87,14 @@ The static linker (`ld`) enforces precise arbitration rules when multiple object
 
 When two or more object files declare strong symbols sharing the same identifier, the linker immediately terminates:
 
-![Linker Error: Multiple Definition Conflict Terminal](../../assets/images/principles/07-symbol-conflict-error.svg)
+![AArch64 Linker Error: Multiple Definition Conflict Terminal](../../assets/images/principles/07-symbol-conflict-error.svg)
 
 ```bash
-gcc-13 -Wall -Wextra auth_main.c token_validator.c token_conflict.c -o test_conflict
+aarch64-linux-gnu-gcc auth_main.c token_validator.c token_conflict.c -o test_conflict
 ```
 
 ```
-/usr/bin/ld: token_conflict.c:(.text+0x0): multiple definition of 'verify_auth_token'; 
+/usr/bin/aarch64-linux-gnu-ld: token_conflict.c:(.text+0x0): multiple definition of 'verify_auth_token'; 
 token_validator.c:(.text+0x0): first defined here
 collect2: error: ld returned 1 exit status
 ```
@@ -102,71 +111,90 @@ When a strong symbol contends with one or more weak symbols, the linker silently
 
 ELF binaries maintain two distinct symbol tables serving different architectural purposes:
 
-![Symbol Stripping Verification Terminal](../../assets/images/principles/07-symbol-strip-verification.svg)
+![AArch64 Symbol Stripping Verification Terminal](../../assets/images/principles/07-symbol-strip-verification.svg)
 
 ```bash
 # Before strip: Both symbol tables are present
-readelf -S auth_demo | grep -E '\.symtab|\.dynsym'
-  [ 6] .dynsym           DYNSYM           00000000000003d8  000003d8
-  [28] .symtab           SYMTAB           0000000000000000  00003040
+aarch64-linux-gnu-readelf -S auth_demo | grep -E '\.symtab|\.dynsym'
+  [ 5] .dynsym           DYNSYM           00000000000002b8  000002b8
+  [25] .symtab           SYMTAB           0000000000000000  00010040
 
 # Strip non-dynamic symbols
-strip --strip-all auth_demo -o auth_demo_stripped
+aarch64-linux-gnu-strip --strip-all auth_demo -o auth_demo_stripped
 
 # After strip: .symtab eliminated, .dynsym retained
-readelf -S auth_demo_stripped | grep -E '\.symtab|\.dynsym'
-  [ 6] .dynsym           DYNSYM           00000000000003d8  000003d8
+aarch64-linux-gnu-readelf -S auth_demo_stripped | grep -E '\.symtab|\.dynsym'
+  [ 5] .dynsym           DYNSYM           00000000000002b8  000002b8
 ```
 
-- **`.symtab` (Static Symbol Table)**: Houses local functions, `static` variables, and debugger symbols. It is not loaded into memory (`SHF_ALLOC` clear) and can be completely eliminated by `strip`.
-- **`.dynsym` (Dynamic Symbol Table)**: Required at runtime by the dynamic linker (`ld-linux.so`) to resolve imports and exports. It is marked `SHF_ALLOC` and preserved even after `strip --strip-all`.
-- The stripped executable `auth_demo_stripped` runs seamlessly, proving that application execution depends solely on `.dynsym`.
+```bash
+# Execute stripped AArch64 binary using QEMU
+qemu-aarch64 -L /usr/aarch64-linux-gnu ./auth_demo_stripped
+```
+
+- **`.symtab`**: Contains local functions, `static` variables, and debugger symbols. It is not loaded into memory (`SHF_ALLOC` clear) and can be completely eliminated by `strip`.
+- **`.dynsym`**: Required at runtime by the dynamic linker (`ld-linux-aarch64.so.1`) to resolve external symbols. It is marked `SHF_ALLOC` and preserved after `strip`.
+- The stripped executable runs seamlessly, proving that runtime execution depends solely on `.dynsym`.
 
 ---
 
-## 6. Relocation Arithmetic Mechanics (`S + A - P`)
+## 6. AArch64 vs. x86_64 Relocation Mechanics
 
-Because the compiler cannot predict external symbol addresses during single-file translation, it leaves placeholder bytes (`e8 00 00 00 00`) and records relocation entries in `.rela.text`:
+Because the compiler cannot predict external symbol addresses during single-file translation, it leaves placeholders and emits relocation directives:
 
-$$\text{Relocation Offset} = S + A - P$$
+| Architecture | Primary Relocation Type | Instruction Operand Patch | Arithmetic Formula |
+| :--- | :--- | :--- | :--- |
+| **AArch64** | `R_AARCH64_ADR_PREL_PG_HI21` | `adrp` (Upper 21-bit 4KB page) | `Page(S + A) - Page(P)` |
+| **AArch64** | `R_AARCH64_ADD_ABS_LO12_NC` | `add` / `ldr` (Lower 12-bit page offset) | `(S + A) & 0xFFF` |
+| **AArch64** | `R_AARCH64_CALL26` | `bl` subroutine branch (26-bit offset) | `(S + A - P) >> 2` |
+| **x86_64** | `R_X86_64_PC32` | `call` / `jmp` (32-bit relative offset) | `S + A - P` |
+| **x86_64** | `R_X86_64_64` | 64-bit absolute address data | `S + A` |
 
-- **$S$ (Symbol)**: Final virtual address of the target function or variable determined by the linker.
-- **$A$ (Addend)**: Explicit constant offset recorded in the relocation entry (typically `-4` for x86_64 call instructions).
-- **$P$ (Place)**: Virtual memory address of the instruction operand being patched.
+- Because all AArch64 instructions are strictly 32-bit fixed-width, 64-bit virtual addresses cannot be embedded in a single instruction; they are decomposed into an **`adrp` (page address) + `add` (page offset)** relocation pair.
 
 ---
 
-## 7. Practical Lab Source Code & Verification
+## 7. Practical Lab Source Code & Verification (Dual-Architecture)
 
 - **Lab Source Code**: [`auth_main.c`](../../assets/labs/principles/07-symbols-linking/auth_main.c) | [`token_validator.c`](../../assets/labs/principles/07-symbols-linking/token_validator.c) | [`token_conflict.c`](../../assets/labs/principles/07-symbols-linking/token_conflict.c) | [`token_local.c`](../../assets/labs/principles/07-symbols-linking/token_local.c) | [`auth_hook.c`](../../assets/labs/principles/07-symbols-linking/auth_hook.c)
 - **Lab Makefile**: [`Makefile`](../../assets/labs/principles/07-symbols-linking/Makefile)
 
-```bash
-cd labs/principles/07-symbols-linking
+=== "AArch64 (Default - Device)"
+    ```bash
+    cd labs/principles/07-symbols-linking
 
-# 1. Execute default build with weak logger
-make run
+    # 1. Execute default build with weak logger (QEMU AArch64)
+    make run
 
-# 2. Execute hardened build with strong hook override
-make run-override
+    # 2. Execute hardened build with strong hook override
+    make run-override
 
-# 3. Trigger multiple definition error (Rule 1 violation)
-make demo-conflict
+    # 3. Trigger multiple definition error (Rule 1 violation)
+    make demo-conflict
 
-# 4. Trigger undefined reference error (LOCAL static scoping)
-make demo-local
+    # 4. Trigger undefined reference error (LOCAL static scoping)
+    make demo-local
 
-# 5. Inspect symbol bindings (GLOBAL vs. LOCAL) with readelf
-make inspect-symbols
+    # 5. Inspect symbol bindings (GLOBAL vs. LOCAL) with readelf
+    make inspect-symbols
 
-# 6. Verify symbol stripping behavior (.symtab vs. .dynsym)
-make demo-strip
-```
+    # 6. Verify symbol stripping behavior (.symtab vs. .dynsym)
+    make demo-strip
+    ```
+
+=== "x86_64 (Server/Legacy)"
+    ```bash
+    # Execute natively on host x86_64
+    make run ARCH=x86_64
+    make run-override ARCH=x86_64
+    make demo-conflict ARCH=x86_64
+    make demo-strip ARCH=x86_64
+    ```
 
 ---
 
 ## 8. Summary & Next Module
 
 - Symbol tables connect identifiers to physical memory addresses, while `static` scoping prevents symbol pollution across compilation units.
-- Linkers resolve symbols deterministically using Strong/Weak precedence rules, and stripped binaries continue executing reliably via `.dynsym`.
-- Next, examine how all dependencies and C runtime components are statically bundled into self-contained binaries in **[08. Static Linking and Loading](08-static-linking-and-loading.md)**.
+- AArch64 relies on paired `adrp` and `add` relocations to reference addresses across 32-bit fixed-length instructions.
+- Next, examine how dependencies are bundled into standalone executables in **[08. Static Linking and Loading](08-static-linking-and-loading.md)**.

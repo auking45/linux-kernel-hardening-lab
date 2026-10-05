@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generate Vector-Sharp Dark-Themed Terminal SVGs for Principles Labs (06-09)
-Linux Kernel Hardening Lab
+Linux Kernel Hardening Lab - Dual-Architecture (AArch64 Default + x86_64 Comparison)
 """
 
 import html
@@ -72,7 +72,7 @@ def create_terminal_svg(
         if ltype == 'prompt':
             # Highlight user prompt differently from command
             svg_lines.append(f'  <text x="24" y="{current_y}" font-size="12.5" xml:space="preserve">')
-            svg_lines.append('    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>')
+            svg_lines.append('    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@arm64</tspan>')
             svg_lines.append('    <tspan fill="#94a3b8">:</tspan>')
             svg_lines.append('    <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>')
             svg_lines.append(f'    <tspan fill="#f1f5f9" font-weight="bold">$ {escaped}</tspan>')
@@ -104,240 +104,250 @@ def build_all_svgs():
     # 1. 06-compiler-pipeline.svg
     # -------------------------------------------------------------
     lines_06_pipe = [
-        ('prompt', 'gcc-13 -v --save-temps -O2 -g vault_core.c -o vault_core'),
-        ('dim', '# [Pass 1] C Preprocessor (cpp / cc1 -E) -> Macro Expansion & Header Inlining'),
+        ('prompt', 'aarch64-linux-gnu-gcc -v --save-temps -O2 -g vault_core.c -o vault_core'),
+        ('dim', '# [Pass 1] C Preprocessor (cpp) -> Header Inlining & Macro Expansion'),
         ('code', '[+] Generated: vault_core.i (Preprocessed C source: 55,630 lines)'),
-        ('dim', '# [Pass 2] Compiler Engine (cc1 -O2) -> AST, Optimization Passes, CodeGen'),
-        ('code', '[+] Generated: vault_core.s (GNU x86_64 Assembly text: 541 lines)'),
-        ('dim', '# [Pass 3] Assembler (as) -> Machine Code Translation to Relocatable ELF'),
-        ('code', '[+] Generated: vault_core.o (ELF 64-bit Relocatable Object)'),
+        ('dim', '# [Pass 2] Compiler Engine (cc1 -O2) -> AArch64 Register Allocation (x0-x30)'),
+        ('code', '[+] Generated: vault_core.s (GNU AArch64 Assembly text: 280 lines)'),
+        ('dim', '# [Pass 3] Assembler (as) -> 32-bit Fixed Instruction Encoding (A64)'),
+        ('code', '[+] Generated: vault_core.o (ELF 64-bit Relocatable Object, ARM aarch64)'),
         ('dim', '# [Pass 4] Linker (collect2 / ld) -> Symbol Resolution & Segment Packaging'),
-        ('success', '[+] Generated: vault_core   (ELF 64-bit PIE Executable)'),
+        ('success', '[+] Generated: vault_core   (ELF 64-bit PIE Executable, ARM aarch64)'),
         ('blank', ''),
         ('prompt', 'file vault_core.* vault_core'),
         ('highlight', 'vault_core.i: C source, Unicode text, UTF-8 text'),
-        ('highlight', 'vault_core.s: assembler source, ASCII text'),
-        ('header',    'vault_core.o: ELF 64-bit LSB relocatable, x86-64, version 1 (SYSV), with debug_info'),
-        ('success',   'vault_core:   ELF 64-bit LSB pie executable, x86-64, version 1 (SYSV), dynamically linked')
+        ('highlight', 'vault_core.s: assembler source, ASCII text (AArch64 GAS)'),
+        ('header',    'vault_core.o: ELF 64-bit LSB relocatable, ARM aarch64, version 1 (SYSV)'),
+        ('success',   'vault_core:   ELF 64-bit LSB pie executable, ARM aarch64, dynamically linked'),
+        ('blank', ''),
+        ('prompt', 'qemu-aarch64 -L /usr/aarch64-linux-gnu ./vault_core'),
+        ('success', '=== Security Vault Service Online === (HSM Token Active on AArch64)')
     ]
     with open(f"{OUTPUT_DIR}/06-compiler-pipeline.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("Compiler Pipeline: Intermediate Files (gcc -v --save-temps)", lines_06_pipe, 840))
+        f.write(create_terminal_svg("AArch64 Compiler Pipeline: Intermediate Files (aarch64-linux-gnu-gcc)", lines_06_pipe, 840))
 
     # -------------------------------------------------------------
     # 2. 06-readelf-headers.svg
     # -------------------------------------------------------------
     lines_06_hdr = [
-        ('prompt', 'readelf -h vault_core.o'),
-        ('header', 'ELF Header (Relocatable Object File):'),
+        ('prompt', 'aarch64-linux-gnu-readelf -h vault_core.o'),
+        ('header', 'ELF Header (AArch64 Relocatable Object File):'),
         ('code',   '  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00'),
         ('code',   '  Class:                             ELF64'),
         ('code',   '  Data:                              2\'s complement, little endian'),
         ('warning','  Type:                              REL (Relocatable file)'),
+        ('highlight','  Machine:                           AArch64 (EM_AARCH64 = 183)'),
         ('dim',    '  Entry point address:               0x0  <-- [No entry point defined yet!]'),
-        ('dim',    '  Start of program headers:          0 (bytes into file) <-- [No Program Headers!]'),
-        ('code',   '  Start of section headers:          9816 (bytes into file)'),
-        ('code',   '  Number of section headers:         24'),
+        ('dim',    '  Start of program headers:          0 (bytes into file) <-- [0 Segments]'),
+        ('code',   '  Number of section headers:         29'),
         ('blank', ''),
-        ('prompt', 'readelf -h vault_core'),
-        ('header', 'ELF Header (Position-Independent Executable):'),
+        ('prompt', 'aarch64-linux-gnu-readelf -h vault_core'),
+        ('header', 'ELF Header (AArch64 Position-Independent Executable):'),
         ('code',   '  Magic:   7f 45 4c 46 02 01 01 00 00 00 00 00 00 00 00 00'),
         ('success','  Type:                              DYN (Position-Independent Executable file)'),
-        ('success','  Entry point address:               0x1190  <-- [_start in .text]'),
-        ('success','  Start of program headers:          64 (bytes into file)  <-- [13 Segments for Kernel Loader]'),
-        ('code',   '  Start of section headers:          16832 (bytes into file)'),
-        ('code',   '  Number of section headers:         39')
+        ('highlight','  Machine:                           AArch64 (EM_AARCH64 = 183)'),
+        ('success','  Entry point address:               0x7c0  <-- [_start in .text]'),
+        ('success','  Start of program headers:          64 (bytes into file)  <-- [9 Program Headers]'),
+        ('code',   '  Number of section headers:         36')
     ]
     with open(f"{OUTPUT_DIR}/06-readelf-headers.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("ELF Header Comparison: Relocatable (.o) vs Executable (readelf -h)", lines_06_hdr, 840))
+        f.write(create_terminal_svg("AArch64 ELF Header Comparison: Relocatable vs Executable (readelf -h)", lines_06_hdr, 840))
 
     # -------------------------------------------------------------
     # 3. 06-readelf-symbols-opt.svg
     # -------------------------------------------------------------
     lines_06_sym = [
-        ('prompt', 'readelf -s vault_core.o'),
-        ('header', 'Symbol table \'.symtab\' contains 24 entries:'),
+        ('prompt', 'aarch64-linux-gnu-readelf -s vault_core.o'),
+        ('header', 'Symbol table \'.symtab\' contains 32 entries (AArch64):'),
         ('dim',    '   Num:    Value          Size Type    Bind   Vis      Ndx Name'),
-        ('code',   '    18: 0000000000000000   272 FUNC    GLOBAL DEFAULT    6 main'),
-        ('warning','    19: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND puts  <-- [Compiler Optimization!]'),
-        ('code',   '    20: 0000000000000000     8 OBJECT  GLOBAL DEFAULT    8 g_banner'),
-        ('dim',    '    21: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND __printf_chk'),
-        ('highlight','  22: 0000000000000000   256 OBJECT  GLOBAL DEFAULT    3 g_session_token (Section 3: .bss)'),
-        ('success','    23: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    2 g_vault_status  (Section 2: .data)'),
+        ('highlight','   6: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT    4 $d   <-- [ARM Mapping Symbol: Data]'),
+        ('highlight','   8: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT    5 $x   <-- [ARM Mapping Symbol: Code]'),
+        ('code',   '    25: 0000000000000000   168 FUNC    GLOBAL DEFAULT    5 main'),
+        ('warning','    26: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND puts  <-- [AArch64 Optimization!]'),
+        ('dim',    '    27: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND __printf_chk'),
+        ('highlight','  29: 0000000000000000   256 OBJECT  GLOBAL DEFAULT    3 g_session_token (Section: .bss)'),
+        ('code',   '    30: 0000000000000000     8 OBJECT  GLOBAL DEFAULT    7 g_banner'),
+        ('success','    31: 0000000000000000     4 OBJECT  GLOBAL DEFAULT    2 g_vault_status  (Section: .data)'),
         ('blank', ''),
-        ('dim', '# Note: Compiler automatically converted printf("...\\n") with constant string to puts()!'),
-        ('dim', '# Uninitialized g_session_token (256B) placed into .bss; initialized g_vault_status in .data.')
+        ('dim', '# Note: ARM64 compiler uses Mapping Symbols ($x for A64 instructions, $d for literal pools).'),
+        ('dim', '# printf() with constant string is automatically optimized to puts() symbol on AArch64.')
     ]
     with open(f"{OUTPUT_DIR}/06-readelf-symbols-opt.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("Section & Symbol Table Analysis: puts Optimization (readelf -s)", lines_06_sym, 840))
+        f.write(create_terminal_svg("AArch64 Symbols & Mapping Symbols ($x, $d, puts optimization)", lines_06_sym, 840))
 
     # -------------------------------------------------------------
     # 4. 07-symbol-conflict-error.svg
     # -------------------------------------------------------------
     lines_07_conflict = [
-        ('prompt', 'gcc-13 auth_main.c token_validator.c token_conflict.c -o test_conflict'),
-        ('error',  '/usr/bin/ld: /tmp/ccuiQshk.o: in function \'verify_auth_token\':'),
+        ('prompt', 'aarch64-linux-gnu-gcc auth_main.c token_validator.c token_conflict.c -o test_conflict'),
+        ('error',  '/usr/bin/aarch64-linux-gnu-ld: /tmp/ccllcluP.o: in function \'verify_auth_token\':'),
         ('error',  'token_conflict.c:(.text+0x0): multiple definition of \'verify_auth_token\';'),
-        ('error',  '/tmp/ccDJYFSi.o:token_validator.c:(.text+0x0): first defined here'),
+        ('error',  '/tmp/ccDCKPc8.o:token_validator.c:(.text+0x0): first defined here'),
         ('error',  'collect2: error: ld returned 1 exit status'),
         ('blank', ''),
-        ('dim', '# [Root Cause Analysis]'),
+        ('dim', '# [Root Cause Analysis on AArch64]'),
         ('warning','- Symbol: verify_auth_token (Type: FUNC, Bind: GLOBAL, Status: STRONG in both files)'),
         ('code',   '- Rule 1 of Linker Symbol Resolution: Multiple strong symbols cannot coexist!'),
-        ('dim', '- Fix: Mark one implementation as static (LOCAL) or declare as __attribute__((weak)).')
+        ('dim', '- Applies identically across AArch64 and x86_64 architectures.')
     ]
     with open(f"{OUTPUT_DIR}/07-symbol-conflict-error.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("Linker Error: Multiple Definition Conflict (Rule 1 Violation)", lines_07_conflict, 840))
+        f.write(create_terminal_svg("AArch64 Linker Error: Multiple Definition Conflict (Rule 1)", lines_07_conflict, 840))
 
     # -------------------------------------------------------------
     # 5. 07-symbol-local-error.svg
     # -------------------------------------------------------------
     lines_07_local = [
-        ('prompt', 'gcc-13 auth_main.c token_local.c -o test_local'),
-        ('error',  '/usr/bin/ld: /tmp/ccrYOTnt.o: in function \'main\':'),
-        ('error',  'auth_main.c:(.text+0x82): undefined reference to \'g_auth_counter\''),
+        ('prompt', 'aarch64-linux-gnu-gcc auth_main.c token_local.c -o test_local'),
+        ('error',  '/usr/bin/aarch64-linux-gnu-ld: in function \'main\':'),
+        ('error',  'auth_main.c:(.text+0x74): undefined reference to \'g_auth_counter\''),
         ('error',  'collect2: error: ld returned 1 exit status'),
         ('blank', ''),
-        ('prompt', 'readelf -s token_local.o | grep g_auth_counter'),
-        ('warning','     4: 0000000000000000     4 OBJECT  LOCAL  DEFAULT    4 g_auth_counter'),
+        ('prompt', 'aarch64-linux-gnu-readelf -s token_local.o | grep g_auth_counter'),
+        ('warning','     5: 0000000000000000     4 OBJECT  LOCAL  DEFAULT    4 g_auth_counter'),
         ('blank', ''),
         ('dim', '# [Root Cause Analysis]'),
         ('dim', '- In token_local.c: declared as "static int g_auth_counter;"'),
         ('highlight','- LOCAL binding restricts visibility strictly to token_local.c translation unit.'),
-        ('code',   '- auth_main.c declares "extern int g_auth_counter;", but linker cannot resolve it!')
+        ('code',   '- auth_main.c references extern symbol, but AArch64 linker cannot find it in global pool.')
     ]
     with open(f"{OUTPUT_DIR}/07-symbol-local-error.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("Linker Error: Undefined Reference due to LOCAL Binding", lines_07_local, 840))
+        f.write(create_terminal_svg("AArch64 Linker Error: Undefined Reference due to LOCAL Binding", lines_07_local, 840))
 
     # -------------------------------------------------------------
     # 6. 07-symbol-strip-verification.svg
     # -------------------------------------------------------------
     lines_07_strip = [
-        ('prompt', 'readelf -S auth_demo | grep -E \'\\.symtab|\\.dynsym\''),
-        ('success','  [ 6] .dynsym           DYNSYM           00000000000003d8  000003d8  (Dynamic Symbols)'),
-        ('header', '  [28] .symtab           SYMTAB           0000000000000000  00003040  (Static Debug Symbols)'),
+        ('prompt', 'aarch64-linux-gnu-readelf -S auth_demo | grep -E \'\\.symtab|\\.dynsym\''),
+        ('success','  [ 5] .dynsym           DYNSYM           00000000000002b8  000002b8  (Dynamic Symbols)'),
+        ('header', '  [25] .symtab           SYMTAB           0000000000000000  00010040  (Static Debug Symbols)'),
         ('blank', ''),
-        ('prompt', 'strip --strip-all auth_demo -o auth_demo_stripped'),
-        ('prompt', 'readelf -S auth_demo_stripped | grep -E \'\\.symtab|\\.dynsym\''),
-        ('success','  [ 6] .dynsym           DYNSYM           00000000000003d8  000003d8  (Preserved!)'),
-        ('dim',    '  # Note: .symtab is completely eliminated to reduce size and obfuscate binaries.'),
+        ('prompt', 'aarch64-linux-gnu-strip --strip-all auth_demo -o auth_demo_stripped'),
+        ('prompt', 'aarch64-linux-gnu-readelf -S auth_demo_stripped | grep -E \'\\.symtab|\\.dynsym\''),
+        ('success','  [ 5] .dynsym           DYNSYM           00000000000002b8  000002b8  (Preserved!)'),
+        ('dim',    '  # Note: .symtab is completely eliminated; .dynsym retains SHF_ALLOC flag.'),
         ('blank', ''),
-        ('prompt', './auth_demo_stripped'),
-        ('success','[+] Token verification result : VALID (g_auth_counter=1)'),
+        ('prompt', 'qemu-aarch64 -L /usr/aarch64-linux-gnu ./auth_demo_stripped'),
+        ('success','[+] Token verification result : VALID (AArch64 emulation)'),
         ('success','[+] Calling auth_event_logger : [DEFAULT-WEAK-LOGGER] Cycle completed'),
-        ('dim',    '--> Binary executes flawlessly! Runtime loader relies strictly on .dynsym.')
+        ('dim',    '--> AArch64 binary executes flawlessly without .symtab!')
     ]
     with open(f"{OUTPUT_DIR}/07-symbol-strip-verification.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("Symbol Stripping: .symtab Removal vs .dynsym Retention", lines_07_strip, 840))
+        f.write(create_terminal_svg("AArch64 Symbol Stripping: .symtab Removal & QEMU Execution", lines_07_strip, 840))
 
     # -------------------------------------------------------------
     # 7. 08-static-archive-readelf.svg
     # -------------------------------------------------------------
     lines_08_ar = [
-        ('prompt', 'ar rcs libsecure.a crypto_mac.o token_validator.o'),
-        ('prompt', 'ar -t libsecure.a'),
+        ('prompt', 'aarch64-linux-gnu-ar rcs libsecure.a crypto_mac.o token_validator.o'),
+        ('prompt', 'aarch64-linux-gnu-ar -t libsecure.a'),
         ('code',   'crypto_mac.o'),
         ('code',   'token_validator.o'),
         ('blank', ''),
-        ('prompt', 'readelf -s libsecure.a'),
-        ('header', 'File: libsecure.a(crypto_mac.o)'),
-        ('success','     3: 0000000000000000    54 FUNC    GLOBAL DEFAULT    1 compute_mac'),
-        ('header', 'File: libsecure.a(token_validator.o)'),
-        ('success','     3: 0000000000000000    68 FUNC    GLOBAL DEFAULT    1 validate_security_token'),
+        ('prompt', 'aarch64-linux-gnu-readelf -s libsecure.a'),
+        ('header', 'File: libsecure.a(crypto_mac.o) [AArch64]'),
+        ('success','    10: 0000000000000000    48 FUNC    GLOBAL DEFAULT    1 compute_mac'),
+        ('header', 'File: libsecure.a(token_validator.o) [AArch64]'),
+        ('success','    10: 0000000000000000    64 FUNC    GLOBAL DEFAULT    1 validate_security_token'),
         ('blank', ''),
-        ('dim', '# Static archive (.a) packages individual relocatable .o files into an indexed archive.'),
-        ('dim', '# Linker extracts ONLY the member objects that resolve currently unsatisfied external symbols.')
+        ('dim', '# AArch64 static archive packages relocatable .o objects with an internal symdef index.'),
+        ('dim', '# Linker selectively extracts only the modules resolving unsatisfied symbols.')
     ]
     with open(f"{OUTPUT_DIR}/08-static-archive-readelf.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("Static Archive: Member Inspection & Symbol Extraction (ar & readelf)", lines_08_ar, 840))
+        f.write(create_terminal_svg("AArch64 Static Archive: Member Inspection & Symbol Extraction", lines_08_ar, 840))
 
     # -------------------------------------------------------------
     # 8. 08-static-maps-comparison.svg
     # -------------------------------------------------------------
     lines_08_maps = [
-        ('prompt', 'readelf -l secvault_static | grep -A 1 LOAD'),
+        ('prompt', 'aarch64-linux-gnu-readelf -l secvault_static | grep -A 1 LOAD'),
         ('header', '  LOAD           0x0000000000000000 0x0000000000400000 0x0000000000400000'),
-        ('code',   '                 0x000000000001b448 0x000000000001b448  R      0x1000'),
-        ('header', '  LOAD           0x000000000001c000 0x000000000041c000 0x000000000041c000'),
-        ('code',   '                 0x000000000006f521 0x00000000006f521  R E    0x1000'),
-        ('header', '  LOAD           0x000000000008c000 0x000000000048c000 0x000000000048c000'),
-        ('code',   '                 0x0000000000024068 0x00000000000282b8  RW     0x1000'),
+        ('code',   '                 0x0000000000085188 0x0000000000085188  R E    0x10000 (Code: RX)'),
+        ('header', '  LOAD           0x0000000000090000 0x00000000004a0000 0x00000000004a0000'),
+        ('code',   '                 0x00000000000089e8 0x000000000000f680  RW     0x10000 (Data: RW)'),
         ('blank', ''),
-        ('prompt', 'cat /proc/$(pidof secvault_static)/maps'),
-        ('success','00400000-0041c000 r--p 00000000 08:01 1234567    /secvault_static  <-- [LOAD 1: R--]'),
-        ('success','0041c000-0048c000 r-xp 0001c000 08:01 1234567    /secvault_static  <-- [LOAD 2: R-X]'),
-        ('success','0048c000-004b1000 rw-p 0008c000 08:01 1234567    /secvault_static  <-- [LOAD 3: RW-]'),
-        ('dim',    '004b1000-004d4000 rw-p 00000000 00:00 0          [heap]'),
-        ('dim',    '7ffdb4a1e000-7ffdb4a3f000 rw-p 00000000 00:00 0  [stack]')
+        ('prompt', 'aarch64-linux-gnu-readelf -l secvault_static | grep INTERP'),
+        ('warning','[+] PT_INTERP is absent! Kernel / Loader directly branches to e_entry (0x400700).'),
+        ('blank', ''),
+        ('prompt', 'qemu-aarch64 -L /usr/aarch64-linux-gnu ./secvault_static'),
+        ('success','============================================================'),
+        ('success',' Security Vault Service (PID: 80274 on AArch64)'),
+        ('success','[+] Token validation: PASSED | Computed MAC: 0x651E2B18'),
+        ('success','============================================================')
     ]
     with open(f"{OUTPUT_DIR}/08-static-maps-comparison.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("PT_LOAD Segments vs /proc/<pid>/maps 1:1 Memory Mapping", lines_08_maps, 840))
+        f.write(create_terminal_svg("AArch64 Static Binary: PT_LOAD Segments & Kernel Direct Loading", lines_08_maps, 840))
 
     # -------------------------------------------------------------
     # 9. 09-gdb-lazy-binding-step1.svg
     # -------------------------------------------------------------
     lines_09_gdb1 = [
-        ('prompt', 'gdb -q -nx ./secvault_dyn'),
-        ('dim',    '(gdb) b main && run'),
-        ('code',   'Breakpoint 1, main () at secvault_dyn.c:16'),
+        ('prompt', 'aarch64-linux-gnu-objdump -d -j .plt secvault_dyn'),
+        ('header', 'Disassembly of section .plt (AArch64 Procedure Linkage Table):'),
         ('blank', ''),
-        ('header', '=== [Step 1: BEFORE 1st Call to verify_token] ==='),
-        ('prompt', 'x/gx &verify_token@got.plt'),
-        ('warning','0x555555558020 <verify_token@got.plt>:    0x0000555555555070'),
+        ('dim', '# [1] PLT Header (.plt0 Trampoline)'),
+        ('code',   ' 00000000000006e0 <.plt>:'),
+        ('highlight','  6e0: stp   x16, x30, [sp, #-16]!  <-- [Push GOT slot (x16) & LR (x30)]'),
+        ('code',   '  6e4: adrp  x16, 1f000             <-- [Compute GOT page via PC-relative]'),
+        ('code',   '  6e8: ldr   x17, [x16, #4088]      <-- [Load dynamic resolver address]'),
+        ('code',   '  6ec: add   x16, x16, #0xff8       <-- [Calculate GOT slot address]'),
+        ('highlight','  6f0: br    x17                    <-- [Branch to _dl_runtime_resolve]'),
         ('blank', ''),
-        ('prompt', 'x/2i 0x0000555555555070'),
-        ('dim',    '   0x555555555070:  endbr64'),
-        ('highlight',' 0x555555555074:  push   $0x4        <-- [Relocation Slot Index in .rela.plt]'),
-        ('highlight',' 0x555555555079:  jmp    0x555555555020 <-- [.plt header: _dl_runtime_resolve]'),
-        ('blank', ''),
-        ('dim', '# Crucial Finding: GOT entry points BACK to .plt stub, NOT the shared library function!')
+        ('dim', '# [2] Individual Function PLT Stub (verify_token@plt)'),
+        ('code',   ' 0000000000000780 <verify_token@plt>:'),
+        ('warning','  780: adrp  x16, 20000             <-- [PC-relative base of GOT entry]'),
+        ('warning','  784: ldr   x17, [x16, #64]        <-- [Load target address from GOT]'),
+        ('code',   '  788: add   x16, x16, #0x40        <-- [Slot pointer in x16]'),
+        ('success','  78c: br    x17                    <-- [Indirect branch to function]')
     ]
     with open(f"{OUTPUT_DIR}/09-gdb-lazy-binding-step1.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("GDB Tracing Lazy Binding [Step 1]: GOT Points to PLT Trampoline", lines_09_gdb1, 840))
+        f.write(create_terminal_svg("AArch64 PLT Stub Disassembly & PC-Relative Dispatch (adrp + ldr + br)", lines_09_gdb1, 840))
 
     # -------------------------------------------------------------
     # 10. 09-gdb-lazy-binding-step2.svg
     # -------------------------------------------------------------
     lines_09_gdb2 = [
-        ('prompt', 'continue  # (Executes 1st call to verify_token, invoking dynamic linker)'),
-        ('code',   '[*] [Call 1] Invoking verify_token() for the first time...'),
+        ('prompt', 'qemu-aarch64 -L /usr/aarch64-linux-gnu -E LD_LIBRARY_PATH=. ./secvault_dyn'),
+        ('header', '============================================================'),
+        ('header', ' PLT / GOT Lazy Binding Demonstration (AArch64 Emulation)'),
+        ('header', '============================================================'),
+        ('warning','[*] [Call 1] Invoking verify_token() for the first time...'),
+        ('dim',    '    -> Triggers AArch64 adrp/ldr into GOT -> branches to .plt0 trampoline'),
+        ('dim',    '    -> _dl_runtime_resolve updates GOT slot with libsecure.so address'),
         ('success','[+] [Call 1 Result] AUTHORIZED'),
-        ('code',   'Breakpoint 2, main () at secvault_dyn.c:28 (Before Call 2)'),
         ('blank', ''),
-        ('header', '=== [Step 2: AFTER 1st Call to verify_token] ==='),
-        ('prompt', 'x/gx &verify_token@got.plt'),
-        ('success','0x555555558020 <verify_token@got.plt>:    0x00007ffff7fb9119'),
+        ('success','[*] [Call 2] Invoking verify_token() for the second time...'),
+        ('dim',    '    -> adrp/ldr directly branches to cached address via "br x17"! (0 linker overhead)'),
+        ('success','[+] [Call 2 Result] AUTHORIZED'),
         ('blank', ''),
-        ('prompt', 'info symbol 0x00007ffff7fb9119'),
-        ('success','verify_token in section .text of ./libsecure.so'),
-        ('blank', ''),
-        ('dim', '# Crucial Finding: _dl_runtime_resolve updated GOT with actual virtual address!'),
-        ('dim', '# 2nd call to verify_token will branch DIRECTLY to 0x7ffff7fb9119 without linker intervention.')
+        ('dim', '# [Security Note] Full RELRO (-Wl,-z,relro,-z,now) resolves symbols on startup'),
+        ('dim', '# and marks the .got segment read-only (mprotect r--p) to block GOT Overwrite.')
     ]
     with open(f"{OUTPUT_DIR}/09-gdb-lazy-binding-step2.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("GDB Tracing Lazy Binding [Step 2]: GOT Overwritten with Target Function", lines_09_gdb2, 840))
+        f.write(create_terminal_svg("AArch64 Dynamic Execution: Lazy Binding & Direct Branching (QEMU)", lines_09_gdb2, 840))
 
     # -------------------------------------------------------------
     # 11. 09-relocation-byte-analysis.svg
     # -------------------------------------------------------------
     lines_09_reloc = [
-        ('prompt', 'readelf -r secvault_dyn'),
-        ('header', 'Relocation section \'.rela.plt\' at offset 0x668 contains 5 entries:'),
-        ('dim',    '  Offset          Info           Type           Sym. Value        Sym. Name + Addend'),
-        ('code',   '  000000004000  000100000007 R_X86_64_JUMP_SLOT 0000000000000000 puts@GLIBC_2.2.5 + 0'),
-        ('code',   '  000000004008  000200000007 R_X86_64_JUMP_SLOT 0000000000000000 compute_checksum + 0'),
-        ('code',   '  000000004010  000300000007 R_X86_64_JUMP_SLOT 0000000000000000 getpid@GLIBC_2.2.5 + 0'),
-        ('code',   '  000000004018  000400000007 R_X86_64_JUMP_SLOT 0000000000000000 printf@GLIBC_2.2.5 + 0'),
-        ('success','  000000004020  000500000007 R_X86_64_JUMP_SLOT 0000000000000000 verify_token + 0'),
+        ('prompt', 'aarch64-linux-gnu-readelf -r secvault_dyn'),
+        ('header', 'Relocation section \'.rela.plt\' at offset 0x5e8 contains 9 entries (AArch64):'),
+        ('dim',    '  Offset          Info           Type           Sym. Value    Sym. Name + Addend'),
+        ('code',   '000000020000  000300000402 R_AARCH64_JUMP_SL 0000000000000000 __libc_start_main + 0'),
+        ('code',   '000000020008  000500000402 R_AARCH64_JUMP_SL 0000000000000000 compute_checksum + 0'),
+        ('code',   '000000020038  000c00000402 R_AARCH64_JUMP_SL 0000000000000000 printf@GLIBC_2.17 + 0'),
+        ('success','000000020040  000d00000402 R_AARCH64_JUMP_SL 0000000000000000 verify_token + 0'),
         ('blank', ''),
-        ('dim', '# [Elf64_Rela Struct Breakdown for verify_token]'),
-        ('highlight','- r_offset : 0x00004020  (Target GOT slot to be rewritten by dynamic linker)'),
-        ('highlight','- r_info   : 0x000500000007 (High 32b: Symbol Index 5 in .dynsym, Low 32b: R_X86_64_JUMP_SLOT)'),
-        ('dim',      '- r_addend : 0x00000000  (Explicit addend value)')
+        ('dim', '# [Elf64_Rela Struct Breakdown for verify_token on AArch64]'),
+        ('highlight','- r_offset : 0x000000020040 (Target GOT entry address to be patched by dynamic linker)'),
+        ('highlight','- r_info   : 0x000d00000402'),
+        ('code',     '  * High 32b : 0x0000000d (Symbol Index 13 in .dynsym: "verify_token")'),
+        ('code',     '  * Low 32b  : 0x00000402 (Type 1026: R_AARCH64_JUMP_SLOT)'),
+        ('dim',      '- r_addend : 0x0000000000000000 (Explicit addend constant)')
     ]
     with open(f"{OUTPUT_DIR}/09-relocation-byte-analysis.svg", "w", encoding="utf-8") as f:
-        f.write(create_terminal_svg("Relocation Table: R_X86_64_JUMP_SLOT & Elf64_Rela Breakdown", lines_09_reloc, 840))
+        f.write(create_terminal_svg("AArch64 Relocation Table: R_AARCH64_JUMP_SLOT & Elf64_Rela Breakdown", lines_09_reloc, 840))
 
-    print(f"[+] All 11 terminal SVGs successfully generated in {OUTPUT_DIR}")
+    print(f"[+] All 11 AArch64 terminal SVGs successfully regenerated in {OUTPUT_DIR}")
 
 if __name__ == '__main__':
     build_all_svgs()

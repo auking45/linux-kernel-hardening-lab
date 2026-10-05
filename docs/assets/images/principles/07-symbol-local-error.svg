@@ -14,25 +14,25 @@
   <circle cx="22" cy="19" r="6" fill="#ef4444" />
   <circle cx="40" cy="19" r="6" fill="#f59e0b" />
   <circle cx="58" cy="19" r="6" fill="#10b981" />
-  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">Linker Error: Undefined Reference due to LOCAL Binding</text>
+  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">AArch64 Linker Error: Undefined Reference due to LOCAL Binding</text>
   <text x="24" y="62" font-size="12.5" xml:space="preserve">
-    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@arm64</tspan>
     <tspan fill="#94a3b8">:</tspan>
     <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
-    <tspan fill="#f1f5f9" font-weight="bold">$ gcc-13 auth_main.c token_local.c -o test_local</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ aarch64-linux-gnu-gcc auth_main.c token_local.c -o test_local</tspan>
   </text>
-  <text x="24" y="82" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">/usr/bin/ld: /tmp/ccrYOTnt.o: in function &#x27;main&#x27;:</text>
-  <text x="24" y="102" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">auth_main.c:(.text+0x82): undefined reference to &#x27;g_auth_counter&#x27;</text>
+  <text x="24" y="82" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">/usr/bin/aarch64-linux-gnu-ld: in function &#x27;main&#x27;:</text>
+  <text x="24" y="102" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">auth_main.c:(.text+0x74): undefined reference to &#x27;g_auth_counter&#x27;</text>
   <text x="24" y="122" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">collect2: error: ld returned 1 exit status</text>
   <text x="24" y="162" font-size="12.5" xml:space="preserve">
-    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@arm64</tspan>
     <tspan fill="#94a3b8">:</tspan>
     <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
-    <tspan fill="#f1f5f9" font-weight="bold">$ readelf -s token_local.o | grep g_auth_counter</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ aarch64-linux-gnu-readelf -s token_local.o | grep g_auth_counter</tspan>
   </text>
-  <text x="24" y="182" fill="#fbbf24" font-size="12" xml:space="preserve">     4: 0000000000000000     4 OBJECT  LOCAL  DEFAULT    4 g_auth_counter</text>
+  <text x="24" y="182" fill="#fbbf24" font-size="12" xml:space="preserve">     5: 0000000000000000     4 OBJECT  LOCAL  DEFAULT    4 g_auth_counter</text>
   <text x="24" y="222" fill="#64748b" font-size="12" xml:space="preserve"># [Root Cause Analysis]</text>
   <text x="24" y="242" fill="#64748b" font-size="12" xml:space="preserve">- In token_local.c: declared as &quot;static int g_auth_counter;&quot;</text>
   <text x="24" y="262" fill="#c084fc" font-size="12" font-weight="bold" xml:space="preserve">- LOCAL binding restricts visibility strictly to token_local.c translation unit.</text>
-  <text x="24" y="282" fill="#cbd5e1" font-size="12" xml:space="preserve">- auth_main.c declares &quot;extern int g_auth_counter;&quot;, but linker cannot resolve it!</text>
+  <text x="24" y="282" fill="#cbd5e1" font-size="12" xml:space="preserve">- auth_main.c references extern symbol, but AArch64 linker cannot find it in global pool.</text>
 </svg>

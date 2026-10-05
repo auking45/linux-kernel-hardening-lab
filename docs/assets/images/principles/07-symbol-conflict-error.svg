@@ -14,19 +14,19 @@
   <circle cx="22" cy="19" r="6" fill="#ef4444" />
   <circle cx="40" cy="19" r="6" fill="#f59e0b" />
   <circle cx="58" cy="19" r="6" fill="#10b981" />
-  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">Linker Error: Multiple Definition Conflict (Rule 1 Violation)</text>
+  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">AArch64 Linker Error: Multiple Definition Conflict (Rule 1)</text>
   <text x="24" y="62" font-size="12.5" xml:space="preserve">
-    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@arm64</tspan>
     <tspan fill="#94a3b8">:</tspan>
     <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
-    <tspan fill="#f1f5f9" font-weight="bold">$ gcc-13 auth_main.c token_validator.c token_conflict.c -o test_conflict</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ aarch64-linux-gnu-gcc auth_main.c token_validator.c token_conflict.c -o test_conflict</tspan>
   </text>
-  <text x="24" y="82" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">/usr/bin/ld: /tmp/ccuiQshk.o: in function &#x27;verify_auth_token&#x27;:</text>
+  <text x="24" y="82" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">/usr/bin/aarch64-linux-gnu-ld: /tmp/ccllcluP.o: in function &#x27;verify_auth_token&#x27;:</text>
   <text x="24" y="102" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">token_conflict.c:(.text+0x0): multiple definition of &#x27;verify_auth_token&#x27;;</text>
-  <text x="24" y="122" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">/tmp/ccDJYFSi.o:token_validator.c:(.text+0x0): first defined here</text>
+  <text x="24" y="122" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">/tmp/ccDCKPc8.o:token_validator.c:(.text+0x0): first defined here</text>
   <text x="24" y="142" fill="#f87171" font-size="12" font-weight="bold" xml:space="preserve">collect2: error: ld returned 1 exit status</text>
-  <text x="24" y="182" fill="#64748b" font-size="12" xml:space="preserve"># [Root Cause Analysis]</text>
+  <text x="24" y="182" fill="#64748b" font-size="12" xml:space="preserve"># [Root Cause Analysis on AArch64]</text>
   <text x="24" y="202" fill="#fbbf24" font-size="12" xml:space="preserve">- Symbol: verify_auth_token (Type: FUNC, Bind: GLOBAL, Status: STRONG in both files)</text>
   <text x="24" y="222" fill="#cbd5e1" font-size="12" xml:space="preserve">- Rule 1 of Linker Symbol Resolution: Multiple strong symbols cannot coexist!</text>
-  <text x="24" y="242" fill="#64748b" font-size="12" xml:space="preserve">- Fix: Mark one implementation as static (LOCAL) or declare as __attribute__((weak)).</text>
+  <text x="24" y="242" fill="#64748b" font-size="12" xml:space="preserve">- Applies identically across AArch64 and x86_64 architectures.</text>
 </svg>

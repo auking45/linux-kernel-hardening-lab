@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 328" width="100%" height="328" style="background: transparent; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 348" width="100%" height="348" style="background: transparent; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;">
   <defs>
     <linearGradient id="termGrad" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#0f172a" />
@@ -8,28 +8,29 @@
       <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000000" flood-opacity="0.5"/>
     </filter>
   </defs>
-  <rect x="2" y="2" width="836" height="324" rx="12" fill="url(#termGrad)" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="2" y="2" width="836" height="344" rx="12" fill="url(#termGrad)" stroke="#334155" stroke-width="1.5" filter="url(#shadow)"/>
   <path d="M 2 14 C 2 7.37 7.37 2 14 2 L 826 2 C 832.63 2 838 7.37 838 14 L 838 36 L 2 36 Z" fill="#1e293b" />
   <line x1="2" y1="36" x2="838" y2="36" stroke="#334155" stroke-width="1" />
   <circle cx="22" cy="19" r="6" fill="#ef4444" />
   <circle cx="40" cy="19" r="6" fill="#f59e0b" />
   <circle cx="58" cy="19" r="6" fill="#10b981" />
-  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">Relocation Table: R_X86_64_JUMP_SLOT &amp; Elf64_Rela Breakdown</text>
+  <text x="420.0" y="23" text-anchor="middle" fill="#94a3b8" font-size="12" font-weight="500">AArch64 Relocation Table: R_AARCH64_JUMP_SLOT &amp; Elf64_Rela Breakdown</text>
   <text x="24" y="62" font-size="12.5" xml:space="preserve">
-    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@linux</tspan>
+    <tspan fill="#38bdf8" font-weight="bold">hardening-lab@arm64</tspan>
     <tspan fill="#94a3b8">:</tspan>
     <tspan fill="#a855f7" font-weight="bold">~/principles</tspan>
-    <tspan fill="#f1f5f9" font-weight="bold">$ readelf -r secvault_dyn</tspan>
+    <tspan fill="#f1f5f9" font-weight="bold">$ aarch64-linux-gnu-readelf -r secvault_dyn</tspan>
   </text>
-  <text x="24" y="82" fill="#38bdf8" font-size="12" font-weight="bold" xml:space="preserve">Relocation section &#x27;.rela.plt&#x27; at offset 0x668 contains 5 entries:</text>
-  <text x="24" y="102" fill="#64748b" font-size="12" xml:space="preserve">  Offset          Info           Type           Sym. Value        Sym. Name + Addend</text>
-  <text x="24" y="122" fill="#cbd5e1" font-size="12" xml:space="preserve">  000000004000  000100000007 R_X86_64_JUMP_SLOT 0000000000000000 puts@GLIBC_2.2.5 + 0</text>
-  <text x="24" y="142" fill="#cbd5e1" font-size="12" xml:space="preserve">  000000004008  000200000007 R_X86_64_JUMP_SLOT 0000000000000000 compute_checksum + 0</text>
-  <text x="24" y="162" fill="#cbd5e1" font-size="12" xml:space="preserve">  000000004010  000300000007 R_X86_64_JUMP_SLOT 0000000000000000 getpid@GLIBC_2.2.5 + 0</text>
-  <text x="24" y="182" fill="#cbd5e1" font-size="12" xml:space="preserve">  000000004018  000400000007 R_X86_64_JUMP_SLOT 0000000000000000 printf@GLIBC_2.2.5 + 0</text>
-  <text x="24" y="202" fill="#34d399" font-size="12" xml:space="preserve">  000000004020  000500000007 R_X86_64_JUMP_SLOT 0000000000000000 verify_token + 0</text>
-  <text x="24" y="242" fill="#64748b" font-size="12" xml:space="preserve"># [Elf64_Rela Struct Breakdown for verify_token]</text>
-  <text x="24" y="262" fill="#c084fc" font-size="12" font-weight="bold" xml:space="preserve">- r_offset : 0x00004020  (Target GOT slot to be rewritten by dynamic linker)</text>
-  <text x="24" y="282" fill="#c084fc" font-size="12" font-weight="bold" xml:space="preserve">- r_info   : 0x000500000007 (High 32b: Symbol Index 5 in .dynsym, Low 32b: R_X86_64_JUMP_SLOT)</text>
-  <text x="24" y="302" fill="#64748b" font-size="12" xml:space="preserve">- r_addend : 0x00000000  (Explicit addend value)</text>
+  <text x="24" y="82" fill="#38bdf8" font-size="12" font-weight="bold" xml:space="preserve">Relocation section &#x27;.rela.plt&#x27; at offset 0x5e8 contains 9 entries (AArch64):</text>
+  <text x="24" y="102" fill="#64748b" font-size="12" xml:space="preserve">  Offset          Info           Type           Sym. Value    Sym. Name + Addend</text>
+  <text x="24" y="122" fill="#cbd5e1" font-size="12" xml:space="preserve">000000020000  000300000402 R_AARCH64_JUMP_SL 0000000000000000 __libc_start_main + 0</text>
+  <text x="24" y="142" fill="#cbd5e1" font-size="12" xml:space="preserve">000000020008  000500000402 R_AARCH64_JUMP_SL 0000000000000000 compute_checksum + 0</text>
+  <text x="24" y="162" fill="#cbd5e1" font-size="12" xml:space="preserve">000000020038  000c00000402 R_AARCH64_JUMP_SL 0000000000000000 printf@GLIBC_2.17 + 0</text>
+  <text x="24" y="182" fill="#34d399" font-size="12" xml:space="preserve">000000020040  000d00000402 R_AARCH64_JUMP_SL 0000000000000000 verify_token + 0</text>
+  <text x="24" y="222" fill="#64748b" font-size="12" xml:space="preserve"># [Elf64_Rela Struct Breakdown for verify_token on AArch64]</text>
+  <text x="24" y="242" fill="#c084fc" font-size="12" font-weight="bold" xml:space="preserve">- r_offset : 0x000000020040 (Target GOT entry address to be patched by dynamic linker)</text>
+  <text x="24" y="262" fill="#c084fc" font-size="12" font-weight="bold" xml:space="preserve">- r_info   : 0x000d00000402</text>
+  <text x="24" y="282" fill="#cbd5e1" font-size="12" xml:space="preserve">  * High 32b : 0x0000000d (Symbol Index 13 in .dynsym: &quot;verify_token&quot;)</text>
+  <text x="24" y="302" fill="#cbd5e1" font-size="12" xml:space="preserve">  * Low 32b  : 0x00000402 (Type 1026: R_AARCH64_JUMP_SLOT)</text>
+  <text x="24" y="322" fill="#64748b" font-size="12" xml:space="preserve">- r_addend : 0x0000000000000000 (Explicit addend constant)</text>
 </svg>
