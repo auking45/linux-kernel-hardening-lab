@@ -12,7 +12,7 @@ CFLAGS ?= -O0 -g -Wall -Wextra -z execstack
 
 TARGET = shellcode_tester
 
-.PHONY: all run run-exec clean
+.PHONY: all run run-nx run-exec clean
 
 all: $(TARGET)
 
@@ -22,6 +22,10 @@ $(TARGET): shellcode_tester.c
 run: $(TARGET)
 	@echo "=== Running Shellcode Inspection on $(ARCH) ==="
 	$(RUNNER) ./$(TARGET)
+
+run-nx: $(TARGET)
+	@echo "=== Testing W^X / NX Enforcement on $(ARCH) ==="
+	$(RUNNER) ./$(TARGET) --test-nx
 
 run-exec: $(TARGET)
 	@echo "=== Executing Shellcode on $(ARCH) ==="

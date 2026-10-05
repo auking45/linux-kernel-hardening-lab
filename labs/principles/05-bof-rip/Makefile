@@ -12,7 +12,7 @@ CFLAGS ?= -O0 -g -fno-stack-protector -no-pie -fno-omit-frame-pointer -Wall -Wex
 
 TARGET = bof_demo
 
-.PHONY: all run run-normal run-attack clean
+.PHONY: all run run-normal run-attack run-heap run-nop-sled clean
 
 all: $(TARGET)
 
@@ -26,8 +26,16 @@ run-normal: $(TARGET)
 	$(RUNNER) ./$(TARGET)
 
 run-attack: $(TARGET)
-	@echo "=== [2] Running Control Flow Hijack Attack [$(ARCH)] ==="
-	$(RUNNER) ./$(TARGET) --attack
+	@echo "=== [2] Running Stack FP Hijack Attack [$(ARCH)] ==="
+	$(RUNNER) ./$(TARGET) --stack-fp
+
+run-heap: $(TARGET)
+	@echo "=== [3] Running Heap Buffer Overflow Attack [$(ARCH)] ==="
+	$(RUNNER) ./$(TARGET) --heap-bof
+
+run-nop-sled: $(TARGET)
+	@echo "=== [4] Running NOP Sled Simulation [$(ARCH)] ==="
+	$(RUNNER) ./$(TARGET) --nop-sled
 
 clean:
 	rm -f $(TARGET)

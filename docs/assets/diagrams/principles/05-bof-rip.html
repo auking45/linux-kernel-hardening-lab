@@ -203,12 +203,12 @@
     <div style="font-size:0.75rem; color:var(--text-dim); text-align:center;">▲ High Memory (상위 주소)</div>
 
     <div class="mem-cell" id="cellRet">
-      <span>Return Address (RET)</span>
+      <span>Return Address (LR / X30 / RET)</span>
       <span id="valRet" style="color:var(--accent-blue);">0x000000000040124a (&lt;main+32&gt;)</span>
     </div>
 
     <div class="mem-cell" id="cellSfp">
-      <span>Saved Frame Pointer (SFP)</span>
+      <span>Saved Frame Pointer (FP / X29 / RBP)</span>
       <span id="valSfp" style="color:var(--accent-amber);">0x7fffffffe050</span>
     </div>
 
@@ -227,27 +227,27 @@
       <span id="valBufLo" style="color:var(--accent-green);">"NORMAL_DATA\0"</span>
     </div>
 
-    <div style="font-size:0.75rem; color:var(--text-dim); text-align:center;">▼ Low Memory (하위 주소 - RSP)</div>
+    <div style="font-size:0.75rem; color:var(--text-dim); text-align:center;">▼ Low Memory (하위 주소 - SP / RSP)</div>
   </div>
 
   <!-- CPU Register & Execution View -->
   <div class="stack-panel">
     <div class="panel-badge" style="background:rgba(56,189,248,0.15); color:var(--accent-blue);">
-      CPU 레지스터 및 명령어 흐름
+      CPU 레지스터 및 명령어 흐름 (Dual Arch: AArch64 & x86_64)
     </div>
 
     <div class="mem-cell">
-      <span style="font-weight:bold;">Instruction Pointer (RIP)</span>
+      <span style="font-weight:bold;">Program Counter (PC / RIP)</span>
       <span id="regRip" style="color:var(--accent-blue); font-weight:bold;">0x401180 (&lt;vulnerable_service&gt;)</span>
     </div>
 
     <div class="mem-cell">
-      <span style="font-weight:bold;">Stack Pointer (RSP)</span>
+      <span style="font-weight:bold;">Stack Pointer (SP / RSP)</span>
       <span id="regRsp" style="color:var(--accent-green);">0x7fffffffe000</span>
     </div>
 
     <div class="mem-cell">
-      <span style="font-weight:bold;">Base Pointer (RBP)</span>
+      <span style="font-weight:bold;">Frame Pointer (FP / X29 / RBP)</span>
       <span id="regRbp" style="color:var(--accent-amber);">0x7fffffffe050</span>
     </div>
 

