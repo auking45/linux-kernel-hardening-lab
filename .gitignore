@@ -32,6 +32,6 @@ linux-*/
 !.vscode/settings.json
 .idea/
 *.swp
-*~
 .DS_Store
-
+# Scratch / Local slides
+scratch_slides/
