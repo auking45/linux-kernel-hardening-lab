@@ -55,6 +55,9 @@ plugins:
           name: English
           build: true
 
+hooks:
+  - scripts/sync_i18n_assets.py
+
 markdown_extensions:
   - abbr
   - admonition

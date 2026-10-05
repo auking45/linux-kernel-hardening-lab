@@ -64,7 +64,7 @@
 
 Experience the AArch64 dual-stack interaction and ROP mitigation sequence using the interactive map below:
 
-<iframe src="../../../assets/diagrams/shadow-call-stack/architecture.html" width="100%" height="700px" style="border:none; border-radius:12px; margin: 16px 0; background: #0f172a;" title="Shadow Call Stack Architecture Map"></iframe>
+<iframe src="../../assets/diagrams/shadow-call-stack/architecture.html" width="100%" height="700px" style="border:none; border-radius:12px; margin: 16px 0; background: #0f172a;" title="Shadow Call Stack Architecture Map"></iframe>
 
 ---
 

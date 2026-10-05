@@ -65,7 +65,7 @@
 
 아래 인터랙티브 다이어그램을 통해 ARM64 하드웨어 레지스터 `x18`과 일반 스택 `SP` 간의 상호작용 및 ROP 방어 시퀀스를 시각적으로 체험할 수 있음:
 
-<iframe src="../../../assets/diagrams/shadow-call-stack/architecture.html" width="100%" height="700px" style="border:none; border-radius:12px; margin: 16px 0; background: #0f172a;" title="Shadow Call Stack Architecture Map"></iframe>
+<iframe src="../../assets/diagrams/shadow-call-stack/architecture.html" width="100%" height="700px" style="border:none; border-radius:12px; margin: 16px 0; background: #0f172a;" title="Shadow Call Stack Architecture Map"></iframe>
 
 ---
 
