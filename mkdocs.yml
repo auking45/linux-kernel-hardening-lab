@@ -8,6 +8,10 @@ repo_name: auking45/linux-kernel-hardening-lab
 theme:
   name: material
   language: ko
+  font: false
+  icon:
+    logo: material/shield-lock-outline
+    repo: fontawesome/brands/github
   features:
     - navigation.tracking
     - navigation.tabs
@@ -18,26 +22,27 @@ theme:
     - navigation.footer
     - content.code.copy
     - content.code.annotate
+    - content.tabs.link
     - search.suggest
     - search.highlight
     - search.share
   palette:
-    # Light mode
-    - media: "(prefers-color-scheme: light)"
-      scheme: default
-      primary: blue grey
-      accent: indigo
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    # Dark mode
+    # Dark mode (Starlight / Deep Navy Slate)
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue grey
-      accent: indigo
+      primary: custom
+      accent: custom
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
 
 plugins:
   - search

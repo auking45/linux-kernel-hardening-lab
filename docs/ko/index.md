@@ -1,6 +1,35 @@
 # Linux Kernel Hardening Lab
 
-리눅스 커널 보안 하드닝(Hardening) 기술의 내부 메커니즘을 심층 분석하고, x86_64 및 arm64 아키텍처 환경에서 커널 빌드 및 QEMU 가상머신을 통해 직접 검증하는 엔지니어링 실습 랩.
+<div class="lab-hero">
+  <div class="lab-hero__badge">x86_64 &amp; ARM64 Interactive Security Verification Lab</div>
+  <div class="lab-hero__title">리눅스 커널 하드닝 엔지니어링 &amp; 익스플로잇 방어 검증 랩</div>
+  <p class="lab-hero__subtitle">
+    리눅스 커널 보안 하드닝(Hardening) 기술의 내부 메커니즘을 커널 소스 코드와 어셈블리 레벨에서 심층 분석하고, x86_64 및 arm64 듀얼 아키텍처 QEMU 가상머신 환경에서 실전 Exploit PoC와 LKDTM으로 직접 실측 검증하는 엔지니어링 랩.
+  </p>
+  <div class="lab-hero__actions">
+    <a href="getting-started/" class="lab-btn lab-btn--primary">실습 환경 시작하기 →</a>
+    <a href="features/" class="lab-btn lab-btn--secondary">44대 하드닝 피처 로드맵</a>
+    <a href="scenarios/" class="lab-btn lab-btn--secondary">공격 시나리오 분석</a>
+  </div>
+  <div class="lab-stat-grid">
+    <div class="lab-stat-card">
+      <div class="lab-stat-card__value">44+ Features</div>
+      <div class="lab-stat-card__label">11대 핵심 하드닝 카테고리 및 Kconfig 전수 분석</div>
+    </div>
+    <div class="lab-stat-card">
+      <div class="lab-stat-card__value">x86_64 &amp; ARM64</div>
+      <div class="lab-stat-card__label">Intel CET/SMEP/SMAP 및 ARM PAC/BTI/MTE 교차 비교</div>
+    </div>
+    <div class="lab-stat-card">
+      <div class="lab-stat-card__value">Base vs Hardened</div>
+      <div class="lab-stat-card__label">실전 익스플로잇 PoC 및 LKDTM 런타임 방어 증명</div>
+    </div>
+    <div class="lab-stat-card">
+      <div class="lab-stat-card__value">Interactive Flow</div>
+      <div class="lab-stat-card__label">동적 SVG 아키텍처 시뮬레이터 기반 제어 흐름 탐색</div>
+    </div>
+  </div>
+</div>
 
 ```mermaid
 graph TD

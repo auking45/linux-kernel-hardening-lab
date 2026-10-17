@@ -1,6 +1,35 @@
 # Linux Kernel Hardening Lab
 
-An engineering and interactive lab exploring internal mechanisms of Linux kernel security hardening features, verified through hands-on kernel builds and QEMU virtual machine runs on x86_64 and arm64 architectures.
+<div class="lab-hero">
+  <div class="lab-hero__badge">x86_64 &amp; ARM64 Interactive Security Verification Lab</div>
+  <div class="lab-hero__title">Linux Kernel Hardening Engineering &amp; Exploit Defense Lab</div>
+  <p class="lab-hero__subtitle">
+    An engineering and interactive verification lab exploring internal mechanisms of Linux kernel security hardening features at the source code and assembly level, verified through Base vs. Hardened kernel builds, custom exploit PoCs, and LKDTM runs on x86_64 and arm64 QEMU virtual machines.
+  </p>
+  <div class="lab-hero__actions">
+    <a href="getting-started/" class="lab-btn lab-btn--primary">Get Started →</a>
+    <a href="features/" class="lab-btn lab-btn--secondary">44+ Hardening Features</a>
+    <a href="scenarios/" class="lab-btn lab-btn--secondary">Attack Scenarios</a>
+  </div>
+  <div class="lab-stat-grid">
+    <div class="lab-stat-card">
+      <div class="lab-stat-card__value">44+ Features</div>
+      <div class="lab-stat-card__label">In-depth analysis across 11 core hardening categories</div>
+    </div>
+    <div class="lab-stat-card">
+      <div class="lab-stat-card__value">x86_64 &amp; ARM64</div>
+      <div class="lab-stat-card__label">Cross-arch comparison of CET/SMEP/SMAP &amp; PAC/BTI/MTE</div>
+    </div>
+    <div class="lab-stat-card">
+      <div class="lab-stat-card__value">Base vs Hardened</div>
+      <div class="lab-stat-card__label">Runtime proof with real-world exploit PoCs &amp; LKDTM</div>
+    </div>
+    <div class="lab-stat-card">
+      <div class="lab-stat-card__value">Interactive Flow</div>
+      <div class="lab-stat-card__label">Dynamic SVG architecture simulators for control flow inspection</div>
+    </div>
+  </div>
+</div>
 
 ```mermaid
 graph TD
