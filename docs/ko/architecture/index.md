@@ -1,6 +1,16 @@
 # 커널 메모리 모델 및 보안 아키텍처 (Memory & Protection Models)
 
-x86_64 및 arm64 아키텍처의 가상 메모리 분할 구조, 특권 레벨 모델 및 커널 하드닝 방어 계층 분석.
+<div class="section-hero">
+  <div class="section-hero__eyebrow">Hardware Privilege &amp; Memory Isolation</div>
+  <p class="section-hero__desc">
+    x86_64(Ring 0~3) 및 arm64(EL0~EL3) 아키텍처의 하드웨어 특권 레벨 모델, 64비트 가상 메모리 분할 구조 및 5단계 심층 방어(Defense-in-Depth) 아키텍처 분석.
+  </p>
+  <div class="section-hero__pills">
+    <span class="sl-badge sl-badge--blue">x86_64 Ring 0 / Ring 3</span>
+    <span class="sl-badge sl-badge--purple">ARM64 EL0–EL3 &amp; TTBR0/1</span>
+    <span class="sl-badge sl-badge--green">5-Layer Defense-in-Depth</span>
+  </div>
+</div>
 
 ---
 
@@ -23,8 +33,8 @@ graph TD
     end
 ```
 
-> [!NOTE]
-> **UID 0 (root)와 Ring 0의 구별**: root 계정(UID 0)으로 실행되는 프로세스도 CPU 관점에서는 여전히 비특권 유저 공간(Ring 3 / EL0)에서 구동됨. 루팅 권한과 커널 제어권(Ring 0)의 본질적 차이 및 커널 하드닝 방어선에 대한 심층 분석은 [시나리오 개요: Rooting vs Kernel Space 보안 경계](../scenarios/index.md#security-boundary-root-vs-kernel)를 참조.
+!!! note "UID 0 (root)와 Ring 0의 구별"
+    root 계정(UID 0)으로 실행되는 프로세스도 CPU 관점에서는 여전히 비특권 유저 공간(Ring 3 / EL0)에서 구동됨. 루팅 권한과 커널 제어권(Ring 0)의 본질적 차이 및 커널 하드닝 방어선에 대한 심층 분석은 [시나리오 개요: Rooting vs Kernel Space 보안 경계](../scenarios/index.md#security-boundary-root-vs-kernel)를 참조.
 
 ---
 

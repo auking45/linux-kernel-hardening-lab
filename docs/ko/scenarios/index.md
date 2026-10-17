@@ -1,6 +1,16 @@
 # 실전 공격 시나리오와 하드닝 방어 (Attack Scenarios & Defense)
 
-본 섹션은 정적인 보안 기능 설명서에서 벗어나, **사이버-물리 시스템(CPS) 및 휴머노이드 로봇 환경에서 실제로 발생할 수 있는 공격자의 침투 킬 체인(Kill Chain)**과 이를 무력화하는 **리눅스 커널 하드닝 메커니즘**을 문제 해결 관점에서 분석함.
+<div class="section-hero">
+  <div class="section-hero__eyebrow">Offensive-to-Defensive Kill Chain Analysis</div>
+  <p class="section-hero__desc">
+    정적인 보안 기능 설명서에서 벗어나, <strong>사이버-물리 시스템(CPS) 및 휴머노이드 로봇 환경에서 실제로 발생할 수 있는 공격자의 침투 킬 체인(Kill Chain)</strong>과 이를 무력화하는 <strong>리눅스 커널 하드닝 메커니즘</strong>을 문제 해결 관점에서 분석함.
+  </p>
+  <div class="section-hero__pills">
+    <span class="sl-badge sl-badge--blue">6 Real-World CVE Scenarios</span>
+    <span class="sl-badge sl-badge--purple">Cyber-Physical &amp; Robotics Security</span>
+    <span class="sl-badge sl-badge--green">Ring 3 Rooting vs Ring 0 Defense</span>
+  </div>
+</div>
 
 ---
 
@@ -23,12 +33,12 @@
 
 | 시나리오 | 핵심 취약점 및 공격 기술 | 실제 현실 CVE 사례 | 1차 및 2차 방어선 | 상태 |
 | :---: | :--- | :--- | :--- | :---: |
-| **01** | **[스택 버퍼 오버플로우 (BOF)](01-humanoid-bof.md)** | **CVE-2026-76640** (Unitree G1 EDU BLE 데몬 BOF ➔ Locomotion PC Root) | **Stack Protector** & **Fortify Source** | <span style="color: #22c55e; font-weight: bold;">완료</span> |
-| **02** | **[유저 코드 실행 점프 (ret2usr)](02-ret2usr.md)** | **CVE-2017-7308** (소켓 취약점 ➔ 커널 권한 유저 쉘코드 실행) | **SMEP** (x86) & **PXN** (ARM64) | <span style="color: #22c55e; font-weight: bold;">완료</span> |
-| **03** | **[유저 데이터 오염 (ret2dir / SMAP)](03-smap.md)** | **CVE-2016-8655** (UAF ➔ 커널 모드 유저 메모리 데이터 변조) | **SMAP** (x86) & **PAN** (ARM64) | <span style="color: #22c55e; font-weight: bold;">완료</span> |
-| **04** | **[힙 UAF & 슬랩 메모리 오염](04-heap-slab.md)** | **CVE-2022-0185** (fs_context Heap BOF ➔ `struct cred` 덮어쓰기) | **SLAB Freelist Hardening** & **KFENCE** | <span style="color: #22c55e; font-weight: bold;">완료</span> |
-| **05** | **[제어 흐름 하이재킹 (CFI)](05-kcfi.md)** | **CVE-2021-4154** (Type Confusion ➔ 간접 함수 포인터 조작) | **Clang kCFI** & **ARM64 PAC/BTI** | <span style="color: #22c55e; font-weight: bold;">완료</span> |
-| **06** | **[부채널/예측 실행 정보 유출](06-spectre.md)** | **CVE-2018-3646** / **Spectre v1/v2** (비전 AI 가속기와 CPU 간 누출) | **array_index_nospec** & **Retpoline/KPTI** | <span style="color: #22c55e; font-weight: bold;">완료</span> |
+| **01** | **[스택 버퍼 오버플로우 (BOF)](01-humanoid-bof.md)** | **CVE-2026-76640** (Unitree G1 EDU BLE 데몬 BOF ➔ Locomotion PC Root) | **Stack Protector** & **Fortify Source** | <span class="sl-badge sl-badge--green">완료</span> |
+| **02** | **[유저 코드 실행 점프 (ret2usr)](02-ret2usr.md)** | **CVE-2017-7308** (소켓 취약점 ➔ 커널 권한 유저 쉘코드 실행) | **SMEP** (x86) & **PXN** (ARM64) | <span class="sl-badge sl-badge--green">완료</span> |
+| **03** | **[유저 데이터 오염 (ret2dir / SMAP)](03-smap.md)** | **CVE-2016-8655** (UAF ➔ 커널 모드 유저 메모리 데이터 변조) | **SMAP** (x86) & **PAN** (ARM64) | <span class="sl-badge sl-badge--green">완료</span> |
+| **04** | **[힙 UAF & 슬랩 메모리 오염](04-heap-slab.md)** | **CVE-2022-0185** (fs_context Heap BOF ➔ `struct cred` 덮어쓰기) | **SLAB Freelist Hardening** & **KFENCE** | <span class="sl-badge sl-badge--green">완료</span> |
+| **05** | **[제어 흐름 하이재킹 (CFI)](05-kcfi.md)** | **CVE-2021-4154** (Type Confusion ➔ 간접 함수 포인터 조작) | **Clang kCFI** & **ARM64 PAC/BTI** | <span class="sl-badge sl-badge--green">완료</span> |
+| **06** | **[부채널/예측 실행 정보 유출](06-spectre.md)** | **CVE-2018-3646** / **Spectre v1/v2** (비전 AI 가속기와 CPU 간 누출) | **array_index_nospec** & **Retpoline/KPTI** | <span class="sl-badge sl-badge--green">완료</span> |
 
 ---
 

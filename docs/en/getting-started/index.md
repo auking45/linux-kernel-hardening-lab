@@ -1,6 +1,16 @@
 # Quick Start Guide
 
-Prerequisites, dependency setup, kernel source preparation, and QEMU virtual machine environment configuration for Linux Kernel Hardening Lab.
+<div class="section-hero">
+  <div class="section-hero__eyebrow">Environment &amp; Toolchain Setup</div>
+  <p class="section-hero__desc">
+    Prerequisites, host package dependency setup, kernel source preparation, and one-click x86_64/arm64 QEMU virtual machine environment configuration for Linux Kernel Hardening Lab.
+  </p>
+  <div class="section-hero__pills">
+    <span class="sl-badge sl-badge--blue">Ubuntu 22.04 / 24.04 LTS</span>
+    <span class="sl-badge sl-badge--purple">GCC Cross-Toolchain (x86_64 &amp; AArch64)</span>
+    <span class="sl-badge sl-badge--green">One-Click QEMU Runner</span>
+  </div>
+</div>
 
 ---
 

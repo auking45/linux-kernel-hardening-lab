@@ -1,6 +1,16 @@
 # 빠른 시작 가이드 (Quick Start Guide)
 
-리눅스 커널 하드닝 랩 실습을 위한 호스트 패키지 의존성 설치, 커널 소스 코드 준비 및 QEMU 가상머신 환경 구성 절차 안내.
+<div class="section-hero">
+  <div class="section-hero__eyebrow">Environment &amp; Toolchain Setup</div>
+  <p class="section-hero__desc">
+    리눅스 커널 하드닝 랩 실습을 위한 호스트 패키지 의존성 설치, 커널 소스 코드 준비 및 x86_64·arm64 QEMU 가상머신 환경 원클릭 구성 절차 안내.
+  </p>
+  <div class="section-hero__pills">
+    <span class="sl-badge sl-badge--blue">Ubuntu 22.04 / 24.04 LTS</span>
+    <span class="sl-badge sl-badge--purple">GCC Cross-Toolchain (x86_64 &amp; AArch64)</span>
+    <span class="sl-badge sl-badge--green">One-Click QEMU Runner</span>
+  </div>
+</div>
 
 ---
 

@@ -1,6 +1,16 @@
 # Attack Scenarios & Hardening Defense
 
-This section moves away from static reference manuals and approaches security from a problem-solving perspective, analyzing **real-world Cyber-Physical System (CPS) and humanoid robotics attack kill chains** and how **Linux kernel hardening features** intercept them.
+<div class="section-hero">
+  <div class="section-hero__eyebrow">Offensive-to-Defensive Kill Chain Analysis</div>
+  <p class="section-hero__desc">
+    Moving beyond static reference manuals, this section analyzes <strong>real-world Cyber-Physical System (CPS) and humanoid robotics attack kill chains</strong> and how <strong>Linux kernel hardening features</strong> intercept them from a problem-solving perspective.
+  </p>
+  <div class="section-hero__pills">
+    <span class="sl-badge sl-badge--blue">6 Real-World CVE Scenarios</span>
+    <span class="sl-badge sl-badge--purple">Cyber-Physical &amp; Robotics Security</span>
+    <span class="sl-badge sl-badge--green">Ring 3 Rooting vs Ring 0 Defense</span>
+  </div>
+</div>
 
 ---
 
@@ -19,12 +29,12 @@ While the `Features` tab acts as an encyclopedic specification of 44 hardening f
 
 | Scenario | Core Vulnerability & Technique | Real-World CVE Precedent | Primary & Secondary Defenses | Status |
 | :---: | :--- | :--- | :--- | :---: |
-| **01** | **[Stack Buffer Overflow (BOF)](01-humanoid-bof.md)** | **CVE-2026-76640** (Unitree G1 EDU BLE Daemon BOF ➔ Locomotion PC Root) | **Stack Protector** & **Fortify Source** | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **02** | **[Return-to-User (ret2usr)](02-ret2usr.md)** | **CVE-2017-7308** (Packet Socket Bug ➔ User Shellcode Execution) | **SMEP** (x86) & **PXN** (ARM64) | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **03** | **[User Data Access (ret2dir / SMAP)](03-smap.md)** | **CVE-2016-8655** (Packet Socket UAF ➔ User Data Tampering) | **SMAP** (x86) & **PAN** (ARM64) | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **04** | **[Heap UAF & SLAB Corruption](04-heap-slab.md)** | **CVE-2022-0185** (fs_context Heap BOF ➔ `struct cred` Overwrite) | **SLAB Freelist Hardening** & **KFENCE** | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **05** | **[Control Flow Hijacking (CFI)](05-kcfi.md)** | **CVE-2021-4154** (Type Confusion ➔ Indirect Function Pointer Hijack) | **Clang kCFI** & **ARM64 PAC/BTI** | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **06** | **[Side-Channel & Speculative Leaks](06-spectre.md)** | **CVE-2018-3646** / **Spectre v1/v2** (AI Vision Accelerator vs CPU Leaks) | **array_index_nospec** & **Retpoline/KPTI** | <span style="color: #22c55e; font-weight: bold;">Active</span> |
+| **01** | **[Stack Buffer Overflow (BOF)](01-humanoid-bof.md)** | **CVE-2026-76640** (Unitree G1 EDU BLE Daemon BOF ➔ Locomotion PC Root) | **Stack Protector** & **Fortify Source** | <span class="sl-badge sl-badge--green">Active</span> |
+| **02** | **[Return-to-User (ret2usr)](02-ret2usr.md)** | **CVE-2017-7308** (Packet Socket Bug ➔ User Shellcode Execution) | **SMEP** (x86) & **PXN** (ARM64) | <span class="sl-badge sl-badge--green">Active</span> |
+| **03** | **[User Data Access (ret2dir / SMAP)](03-smap.md)** | **CVE-2016-8655** (Packet Socket UAF ➔ User Data Tampering) | **SMAP** (x86) & **PAN** (ARM64) | <span class="sl-badge sl-badge--green">Active</span> |
+| **04** | **[Heap UAF & SLAB Corruption](04-heap-slab.md)** | **CVE-2022-0185** (fs_context Heap BOF ➔ `struct cred` Overwrite) | **SLAB Freelist Hardening** & **KFENCE** | <span class="sl-badge sl-badge--green">Active</span> |
+| **05** | **[Control Flow Hijacking (CFI)](05-kcfi.md)** | **CVE-2021-4154** (Type Confusion ➔ Indirect Function Pointer Hijack) | **Clang kCFI** & **ARM64 PAC/BTI** | <span class="sl-badge sl-badge--green">Active</span> |
+| **06** | **[Side-Channel & Speculative Leaks](06-spectre.md)** | **CVE-2018-3646** / **Spectre v1/v2** (AI Vision Accelerator vs CPU Leaks) | **array_index_nospec** & **Retpoline/KPTI** | <span class="sl-badge sl-badge--green">Active</span> |
 
 ---
 

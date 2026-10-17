@@ -1,6 +1,16 @@
 # Kernel Memory Models & Protection Architecture
 
-Analysis of 64-bit virtual memory layout, hardware privilege levels, and defense-in-depth architecture across x86_64 and arm64.
+<div class="section-hero">
+  <div class="section-hero__eyebrow">Hardware Privilege &amp; Memory Isolation</div>
+  <p class="section-hero__desc">
+    Analysis of hardware privilege levels across x86_64 (Ring 0–3) and arm64 (EL0–EL3), 64-bit virtual address space splitting, and the 5-layer defense-in-depth kernel hardening architecture.
+  </p>
+  <div class="section-hero__pills">
+    <span class="sl-badge sl-badge--blue">x86_64 Ring 0 / Ring 3</span>
+    <span class="sl-badge sl-badge--purple">ARM64 EL0–EL3 &amp; TTBR0/1</span>
+    <span class="sl-badge sl-badge--green">5-Layer Defense-in-Depth</span>
+  </div>
+</div>
 
 ---
 
@@ -23,8 +33,8 @@ graph TD
     end
 ```
 
-> [!NOTE]
-> **Distinction Between UID 0 (root) and Ring 0**: Processes executing under the root account (UID 0) remain confined within unprivileged user mode (Ring 3 / EL0) from the CPU hardware perspective. For a deep architectural comparison between rooting and Ring 0 kernel control, see [Scenarios Overview: Rooting vs Kernel Space Security Boundary](../scenarios/index.md#security-boundary-root-vs-kernel).
+!!! note "Distinction Between UID 0 (root) and Ring 0"
+    Processes executing under the root account (UID 0) remain confined within unprivileged user mode (Ring 3 / EL0) from the CPU hardware perspective. For a deep architectural comparison between rooting and Ring 0 kernel control, see [Scenarios Overview: Rooting vs Kernel Space Security Boundary](../scenarios/index.md#security-boundary-root-vs-kernel).
 
 ---
 

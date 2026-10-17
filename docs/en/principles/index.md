@@ -1,6 +1,16 @@
 # System Security Principles & Program Execution Mechanics
 
-Starting from the most foundational question—**"How does a simple Hello World program get compiled, loaded, and executed on a CPU?"**—this curriculum investigates the immutable principles of system security: Linux process memory layouts, the System V/ARM64 ABI function calling conventions, machine-level shellcode engineering, and classic stack buffer overflow exploitation leading to instruction pointer (RIP) hijacking.
+<div class="section-hero">
+  <div class="section-hero__eyebrow">Bottom-Up Systems &amp; Binary Security Curriculum</div>
+  <p class="section-hero__desc">
+    Starting from the foundational question—<strong>"How does a simple Hello World program get compiled, loaded, and executed on a CPU?"</strong>—this curriculum investigates the immutable principles of system security: Linux process memory layouts, System V/ARM64 ABI calling conventions, machine-level shellcode engineering, classic stack buffer overflow (RIP hijacking), and ELF static/dynamic linking mechanics.
+  </p>
+  <div class="section-hero__pills">
+    <span class="sl-badge sl-badge--blue">4 Curriculum Tracks</span>
+    <span class="sl-badge sl-badge--purple">9 Hands-on Chapters</span>
+    <span class="sl-badge sl-badge--green">ELF · ABI · Shellcode · PLT/GOT</span>
+  </div>
+</div>
 
 ---
 
@@ -58,15 +68,15 @@ flowchart TD
 
 | Chapter | Topic & Core Focus | Key Concepts Covered | Dedicated Lab Code | Status |
 | :---: | :--- | :--- | :--- | :---: |
-| **01** | **[Hello World Execution Lifecycle](01-hello-world-pipeline.md)** | C Source ➔ Preprocessing ➔ Compilation ➔ Assembly ➔ Linking ➔ `execve` Kernel Ingress ➔ `load_elf_binary` ➔ `_start` ➔ `main()` | `readelf`, `objdump`, `nm`, `strace` | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **02** | **[Process Anatomy & Virtual Address Space](02-virtual-memory-layout.md)** | 64-bit Virtual Address Partitioning, Canonical Hole, Text/Data/BSS/Heap/mmap/Stack Segment Permissions (W^X) | `/proc/[pid]/maps` dump | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **03** | **[Stack Frame Mechanics & Calling Convention (ABI)](03-stack-frame-and-abi.md)** | Downward Stack Growth, Prologue (`push rbp; mov rbp, rsp`), Epilogue (`leave; ret`), SFP, RET Address Offset Math | System V AMD64 vs ARM64 AAPCS | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **04** | **[Shellcode Architecture & Opcode Engineering](04-shellcode-engineering.md)** | Machine Opcode Structure, `execve("/bin/sh")` Syscall Setup, Null-Byte (`\x00`) Elimination, Position Independence (PIC) | x86_64 & ARM64 Null-Free Shellcode | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **05** | **[Classic Stack Buffer Overflow & Control Flow](05-stack-bof-rip.md)** | Unchecked Memory Copying, Buffer ➔ SFP ➔ RET Smash Pipeline, Arbitrary Code Execution & Modern Defense Bridge (Canary, NX, ASLR) | Buffer Overflow Simulator | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **06** | **[Compilation Process & ELF Architecture](06-compilation-and-elf.md)** | AST ➔ IR ➔ ASM Pipeline, Linking View vs Execution View, `PT_LOAD`, `PT_INTERP`, `PT_GNU_STACK` | C-based `Elf64_Ehdr` parser | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **07** | **[Symbols, Resolution & Relocation Mechanics](07-symbols-and-linking.md)** | Symbol Table (`Elf64_Sym`), Three Rules of Strong vs Weak, Relocation Formula (`S + A - P`) & Instruction Patching | Weak Symbol Override Lab | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **08** | **[Static Linking & Binary Loading](08-static-linking-and-loading.md)** | Static Archive (`.a`), Inlined `libc.a`, `PT_INTERP` Absence and Direct Kernel `_start` Jump | Static Archive & Self-Contained Binary | <span style="color: #22c55e; font-weight: bold;">Active</span> |
-| **09** | **[Dynamic Linking (PLT/GOT) & Runtime Loading](09-dynamic-linking-and-loading.md)** | Shared Objects (`.so`), Position-Independent Code (PIC), PLT/GOT Lazy Binding, GOT Overwrite vs Full RELRO, `dlopen` | PLT/GOT Inspector & `dlopen` Plugin | <span style="color: #22c55e; font-weight: bold;">Active</span> |
+| **01** | **[Hello World Execution Lifecycle](01-hello-world-pipeline.md)** | C Source ➔ Preprocessing ➔ Compilation ➔ Assembly ➔ Linking ➔ `execve` Kernel Ingress ➔ `load_elf_binary` ➔ `_start` ➔ `main()` | `readelf`, `objdump`, `nm`, `strace` | <span class="sl-badge sl-badge--green">Active</span> |
+| **02** | **[Process Anatomy & Virtual Address Space](02-virtual-memory-layout.md)** | 64-bit Virtual Address Partitioning, Canonical Hole, Text/Data/BSS/Heap/mmap/Stack Segment Permissions (W^X) | `/proc/[pid]/maps` dump | <span class="sl-badge sl-badge--green">Active</span> |
+| **03** | **[Stack Frame Mechanics & Calling Convention (ABI)](03-stack-frame-and-abi.md)** | Downward Stack Growth, Prologue (`push rbp; mov rbp, rsp`), Epilogue (`leave; ret`), SFP, RET Address Offset Math | System V AMD64 vs ARM64 AAPCS | <span class="sl-badge sl-badge--green">Active</span> |
+| **04** | **[Shellcode Architecture & Opcode Engineering](04-shellcode-engineering.md)** | Machine Opcode Structure, `execve("/bin/sh")` Syscall Setup, Null-Byte (`\x00`) Elimination, Position Independence (PIC) | x86_64 & ARM64 Null-Free Shellcode | <span class="sl-badge sl-badge--green">Active</span> |
+| **05** | **[Classic Stack Buffer Overflow & Control Flow](05-stack-bof-rip.md)** | Unchecked Memory Copying, Buffer ➔ SFP ➔ RET Smash Pipeline, Arbitrary Code Execution & Modern Defense Bridge (Canary, NX, ASLR) | Buffer Overflow Simulator | <span class="sl-badge sl-badge--green">Active</span> |
+| **06** | **[Compilation Process & ELF Architecture](06-compilation-and-elf.md)** | AST ➔ IR ➔ ASM Pipeline, Linking View vs Execution View, `PT_LOAD`, `PT_INTERP`, `PT_GNU_STACK` | C-based `Elf64_Ehdr` parser | <span class="sl-badge sl-badge--green">Active</span> |
+| **07** | **[Symbols, Resolution & Relocation Mechanics](07-symbols-and-linking.md)** | Symbol Table (`Elf64_Sym`), Three Rules of Strong vs Weak, Relocation Formula (`S + A - P`) & Instruction Patching | Weak Symbol Override Lab | <span class="sl-badge sl-badge--green">Active</span> |
+| **08** | **[Static Linking & Binary Loading](08-static-linking-and-loading.md)** | Static Archive (`.a`), Inlined `libc.a`, `PT_INTERP` Absence and Direct Kernel `_start` Jump | Static Archive & Self-Contained Binary | <span class="sl-badge sl-badge--green">Active</span> |
+| **09** | **[Dynamic Linking (PLT/GOT) & Runtime Loading](09-dynamic-linking-and-loading.md)** | Shared Objects (`.so`), Position-Independent Code (PIC), PLT/GOT Lazy Binding, GOT Overwrite vs Full RELRO, `dlopen` | PLT/GOT Inspector & `dlopen` Plugin | <span class="sl-badge sl-badge--green">Active</span> |
 
 ---
 
