@@ -38,7 +38,7 @@ Explore and compare hexadecimal bytecode instructions and register state changes
 The hardware mechanism for transitioning control from user space (Ring 3 / EL0) to kernel space (Ring 0 / EL1) has evolved for performance and security:
 
 | Architecture / Era | Entry Instruction | Return Instruction | Hardware Transition Mechanism |
-| :--- | :--- | :--- | :--- |
+| :--- | :---: | :---: | :--- |
 | **Legacy x86 (32-bit)** | `int $0x80` | `iret` | Software interrupt via Interrupt Descriptor Table (IDT) (hundreds of clock cycles) |
 | **Intel x86 (Fast Call)** | `sysenter` | `sysexit` | Model Specific Register (MSR) fast kernel entry |
 | **AMD/Intel x86_64** | `syscall` | `sysret` | Direct jump via MSR `LSTAR` register (bypasses IDT lookup overhead) |
