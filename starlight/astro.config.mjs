@@ -8,6 +8,10 @@ const basePrefix = process.env.BASE_PATH ?? (process.env.GITHUB_ACTIONS ? '/linu
 export default defineConfig({
   site: 'https://auking45.github.io',
   base: basePrefix || '/',
+  prefetch: {
+    prefetchAll: true,
+    defaultStrategy: 'hover',
+  },
   markdown: {
     remarkPlugins: [remarkMath],
     rehypePlugins: [rehypeKatex],
