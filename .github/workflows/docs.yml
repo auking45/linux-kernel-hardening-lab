@@ -6,6 +6,15 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      engine:
+        description: 'Documentation engine to build and deploy'
+        required: true
+        default: 'mkdocs'
+        type: choice
+        options:
+          - mkdocs
+          - starlight
 
 permissions:
   contents: read
@@ -21,7 +30,7 @@ jobs:
   # 1. Build Documentation & Validate
   # ---------------------------------------------------------------------------
   build:
-    name: "Build MkDocs Site"
+    name: "Build Documentation Site"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -29,26 +38,77 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Python
+      - name: Resolve documentation engine
+        run: |
+          ENGINE="${{ inputs.engine || 'mkdocs' }}"
+          echo "SELECTED_ENGINE=${ENGINE}" >> "$GITHUB_ENV"
+          echo "Selected documentation engine: ${ENGINE}"
+
+      # ---------------- MkDocs Engine ----------------
+      - name: Set up Python (MkDocs)
+        if: env.SELECTED_ENGINE == 'mkdocs'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
 
-      - name: Install documentation dependencies
+      - name: Install MkDocs dependencies
+        if: env.SELECTED_ENGINE == 'mkdocs'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Build MkDocs documentation (strict mode)
+        if: env.SELECTED_ENGINE == 'mkdocs'
         run: |
           mkdocs build --strict
 
-      - name: Upload Pages artifact
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      - name: Upload Pages artifact (MkDocs)
+        if: env.SELECTED_ENGINE == 'mkdocs' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
+
+      # ---------------- Starlight Engine ----------------
+      - name: Set up Node.js (Starlight)
+        if: env.SELECTED_ENGINE == 'starlight'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: "starlight/package-lock.json"
+
+      - name: Set up Python for Sync (Starlight)
+        if: env.SELECTED_ENGINE == 'starlight'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML for Sync Script
+        if: env.SELECTED_ENGINE == 'starlight'
+        run: |
+          python -m pip install pyyaml
+
+      - name: Sync Markdown docs to Starlight
+        if: env.SELECTED_ENGINE == 'starlight'
+        run: |
+          python3 scripts/sync_docs_to_starlight.py
+
+      - name: Install Starlight dependencies
+        if: env.SELECTED_ENGINE == 'starlight'
+        run: |
+          npm --prefix starlight ci
+
+      - name: Build Astro Starlight documentation
+        if: env.SELECTED_ENGINE == 'starlight'
+        run: |
+          npm --prefix starlight run build
+
+      - name: Upload Pages artifact (Starlight)
+        if: env.SELECTED_ENGINE == 'starlight' && github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: starlight/dist
 
   # ---------------------------------------------------------------------------
   # 2. Deploy to GitHub Pages (Main branch only)

@@ -41,6 +41,12 @@ docs:
 docs-build:
 	@./scripts/run_docs.sh --build --strict
 
+docs-starlight:
+	@./scripts/run_docs.sh --engine starlight --serve
+
+docs-starlight-build:
+	@./scripts/run_docs.sh --engine starlight --build
+
 docker-pull:
 	@docker compose pull lab
 

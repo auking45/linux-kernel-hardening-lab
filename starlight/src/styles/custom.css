@@ -1,0 +1,62 @@
+/* ==========================================================================
+   Astro Starlight PoC — Custom Theme & Interactive Diagram Styling
+   ========================================================================== */
+
+/* Remote fonts and KaTeX CSS are loaded via link tags in astro.config.mjs */
+
+:root {
+  --sl-font: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --sl-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Dark mode palette synced with STYLE_GUIDE.md (#0b132b) */
+  --sl-color-accent-low: #0c2d48;
+  --sl-color-accent: #38bdf8;
+  --sl-color-accent-high: #bae6fd;
+  --sl-color-bg: #090e1a;
+  --sl-color-bg-nav: rgba(9, 14, 26, 0.85);
+  --sl-color-bg-sidebar: #0b132b;
+  --sl-color-hairline-shade: rgba(148, 163, 184, 0.16);
+}
+
+:root[data-theme='light'] {
+  --sl-color-accent-low: #e0f2fe;
+  --sl-color-accent: #0284c7;
+  --sl-color-accent-high: #0c4a6e;
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: rgba(255, 255, 255, 0.88);
+  --sl-color-bg-sidebar: #f8fafc;
+}
+
+/* Hero Gradient Text on Splash Page */
+.hero h1 {
+  background: linear-gradient(135deg, #ffffff 0%, #38bdf8 55%, #818cf8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+:root[data-theme='light'] .hero h1 {
+  background: linear-gradient(135deg, #0f172a 0%, #0284c7 55%, #4f46e5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Interactive Diagram Container (Zero-Void / Zero-Scroll) */
+.archify-container {
+  width: 100%;
+  margin: 1.5rem 0;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--sl-color-hairline-shade);
+  background: var(--sl-color-bg-sidebar);
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.25);
+}
+
+.archify-container iframe {
+  width: 100%;
+  min-height: 440px;
+  border: none;
+  display: block;
+}
+

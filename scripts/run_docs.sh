@@ -13,9 +13,10 @@ REQUIREMENTS="${REPO_ROOT}/requirements.txt"
 
 # Default configuration
 ACTION="serve"
+ENGINE="mkdocs"
+PORT_SPECIFIED=false
 HOST="127.0.0.1"
-DEFAULT_PORT=8000
-PORT="${DEFAULT_PORT}"
+PORT=8000
 STRICT_MODE=false
 CLEAN_VENV=false
 
@@ -52,25 +53,30 @@ ${BOLD}USAGE:${NC}
   $0 [OPTIONS]
 
 ${BOLD}OPTIONS:${NC}
+  -e, --engine ENGINE  Documentation engine: mkdocs (default) or starlight
   -s, --serve          Start local documentation server with live reload (default)
-  -b, --build          Build static documentation site to site/ directory
-  -p, --port PORT      Port to bind server (default: 8000, auto-increments if busy)
+  -b, --build          Build static documentation site
+  -p, --port PORT      Port to bind server (default: 8000 for MkDocs, 4321 for Starlight)
   -H, --host HOST      Host address to bind server (default: 127.0.0.1)
-      --strict         Treat warnings as errors during build
+      --strict         Treat warnings as errors during build (MkDocs)
       --clean          Recreate Python virtualenv from scratch
   -h, --help           Show this help message
 
 ${BOLD}EXAMPLES:${NC}
-  $0                                      # Serve locally at http://127.0.0.1:8000
-  $0 --port 8080                          # Serve at port 8080
-  $0 --build                              # Build production static site
-  $0 --build --strict                     # Strict build test (CI/CD style)
+  $0                                      # Serve MkDocs at http://127.0.0.1:8000
+  $0 --engine starlight                   # Serve Astro Starlight at http://127.0.0.1:4321
+  $0 --engine starlight --build           # Build Astro Starlight static site
+  $0 --build --strict                     # Strict MkDocs build test (CI/CD style)
 EOF
 }
 
 parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
+            -e|--engine)
+                ENGINE="$2"
+                shift 2
+                ;;
             -s|--serve)
                 ACTION="serve"
                 shift
@@ -81,6 +87,7 @@ parse_args() {
                 ;;
             -p|--port)
                 PORT="$2"
+                PORT_SPECIFIED=true
                 shift 2
                 ;;
             -H|--host)
@@ -107,6 +114,7 @@ parse_args() {
         esac
     done
 }
+
 
 setup_virtualenv() {
     # Clean virtualenv if requested
@@ -225,10 +233,74 @@ build_docs() {
     log_success "Static site build completed! Output directory: ${REPO_ROOT}/site"
 }
 
+serve_starlight() {
+    if [[ "${PORT_SPECIFIED}" == false ]]; then
+        PORT=4321
+    fi
+    local original_port="${PORT}"
+    while is_port_in_use "${PORT}"; do
+        log_warn "Port ${PORT} is already in use."
+        PORT=$((PORT + 1))
+        if [[ $((PORT - original_port)) -gt 10 ]]; then
+            log_error "Could not find an available port between ${original_port} and ${PORT}. Exiting."
+            exit 1
+        fi
+    done
+
+    log_info "Synchronizing docs/ with Astro Starlight content directory..."
+    python3 "${REPO_ROOT}/scripts/sync_docs_to_starlight.py"
+
+    echo ""
+    echo -e "${BOLD}${BLUE}================================================================${NC}"
+    echo -e "${BOLD} 🚀 Linux Kernel Hardening Lab - Astro Starlight Server ${NC}"
+    echo -e "${BOLD}${BLUE}================================================================${NC}"
+    echo -e " 📖 ${BOLD}Local URL:${NC}       ${GREEN}${BOLD}http://${HOST}:${PORT}/${NC}"
+    echo -e " 🌐 ${BOLD}Korean Docs:${NC}     ${GREEN}http://${HOST}:${PORT}/${NC} (Default / 기본 언어)"
+    echo -e " 🌐 ${BOLD}English Docs:${NC}    ${GREEN}http://${HOST}:${PORT}/en/${NC}"
+    echo -e " 🔄 ${BOLD}Live Reload:${NC}     Enabled"
+    echo -e " 🛑 ${BOLD}Stop Server:${NC}     Press [Ctrl + C]"
+    echo -e "${BOLD}${BLUE}================================================================${NC}"
+    echo ""
+
+    cd "${REPO_ROOT}/starlight"
+    exec npm run dev -- --host "${HOST}" --port "${PORT}"
+}
+
+build_starlight() {
+    log_info "Synchronizing docs/ with Astro Starlight content directory..."
+    python3 "${REPO_ROOT}/scripts/sync_docs_to_starlight.py"
+
+    log_info "Building static documentation site with Astro Starlight..."
+    cd "${REPO_ROOT}/starlight"
+    npm run build
+    log_success "Starlight build completed! Output directory: ${REPO_ROOT}/starlight/dist"
+}
+
 main() {
     parse_args "$@"
     cd "${REPO_ROOT}"
 
+    if [[ "${ENGINE}" == "starlight" ]]; then
+        if ! command -v npm >/dev/null 2>&1; then
+            log_error "Node.js (npm) is required for Starlight engine."
+            exit 1
+        fi
+        if [[ ! -d "${REPO_ROOT}/starlight/node_modules" ]]; then
+            log_info "Installing Starlight dependencies..."
+            (cd "${REPO_ROOT}/starlight" && npm install)
+        fi
+        if [[ "${ACTION}" == "serve" ]]; then
+            serve_starlight
+        elif [[ "${ACTION}" == "build" ]]; then
+            build_starlight
+        else
+            log_error "Unknown action: ${ACTION}"
+            exit 1
+        fi
+        return
+    fi
+
+    # Default MkDocs Engine
     setup_virtualenv
     install_dependencies
 

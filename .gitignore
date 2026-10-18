@@ -35,3 +35,9 @@ linux-*/
 .DS_Store
 # Scratch / Local slides
 scratch_slides/
+
+# Starlight Engine
+starlight/node_modules/
+starlight/dist/
+starlight/.astro/
+

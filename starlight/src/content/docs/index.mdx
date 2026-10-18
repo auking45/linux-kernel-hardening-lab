@@ -1,0 +1,88 @@
+---
+title: Linux Kernel Hardening Lab
+description: 리눅스 커널 보안 하드닝 엔지니어링 & 익스플로잇 방어 검증 랩 (Astro Starlight PoC)
+template: splash
+hero:
+  title: |
+    Linux Kernel
+    Hardening Lab
+  tagline: 리눅스 커널 보안 하드닝(Hardening) 기술의 내부 메커니즘을 소스 코드와 어셈블리 레벨에서 심층 분석하고, x86_64 및 arm64 듀얼 아키텍처 QEMU 가상머신에서 실전 Exploit PoC와 LKDTM으로 직접 실측 검증하는 엔지니어링 랩.
+  actions:
+    - text: 01. 스택 보호기 (Stack Canary) 체험
+      link: /features/01-stack-protector/
+      icon: right-arrow
+      variant: primary
+    - text: 실전 시나리오 (Unitree G1 BOF) 보기
+      link: /scenarios/01-humanoid-bof/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Badge, Aside } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Astro Starlight UI/UX 비교 PoC 안내">
+  현재 화면은 **Astro Starlight (`template: splash`)** 기본 내장 컴포넌트(`<CardGrid>`, `<Card>`, `<LinkCard>`, `<Badge>`, `<Tabs>`, `Expressive Code`)를 사용하여 구성한 비교용 로컬 프로토타입임. 우측 상단의 테마 토글, 언어 선택기(`한국어` / `English`), 검색창(`Ctrl + K`)을 직접 조작하여 MkDocs Material과의 차이를 비교 가능함.
+</Aside>
+
+## 1. 랩의 핵심 설계 철학 (Core Engineering Pillars)
+
+<CardGrid stagger>
+  <Card title="44+ 커널 하드닝 피처 전수 검증" icon="approve-check-circle">
+    <Badge text="11 Categories" variant="tip" /> <Badge text="Kconfig + Source" variant="note" />
+    
+    단순 이론 요약을 넘어 Kconfig 정의, 컴파일러 플러그인, 커널 서브시스템 구현을 어셈블리 레벨까지 추적하고 Base 커널 vs Hardened 커널의 바이너리 차이를 실측 비교함.
+  </Card>
+
+  <Card title="x86_64 & ARM64 듀얼 아키텍처" icon="laptop">
+    <Badge text="Intel CET / SMEP / SMAP" variant="note" /> <Badge text="ARM PAC / BTI / MTE" variant="caution" />
+    
+    인텔/AMD 하드웨어 보안 확장과 ARMv8/ARMv9 보안 확장 명령어가 동일한 공격 벡터를 각각 어떻게 가로채고 차단하는지 1:1 대칭으로 비교 실습함.
+  </Card>
+
+  <Card title="실전 Exploit PoC & LKDTM 증명" icon="warning">
+    <Badge text="ROP / ret2usr / UAF" variant="danger" /> <Badge text="Runtime Panic Proof" variant="tip" />
+    
+    비권한 일반 사용자(`UID 1000`)에서 출발하는 실전 커널 익스플로잇 PoC와 LKDTM 크래시 주입을 통해 방어선의 정확한 절단 지점(Interception Point)을 런타임 로그로 증명함.
+  </Card>
+
+  <Card title="동적 제어 흐름 아키텍처 다이어그램" icon="puzzle">
+    <Badge text="Zero-Scroll SVG" variant="success" /> <Badge text="Theme Synced" variant="note" />
+    
+    정적인 메모리 표에 그치지 않고, 공격 페이로드의 흐름과 MMU/카나리 가드의 실시간 차단 트랩을 인터랙티브 SVG 시뮬레이터로 직접 조작하며 탐색 가능함.
+  </Card>
+</CardGrid>
+
+---
+
+## 2. Starlight PoC 대표 샘플 페이지 바로가기
+
+<CardGrid>
+  <LinkCard
+    title="🛡️ [Feature 01] Stack Protector (CONFIG_STACKPROTECTOR_STRONG)"
+    description="Expressive Code 코드 하이라이팅, 터미널 프레임, x86_64/ARM64 동기화 탭(<Tabs>), 인터랙티브 다이어그램이 적용된 하드닝 피처 문서 확인."
+    href="/features/01-stack-protector/"
+  />
+  <LinkCard
+    title="🤖 [Scenario 01] Unitree G1 휴머노이드 BOF (CVE-2026-76640)"
+    description="실제 로봇 무선 데몬 침해 사례와 4단계 수직 스크롤 인터랙티브 방어 다이어그램을 Starlight 레이아웃으로 확인."
+    href="/scenarios/01-humanoid-bof/"
+  />
+</CardGrid>
+
+---
+
+## 3. 11대 핵심 하드닝 카테고리 로드맵
+
+| 카테고리 | 핵심 메커니즘 | 주요 Kconfig 및 기술 | 상태 |
+| :--- | :--- | :--- | :---: |
+| **01. Stack & Buffer** | 함수 스택 프레임 무결성 검증 및 버퍼 경계 검사 | `CONFIG_STACKPROTECTOR_STRONG`, `CONFIG_FORTIFY_SOURCE` | <Badge text="Ready" variant="success" /> |
+| **02. Memory Layout** | 커널 텍스트, 모듈, 물리 메모리 배치 난수화 | `CONFIG_RANDOMIZE_BASE` (KASLR), FG-KASLR | <Badge text="Ready" variant="success" /> |
+| **03. Memory Permissions** | W^X 메모리 보호, 유저/커널 영역 간 불법 실행·접근 차단 | `CONFIG_STRICT_KERNEL_RWX`, SMEP/SMAP, KPTI | <Badge text="Ready" variant="success" /> |
+| **04. Control Flow Integrity** | 컴파일 타임 및 하드웨어 지원 간접 분기 추적 | Clang kCFI, Intel CET (IBT/SHSTK), ARM PAC/BTI | <Badge text="Ready" variant="success" /> |
+| **05. Heap & SLAB Hardening** | 힙 메타데이터 난독화, UAF 방지 자동 영(0) 초기화 | `CONFIG_SLAB_FREELIST_HARDENED`, KFENCE | <Badge text="Ready" variant="success" /> |
+| **06. Compiler Plugins** | 구조체 레이아웃 난수화, 스택 잔여 데이터 자동 소거 | `CONFIG_GCC_PLUGIN_RANDSTRUCT`, `STACKLEAK` | <Badge text="Ready" variant="success" /> |
+| **07. Speculative Mitigations** | CPU 투기적 실행 결함(Spectre, Meltdown) 완화 | Retpoline, IBPB, STIBP, SSBD | <Badge text="Ready" variant="success" /> |
+| **08. Access Control (LSM)** | 프로세스 단위 강제적 접근 통제 및 샌드박싱 | AppArmor, SELinux, Landlock | <Badge text="Ready" variant="success" /> |
+| **09. Integrity Verification** | 파일 실행 무결성 해시 측정, xattr 서명, 정책 집행 | IMA, EVM, IPE, Kernel Lockdown | <Badge text="Ready" variant="success" /> |
+| **10. Attack Surface Reduction** | 시스템 콜 필터링, 임의 메모리 접근 및 정보 누출 차단 | Seccomp-BPF, `CONFIG_STRICT_DEVMEM`, Yama | <Badge text="Ready" variant="success" /> |
+| **11. Modern ARM & Mobile** | 하드웨어 메모리 태깅, 권한 오버레이, pKVM 및 기밀 컴퓨팅 | ARM64 MTE, ARMv9 POE, AVF / pKVM, Arm CCA | <Badge text="Ready" variant="success" /> |

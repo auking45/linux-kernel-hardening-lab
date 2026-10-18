@@ -1,0 +1,70 @@
+---
+title: Linux Kernel Hardening Lab
+description: Linux Kernel Security Hardening Engineering & Exploit Defense Verification Lab
+template: splash
+hero:
+  title: |
+    Linux Kernel
+    Hardening Lab
+  tagline: An engineering laboratory conducting deep analysis of Linux kernel security hardening mechanisms at source and assembly levels, with hands-on verification using real-world exploit PoCs and LKDTM across dual-architecture (x86_64 & arm64) QEMU virtual machines.
+  actions:
+    - text: 01. Stack Protector Exploration
+      link: /en/features/01-stack-protector/
+      icon: right-arrow
+      variant: primary
+    - text: Real-World Scenario (Unitree G1 BOF)
+      link: /en/scenarios/01-humanoid-bof/
+      icon: open-book
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard, Badge, Aside } from '@astrojs/starlight/components';
+
+<Aside type="tip" title="Astro Starlight Dual-Engine Documentation">
+  This is the **Astro Starlight** version of the Linux Kernel Hardening Lab documentation, featuring syntax-highlighted code blocks, synchronized tabs, interactive SVG architecture diagrams, and full bilingual support.
+</Aside>
+
+## 1. Core Engineering Pillars
+
+<CardGrid stagger>
+  <Card title="44+ Hardening Features Exhaustively Verified" icon="approve-check-circle">
+    <Badge text="11 Categories" variant="tip" /> <Badge text="Kconfig + Source" variant="note" />
+    
+    Trace Kconfig options, compiler plugins, and kernel subsystem implementations down to the assembly level, comparing baseline vs hardened binary outputs.
+  </Card>
+
+  <Card title="x86_64 & ARM64 Dual Architecture" icon="laptop">
+    <Badge text="Intel CET / SMEP / SMAP" variant="note" /> <Badge text="ARM PAC / BTI / MTE" variant="caution" />
+    
+    Analyze how hardware security extensions on x86_64 and ARM64 intercept identical attack vectors under a rigorous 1:1 parity model.
+  </Card>
+
+  <Card title="Real-World Exploit PoC & LKDTM Proofs" icon="warning">
+    <Badge text="ROP / ret2usr / UAF" variant="danger" /> <Badge text="Runtime Panic Proof" variant="tip" />
+    
+    Prove defense boundary efficacy via runtime logs triggered from unprivileged user space (`UID 1000`) and simulated crash injections.
+  </Card>
+
+  <Card title="Dynamic Flow Architecture Diagrams" icon="puzzle">
+    <Badge text="Zero-Scroll SVG" variant="success" /> <Badge text="Theme Synced" variant="note" />
+    
+    Explore attack payload journeys and hardware guard traps through interactive, self-resizing SVG simulators.
+  </Card>
+</CardGrid>
+
+---
+
+## 2. Sample Highlights
+
+<CardGrid>
+  <LinkCard
+    title="🛡️ [Feature 01] Stack Protector (CONFIG_STACKPROTECTOR_STRONG)"
+    description="Check out expressive code blocks, assembly annotations, architecture tabs, and live failure diagrams."
+    href="/en/features/01-stack-protector/"
+  />
+  <LinkCard
+    title="🤖 [Scenario 01] Unitree G1 Humanoid BOF (CVE-2026-76640)"
+    description="Inspect a complete humanoid robot attack scenario with four-phase interactive defense flow."
+    href="/en/scenarios/01-humanoid-bof/"
+  />
+</CardGrid>
