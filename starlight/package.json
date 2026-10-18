@@ -1,5 +1,5 @@
 {
-  "name": "linux-kernel-hardening-lab-starlight-poc",
+  "name": "linux-kernel-hardening-lab-starlight",
   "type": "module",
   "version": "0.0.1",
   "private": true,

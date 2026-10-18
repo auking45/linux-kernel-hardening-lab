@@ -17,6 +17,10 @@ export default defineConfig({
     rehypePlugins: [rehypeKatex],
   },
   integrations: [
+    {
+      name: '@astrojs/sitemap',
+      hooks: {},
+    },
     starlight({
       title: 'Linux Kernel Hardening Lab',
       tagline: 'x86_64 & ARM64 Interactive Security Verification Lab',

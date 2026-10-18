@@ -24,7 +24,7 @@ if ! command -v npm >/dev/null 2>&1; then
 fi
 
 if [ ! -d "node_modules" ]; then
-    echo "[*] Installing Astro Starlight PoC dependencies..."
+    echo "[*] Installing Astro Starlight dependencies..."
     npm install
 fi
 
@@ -40,4 +40,5 @@ if [ "${1:-}" = "build" ]; then
 else
     npm run dev
 fi
+
 
