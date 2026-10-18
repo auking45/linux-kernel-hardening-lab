@@ -18,11 +18,7 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid, LinkCard, Badge, Aside } from '@astrojs/starlight/components';
-
-<Aside type="tip" title="Astro Starlight Dual-Engine Documentation">
-  This is the **Astro Starlight** version of the Linux Kernel Hardening Lab documentation, featuring syntax-highlighted code blocks, synchronized tabs, interactive SVG architecture diagrams, and full bilingual support.
-</Aside>
+import { Card, CardGrid, LinkCard, Badge } from '@astrojs/starlight/components';
 
 ## 1. Core Engineering Pillars
 
@@ -54,17 +50,45 @@ import { Card, CardGrid, LinkCard, Badge, Aside } from '@astrojs/starlight/compo
 
 ---
 
-## 2. Sample Highlights
+## 2. Featured Labs & Attack Scenarios
 
 <CardGrid>
   <LinkCard
-    title="🛡️ [Feature 01] Stack Protector (CONFIG_STACKPROTECTOR_STRONG)"
-    description="Check out expressive code blocks, assembly annotations, architecture tabs, and live failure diagrams."
+    title="🛡️ [Feature 01] Stack Protector (Canary)"
+    description="Stack frame canary verification, epilogue assembly XOR check, and runtime crash analysis."
     href="/en/features/01-stack-protector/"
   />
   <LinkCard
     title="🤖 [Scenario 01] Unitree G1 Humanoid BOF (CVE-2026-76640)"
-    description="Inspect a complete humanoid robot attack scenario with four-phase interactive defense flow."
+    description="Real-world humanoid robot Wi-Fi daemon stack buffer overflow attack and 4-phase defense flow."
     href="/en/scenarios/01-humanoid-bof/"
   />
+  <LinkCard
+    title="📚 44 Hardening Features Catalog"
+    description="Exhaustive Kconfig symbols, architecture support matrix, and runtime LKDTM mapping across 11 categories."
+    href="/en/features/"
+  />
+  <LinkCard
+    title="⚡ 6 Real-World Exploit Defense Scenarios"
+    description="Hands-on scenarios verifying defense intercept points from unprivileged user space."
+    href="/en/scenarios/"
+  />
 </CardGrid>
+
+---
+
+## 3. 11 Core Hardening Categories Roadmap
+
+| Category | Core Mechanism | Key Kconfig & Featured Mitigations | Status |
+| :--- | :--- | :--- | :---: |
+| [**01. Stack & Buffer**](/en/features/#category-01-stack--buffer-protection) | Function stack frame integrity & buffer boundary checks | [`Stack Protector`](/en/features/01-stack-protector/), [`FORTIFY_SOURCE`](/en/features/02-fortify-source/) | <Badge text="Ready" variant="success" /> |
+| [**02. Memory Layout**](/en/features/#category-02-memory-layout--randomization) | Randomizing kernel text, modules, and direct physical mappings | [`KASLR`](/en/features/05-kaslr/), [`FG-KASLR`](/en/features/06-fgkaslr/) | <Badge text="Ready" variant="success" /> |
+| [**03. Memory Permissions**](/en/features/#category-03-memory-permissions--access-separation) | W^X memory protection & illegal user/kernel access prevention | [`Strict RWX`](/en/features/08-strict-rwx/), [`SMEP/PXN`](/en/features/09-smep-pxn/), [`SMAP/PAN`](/en/features/10-smap-pan/) | <Badge text="Ready" variant="success" /> |
+| [**04. Control Flow Integrity**](/en/features/#category-04-control-flow-integrity) | Compile-time & hardware-assisted indirect branch tracking | [`Clang kCFI`](/en/features/13-kcfi/), [`Intel CET`](/en/features/14-ibt-shstk/), [`ARM PAC/BTI`](/en/features/15-bti-pac/) | <Badge text="Ready" variant="success" /> |
+| [**05. Heap & SLAB Hardening**](/en/features/#category-05-heap--slab-allocator-hardening) | Heap metadata obfuscation & automated zero-initialization | [`SLAB Freelist`](/en/features/16-slab-freelist/), [`KFENCE`](/en/features/19-kfence/) | <Badge text="Ready" variant="success" /> |
+| [**06. Compiler Plugins**](/en/features/#category-06-structure--compiler-level-protections) | Structure layout randomization & stack data erasure | [`Randstruct`](/en/features/21-randstruct/), [`STACKLEAK`](/en/features/04-stackleak/) | <Badge text="Ready" variant="success" /> |
+| [**07. Speculative Mitigations**](/en/features/#category-07-speculative-execution-defenses) | Mitigating speculative CPU side-channel attacks | [`Spectre v1`](/en/features/22-spectre-v1/), [`Spectre v2`](/en/features/23-spectre-v2/), [`SSBD`](/en/features/24-ssbd/) | <Badge text="Ready" variant="success" /> |
+| [**08. Access Control (LSM)**](/en/features/#category-08-mandatory-access-control-lsm) | Mandatory access control & fine-grained sandboxing | [`AppArmor`](/en/features/27-apparmor/), [`SELinux`](/en/features/28-selinux/), [`Landlock`](/en/features/29-landlock/) | <Badge text="Ready" variant="success" /> |
+| [**09. Integrity Verification**](/en/features/#category-09-integrity-verification--signatures) | Execution hash measurement, extended attribute signatures | [`IMA`](/en/features/30-ima/), [`EVM`](/en/features/31-evm/), [`Lockdown`](/en/features/33-lockdown/) | <Badge text="Ready" variant="success" /> |
+| [**10. Attack Surface Reduction**](/en/features/#category-10-attack-surface-reduction) | System call filtering, arbitrary memory restriction | [`Seccomp-BPF`](/en/features/35-seccomp/), [`Strict Devmem`](/en/features/37-strict-devmem/), [`Yama`](/en/features/39-yama-ptrace/) | <Badge text="Ready" variant="success" /> |
+| [**11. Modern ARM & Mobile**](/en/features/#category-11-modern-arm-security-extensions) | Memory tagging, permission overlays, pKVM & CCA | [`ARM64 MTE`](/en/features/41-arm64-mte/), [`ARMv9 POE`](/en/features/42-armv9-poe/), [`Arm CCA`](/en/features/44-arm-cca/) | <Badge text="Ready" variant="success" /> |

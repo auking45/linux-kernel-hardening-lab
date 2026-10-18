@@ -59,19 +59,19 @@ graph TD
 
 ## 2. 11대 핵심 하드닝 카테고리 로드맵
 
-| 카테고리                         | 핵심 메커니즘                                           | 주요 Kconfig 및 기술                                                       |
-| :------------------------------- | :------------------------------------------------------ | :------------------------------------------------------------------------- |
-| **1. Stack & Buffer**            | 함수 스택 프레임 무결성 검증 및 버퍼 경계 검사          | `CONFIG_STACKPROTECTOR_STRONG`, `CONFIG_FORTIFY_SOURCE`                    |
-| **2. Memory Layout**             | 커널 텍스트, 모듈, 물리 메모리 배치 난수화              | `CONFIG_RANDOMIZE_BASE` (KASLR), FG-KASLR                                  |
-| **3. Memory Permissions**        | W^X 메모리 보호, 유저/커널 영역 간 불법 실행·접근 차단  | `CONFIG_STRICT_KERNEL_RWX`, SMEP/SMAP, KPTI                                |
-| **4. Control Flow Integrity**    | 컴파일 타임 및 하드웨어 지원 간접 분기 추적             | Clang kCFI, Intel CET (IBT/SHSTK), ARM PAC/BTI                             |
-| **5. Heap & SLAB Hardening**     | 힙 메타데이터 난독화, UAF 방지 자동 영(0) 초기화        | `CONFIG_SLAB_FREELIST_HARDENED`, `CONFIG_INIT_ON_ALLOC_DEFAULT_ON`, KFENCE |
-| **6. Compiler Plugins**          | 구조체 레이아웃 난수화, 스택 잔여 데이터 자동 소거      | `CONFIG_GCC_PLUGIN_RANDSTRUCT`, `CONFIG_GCC_PLUGIN_STACKLEAK`              |
-| **7. Speculative Mitigations**   | CPU 투기적 실행 결함(Spectre, Meltdown) 소프트웨어 완화 | Retpoline, IBPB, STIBP, SSBD                                               |
-| **8. Access Control (LSM)**      | 프로세스 단위 강제적 접근 통제 및 샌드박싱              | AppArmor, SELinux, Landlock                                                |
-| **9. Integrity Verification**    | 파일 실행 무결성 해시 측정, xattr 서명, 정책 집행       | IMA, EVM, IPE, Kernel Lockdown                                             |
-| **10. Attack Surface Reduction** | 시스템 콜 필터링, 임의 메모리 접근 및 정보 누출 차단    | Seccomp-BPF, `CONFIG_STRICT_DEVMEM`, Yama ptrace                           |
-| **11. Modern ARM & Mobile**      | 하드웨어 메모리 태깅, 권한 오버레이, pKVM 및 기밀 컴퓨팅 | ARM64 MTE, ARMv9 POE, AVF / pKVM, Arm CCA                                  |
+| 카테고리 | 핵심 메커니즘 | 주요 Kconfig 및 대표 피처 |
+| :--- | :--- | :--- |
+| [**1. Stack & Buffer**](features/index.md#category-01-stack-buffer-protection) | 함수 스택 프레임 무결성 검증 및 버퍼 경계 검사 | [`Stack Protector`](features/01-stack-protector.md), [`FORTIFY_SOURCE`](features/02-fortify-source.md) |
+| [**2. Memory Layout**](features/index.md#category-02-memory-layout-randomization) | 커널 텍스트, 모듈, 물리 메모리 배치 난수화 | [`KASLR`](features/05-kaslr.md), [`FG-KASLR`](features/06-fgkaslr.md) |
+| [**3. Memory Permissions**](features/index.md#category-03-memory-permissions-access-separation) | W^X 메모리 보호, 유저/커널 영역 간 불법 실행·접근 차단 | [`Strict RWX`](features/08-strict-rwx.md), [`SMEP/PXN`](features/09-smep-pxn.md) |
+| [**4. Control Flow Integrity**](features/index.md#category-04-control-flow-integrity) | 컴파일 타임 및 하드웨어 지원 간접 분기 추적 | [`Clang kCFI`](features/13-kcfi.md), [`Intel CET`](features/14-ibt-shstk.md) |
+| [**5. Heap & SLAB Hardening**](features/index.md#category-05-heap-slab-allocator-hardening) | 힙 메타데이터 난독화, UAF 방지 자동 영(0) 초기화 | [`SLAB Freelist`](features/16-slab-freelist.md), [`KFENCE`](features/19-kfence.md) |
+| [**6. Compiler Plugins**](features/index.md#category-06-structure-compiler-level-protections) | 구조체 레이아웃 난수화, 스택 잔여 데이터 자동 소거 | [`Randstruct`](features/21-randstruct.md), [`STACKLEAK`](features/04-stackleak.md) |
+| [**7. Speculative Mitigations**](features/index.md#category-07-speculative-execution-defenses) | CPU 투기적 실행 결함(Spectre, Meltdown) 소프트웨어 완화 | [`Spectre v1`](features/22-spectre-v1.md), [`Spectre v2`](features/23-spectre-v2.md) |
+| [**8. Access Control (LSM)**](features/index.md#category-08-lsm-mac-lsm-framework) | 프로세스 단위 강제적 접근 통제 및 샌드박싱 | [`AppArmor`](features/27-apparmor.md), [`SELinux`](features/28-selinux.md) |
+| [**9. Integrity Verification**](features/index.md#category-09-system-binary-integrity) | 파일 실행 무결성 해시 측정, xattr 서명, 정책 집행 | [`IMA`](features/30-ima.md), [`Lockdown`](features/33-lockdown.md) |
+| [**10. Attack Surface Reduction**](features/index.md#category-10-attack-surface-reduction) | 시스템 콜 필터링, 임의 메모리 접근 및 정보 누출 차단 | [`Seccomp-BPF`](features/35-seccomp.md), [`Strict Devmem`](features/37-strict-devmem.md) |
+| [**11. Modern ARM & Mobile**](features/index.md#category-11-armv8armv9-modern-armv8armv9-mobile-security) | 하드웨어 메모리 태깅, 권한 오버레이, pKVM 및 기밀 컴퓨팅 | [`ARM64 MTE`](features/41-arm64-mte.md), [`ARMv9 POE`](features/42-armv9-poe.md) |
 
 ---
 

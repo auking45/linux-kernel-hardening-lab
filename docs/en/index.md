@@ -59,19 +59,19 @@ graph TD
 
 ## 2. 11 Core Hardening Categories
  
-| Category                         | Key Mechanism                                                   | Key Kconfig & Technologies                                                 |
-| :------------------------------- | :-------------------------------------------------------------- | :------------------------------------------------------------------------- |
-| **1. Stack & Buffer**            | Stack frame integrity and buffer boundary verification          | `CONFIG_STACKPROTECTOR_STRONG`, `CONFIG_FORTIFY_SOURCE`                    |
-| **2. Memory Layout**             | Randomization of kernel text, modules, and physical mapping     | `CONFIG_RANDOMIZE_BASE` (KASLR), FG-KASLR                                  |
-| **3. Memory Permissions**        | W^X enforcement, separation of user and kernel privileges       | `CONFIG_STRICT_KERNEL_RWX`, SMEP/SMAP, KPTI                                |
-| **4. Control Flow Integrity**    | Forward-edge and backward-edge indirect branch validation       | Clang kCFI, Intel CET (IBT/SHSTK), ARM PAC/BTI                             |
-| **5. Heap & SLAB Hardening**     | Metadata obfuscation, zero-initialization to mitigate UAF       | `CONFIG_SLAB_FREELIST_HARDENED`, `CONFIG_INIT_ON_ALLOC_DEFAULT_ON`, KFENCE |
-| **6. Compiler Plugins**          | Structure layout randomization, stack clearing                  | `CONFIG_GCC_PLUGIN_RANDSTRUCT`, `CONFIG_GCC_PLUGIN_STACKLEAK`              |
-| **7. Speculative Mitigations**   | Hardware vulnerability mitigation (Spectre, Meltdown)           | Retpoline, IBPB, STIBP, SSBD                                               |
-| **8. Access Control (LSM)**      | Process-level mandatory access control and isolation            | AppArmor, SELinux, Landlock                                                |
-| **9. Integrity Verification**    | Measurement, xattr signing, and policy enforcement              | IMA, EVM, IPE, Kernel Lockdown                                             |
-| **10. Attack Surface Reduction** | Syscall filtering, memory device restrictions, info leak limits | Seccomp-BPF, `CONFIG_STRICT_DEVMEM`, Yama ptrace                           |
-| **11. Modern ARM & Mobile**      | Hardware memory tagging, permission overlays, pKVM & CCA        | ARM64 MTE, ARMv9 POE, AVF / pKVM, Arm CCA                                  |
+| Category | Key Mechanism | Key Kconfig & Featured Mitigations |
+| :--- | :--- | :--- |
+| [**1. Stack & Buffer**](features/index.md#category-01-stack-buffer-protection) | Stack frame integrity and buffer boundary verification | [`Stack Protector`](features/01-stack-protector.md), [`FORTIFY_SOURCE`](features/02-fortify-source.md) |
+| [**2. Memory Layout**](features/index.md#category-02-memory-layout-randomization) | Randomization of kernel text, modules, and physical mapping | [`KASLR`](features/05-kaslr.md), [`FG-KASLR`](features/06-fgkaslr.md) |
+| [**3. Memory Permissions**](features/index.md#category-03-memory-permissions-access-separation) | W^X enforcement, separation of user and kernel privileges | [`Strict RWX`](features/08-strict-rwx.md), [`SMEP/PXN`](features/09-smep-pxn.md) |
+| [**4. Control Flow Integrity**](features/index.md#category-04-control-flow-integrity-cfi) | Forward-edge and backward-edge indirect branch validation | [`Clang kCFI`](features/13-kcfi.md), [`Intel CET`](features/14-ibt-shstk.md) |
+| [**5. Heap & SLAB Hardening**](features/index.md#category-05-heap-slab-allocator-hardening) | Metadata obfuscation, zero-initialization to mitigate UAF | [`SLAB Freelist`](features/16-slab-freelist.md), [`KFENCE`](features/19-kfence.md) |
+| [**6. Compiler Plugins**](features/index.md#category-06-structure-compiler-level-protections) | Structure layout randomization, stack clearing | [`Randstruct`](features/21-randstruct.md), [`STACKLEAK`](features/04-stackleak.md) |
+| [**7. Speculative Mitigations**](features/index.md#category-07-speculative-execution-defenses) | Hardware vulnerability mitigation (Spectre, Meltdown) | [`Spectre v1`](features/22-spectre-v1.md), [`Spectre v2`](features/23-spectre-v2.md) |
+| [**8. Access Control (LSM)**](features/index.md#category-08-mandatory-access-control-lsm-framework) | Process-level mandatory access control and isolation | [`AppArmor`](features/27-apparmor.md), [`SELinux`](features/28-selinux.md) |
+| [**9. Integrity Verification**](features/index.md#category-09-system-binary-integrity-verification) | Measurement, xattr signing, and policy enforcement | [`IMA`](features/30-ima.md), [`Lockdown`](features/33-lockdown.md) |
+| [**10. Attack Surface Reduction**](features/index.md#category-10-attack-surface-reduction-system-hardening) | Syscall filtering, memory device restrictions, info leak limits | [`Seccomp-BPF`](features/35-seccomp.md), [`Strict Devmem`](features/37-strict-devmem.md) |
+| [**11. Modern ARM & Mobile**](features/index.md#category-11-modern-armv8armv9-mobile-security) | Hardware memory tagging, permission overlays, pKVM & CCA | [`ARM64 MTE`](features/41-arm64-mte.md), [`ARMv9 POE`](features/42-armv9-poe.md) |
 
 ---
 
